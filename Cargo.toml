@@ -1,0 +1,40 @@
+[package]
+name = "b2-client"
+description = "HTTP client-agnostic Backblaze B2 client library"
+version = "0.1.0"
+edition = "2021"
+
+# TODO: TLS support for all clients.
+# TODO: Add awc?
+[features]
+default = [ "with_surf" ]
+# These features can only be enabled exclusively of each other:
+with_surf = [ "surf", "async-std" ]
+with_hyper = [ "hyper", "tokio", "http" ]
+with_isahc = [ "isahc" ]
+
+[dependencies]
+surf = { version = "2.3.1", optional = true }
+async-std = { version = "1.10.0", optional = true }
+
+# TODO: Can I remove runtime?
+hyper = { version = "0.14.13", optional = true, features = [
+    "client",
+    "http1",
+    "runtime",
+] }
+# TODO: Figure out what features I actually need.
+tokio = { version = "1.12.0", optional = true }
+http = { version = "0.2.5", optional = true }
+
+isahc = { version = "1.5.0", optional = true }
+
+async-trait = "0.1.51"
+chrono = "0.4.19"
+http-types = "2.12.0"
+serde = { version = "1.0.130", features = [ "derive" ] }
+serde_json = "1.0.68"
+base64 = "0.13.0"
+
+[dev-dependencies]
+surf-vcr = "0.1.2"

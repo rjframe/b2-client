@@ -1,0 +1,50 @@
+Project:
+    ☐ Support Isahc
+    ☐ Support arbitrary backends
+    ☐ Add readme/other docs
+    ☐ Allow (require?) setting user-agent
+    ☐ Work with B2 metadata headers
+
+API:
+    ☐ Implement account endpoints
+    ☐ Implement bucket endpoints
+    ☐ Implement file endpoints
+
+    Account:
+        ☐ authorize_account
+        ☐ create_key
+        ☐ delete_key
+        ☐ get_download_authorization
+        ☐ list_keys
+
+    Buckets:
+        ☐ create_bucket
+        ☐ delete_bucket
+        ☐ list_buckets
+        ☐ update_bucket
+
+    Files:
+        ☐ cancel_large_file
+        ☐ copy_file
+        ☐ copy_part
+        ☐ delete_file_version
+        ☐ download_file_by_id
+        ☐ download_file_by_name
+        ☐ finish_large_file
+        ☐ get_file_info
+        ☐ get_upload_part_url
+        ☐ get_upload_url
+        ☐ hide_file
+        ☐ list_file_names
+        ☐ list_file_versions
+        ☐ list_parts
+        ☐ list_unfinished_large_files
+        ☐ start_large_file
+        ☐ update_file_legal_hold
+        ☐ update_file_retention
+        ☐ upload_file
+        ☐ upload_part
+
+＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿
+Archive:
+    ✓ Wrap HTTP clients @done(2021-10-12 11:30) @project(Project)
