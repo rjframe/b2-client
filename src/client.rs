@@ -1,98 +1,41 @@
 //! HTTP client wrappers.
 //!
-//! All implementations of [HttpRequest] here create a new HTTP client per
-//! request.
-//!
-//! If you wish to reuse a client for multiple requests (or alter
-//! configurations, add middlewares, etc.), implement [HttpRequest] on your own
-//! type. For example, with [Surf](https://crates.io/crates/surf):
-//!
-//! ```no_run
-//! # use b2_client::client::*;
-//! enum Method {
-//!     Connect,
-//!     Delete,
-//!     Get,
-//!     // ...
-//! }
-//!
-//! struct SurfClient {
-//!     client: surf::Client,
-//!     req: Option<surf::RequestBuilder>,
-//! }
-//!
-//! #[async_trait::async_trait]
-//! impl HttpRequest for SurfClient {
-//!     // Sending a request takes ownership of Self, so we need to return it
-//!     // with our response.
-//!     type Response = (Self, surf::Response);
-//!     type Error = surf::Error;
-//!
-//!     fn connect(url: impl AsRef<str>) -> Self {
-//!         let client = surf::Client::new();
-//!         let req = client.connect(url.as_ref());
-//!
-//!         Self {
-//!             client,
-//!             req: Some(req),
-//!         }
-//!     }
-//!
-//!     // ...
-//!     # fn delete(url: impl AsRef<str>) -> Self { panic!() }
-//!     # fn get(url: impl AsRef<str>) -> Self { panic!() }
-//!     # fn head(url: impl AsRef<str>) -> Self { panic!() }
-//!     # fn patch(url: impl AsRef<str>) -> Self { panic!() }
-//!     # fn post(url: impl AsRef<str>) -> Self { panic!() }
-//!     # fn put(url: impl AsRef<str>) -> Self { panic!() }
-//!     # fn trace(url: impl AsRef<str>) -> Self { panic!() }
-//!     # fn with_header<S: AsRef<str>>(self, name: S, value: S) -> Self {
-//!     #   panic!()
-//!     # }
-//!     # fn with_body(self, body: &serde_json::Value) -> Self { panic!() }
-//!
-//!     async fn send(mut self) -> Result<Self::Response, Self::Error> {
-//!         if let Some(req) = self.req {
-//!             let req = self.client.send(req.build()).await?;
-//!             self.req = None;
-//!
-//!             Ok((self, req))
-//!         } else {
-//!             // You'll likely want to provide a custom error type that wraps
-//!             // your client's error and return it here rather than panicking.
-//!             panic!("No request to send.");
-//!         }
-//!     }
-//! }
-//! ```
+//! Errors from the backend HTTP client are passed to user code, so dealing with
+//! errors is inconsistent between implementations; if you switch from one
+//! backend to another, your code that inspects errors will need to be updated.
 
 use crate::error::Error;
 
 
-/// A trait that wraps an HTTP client to send an HTTP request.
+/// A trait that wraps an HTTP client to send HTTP requests.
 #[async_trait::async_trait]
-pub trait HttpRequest {
+pub trait HttpClient
+    where Self: Sized,
+{
     /// The response type of the request.
     type Response;
     /// The HTTP client's Error type.
     type Error;
 
+    /// Create a new `HttpClient`.
+    fn new() -> Self;
+
     /// Create an HTTP `CONNECT` request to the specified URL.
-    fn connect(url: impl AsRef<str>) -> Self;
+    fn connect(self, url: impl AsRef<str>) -> Self;
     /// Create an HTTP `DELETE` request to the specified URL.
-    fn delete(url: impl AsRef<str>) -> Self;
+    fn delete(self, url: impl AsRef<str>) -> Self;
     /// Create an HTTP `GET` request to the specified URL.
-    fn get(url: impl AsRef<str>) -> Self;
+    fn get(self, url: impl AsRef<str>) -> Self;
     /// Create an HTTP `HEAD` request to the specified URL.
-    fn head(url: impl AsRef<str>) -> Self;
+    fn head(self, url: impl AsRef<str>) -> Self;
     /// Create an HTTP `PATCH` request to the specified URL.
-    fn patch(url: impl AsRef<str>) -> Self;
+    fn patch(self, url: impl AsRef<str>) -> Self;
     /// Create an HTTP `POST` request to the specified URL.
-    fn post(url: impl AsRef<str>) -> Self;
+    fn post(self, url: impl AsRef<str>) -> Self;
     /// Create an HTTP `PUT` request to the specified URL.
-    fn put(url: impl AsRef<str>) -> Self;
+    fn put(self, url: impl AsRef<str>) -> Self;
     /// Create an HTTP `TRACE` request to the specified URL.
-    fn trace(url: impl AsRef<str>) -> Self;
+    fn trace(self, url: impl AsRef<str>) -> Self;
 
     /// Add a header to the request.
     fn with_header<S: AsRef<str>>(self, name: S, value: S) -> Self;
@@ -100,218 +43,235 @@ pub trait HttpRequest {
     // TODO: Take ownership of body?
     fn with_body(self, body: &serde_json::Value) -> Self;
 
-    /// Send the request and return the HTTP client's Response.
-    async fn send(self) -> Result<Self::Response, Self::Error>;
+    /// Send the previously-constructed request and return a response.
+    async fn send(&mut self) -> Result<Self::Response, Self::Error>;
 }
 
 #[cfg(feature = "with_surf")]
-mod surf_client {
-    use super::{HttpRequest, Error};
+pub mod surf_client {
+    use super::{HttpClient, Error};
+    use surf::{
+        http::Method,
+        Request,
+        Url,
+    };
 
-    /// A wrapper to make HTTP requests via the
-    /// [Surf](https://crates.io/crates/surf) HTTP client library.
-    pub struct SurfRequest {
-        req: surf::RequestBuilder,
+    #[derive(Debug)]
+    pub struct SurfClient {
+        client: surf::Client,
+        req: Option<Request>,
+        url_err: Option<url::ParseError>,
+    }
+
+    macro_rules! gen_method_func {
+        ($func:ident, $method:ident) => {
+            fn $func(mut self, url: impl AsRef<str>) -> Self {
+                match Url::parse(url.as_ref()) {
+                    Ok(url) => {
+                        self.req = Some(Request::new(Method::$method, url));
+                    },
+                    Err(e) => { self.url_err = Some(e); },
+                }
+
+                self
+            }
+        }
     }
 
     #[async_trait::async_trait]
-    impl HttpRequest for SurfRequest {
+    impl HttpClient for SurfClient {
+        /// The JSON response received from a server.
         type Response = serde_json::Value;
-        type Error = Error<surf::Error>;
+        /// Errors that can be returned by a `SurfClient`.
+        type Error = Error;
 
-        fn connect(url: impl AsRef<str>) -> Self {
-            Self { req: surf::connect(url) }
+        /// Create a new `SurfClient`.
+        fn new() -> Self {
+            Self {
+                client: surf::Client::new(),
+                req: None,
+                url_err: None,
+            }
         }
 
-        fn delete(url: impl AsRef<str>) -> Self {
-            Self { req: surf::delete(url) }
-        }
+        gen_method_func!(connect, Connect);
+        gen_method_func!(delete, Delete);
+        gen_method_func!(get, Get);
+        gen_method_func!(head, Head);
+        gen_method_func!(patch, Patch);
+        gen_method_func!(post, Post);
+        gen_method_func!(put, Put);
+        gen_method_func!(trace, Trace);
 
-        fn get(url: impl AsRef<str>) -> Self {
-            Self { req: surf::get(url) }
-        }
-
-        fn head(url: impl AsRef<str>) -> Self {
-            Self { req: surf::head(url) }
-        }
-
-        fn patch(url: impl AsRef<str>) -> Self {
-            Self { req: surf::patch(url) }
-        }
-
-        fn post(url: impl AsRef<str>) -> Self {
-            Self { req: surf::post(url) }
-        }
-
-        fn put(url: impl AsRef<str>) -> Self {
-            Self { req: surf::put(url) }
-        }
-
-        fn trace(url: impl AsRef<str>) -> Self {
-            Self { req: surf::trace(url) }
-        }
-
+        /// Add a header to the request.
+        ///
+        /// If an HTTP method has not been set, this method does nothing.
         fn with_header<S: AsRef<str>>(mut self, name: S, value: S) -> Self {
-            self.req = self.req.header(name.as_ref(), value.as_ref());
+            if let Some(req) = &mut self.req {
+                req.insert_header(name.as_ref(), value.as_ref());
+            }
             self
         }
 
+        /// Use the given [serde_json::Value] as the request's body.
+        ///
+        /// If an HTTP method has not been set, this method does nothing.
         fn with_body(mut self, body: &serde_json::Value) -> Self {
-            // Unwrap: serde_json is used internally, so isn't going to fail
-            // except for bugs within serde_json.
-            self.req = self.req.body_json(body).unwrap();
+            if let Some(req) = &mut self.req {
+                // Unwrap: serde_json is used internally, so isn't going to fail
+                // except for bugs within serde_json.
+                req.body_json(body).unwrap();
+            }
             self
         }
 
-        async fn send(self) -> Result<Self::Response, Self::Error> {
-            let mut res = self.req.send().await?;
-            Ok(res.body_json().await?)
+        /// Send the previously-constructed request and return a response.
+        ///
+        /// # Errors
+        ///
+        /// * If the URL is invalid, returns an [Error] containing a
+        ///   [url::ParseError].
+        /// * If a request has not been created, returns [Error::NoRequest].
+        /// * Returns any underlying HTTP client errors in [Error::Client].
+        async fn send(&mut self) -> Result<Self::Response, Self::Error> {
+            if let Some(e) = self.url_err {
+                return Err(Error::from(e));
+            }
+
+            if let Some(req) = self.req.to_owned() {
+                let res = self.client.send(req).await?
+                    .body_json().await?;
+
+                self.req = None;
+
+                Ok(res)
+            } else {
+                Err(Error::NoRequest)
+            }
         }
     }
 }
 
 #[cfg(feature = "with_surf")]
-pub use surf_client::SurfRequest;
+pub use surf_client::SurfClient;
 
 #[cfg(feature = "with_hyper")]
 mod hyper_client {
-    use super::{HttpRequest, Error};
-    use hyper::{Body, Method};
+    use super::{HttpClient, Error};
+    use hyper::{
+        client::connect::HttpConnector,
+        header::{HeaderName, HeaderValue},
+        Body,
+        Method
+    };
+    use hyper_tls::HttpsConnector;
 
     enum InnerRequest {
+        Empty,
         Builder(http::request::Builder),
         Request(http::Request<Body>),
     }
 
-    /// A wrapper to make HTTP requests via the
-    /// [Hyper](https://crates.io/crates/hyper) library.
-    pub struct HyperRequest {
-        req: InnerRequest,
+    #[derive(Debug)]
+    pub struct HyperClient {
+        client: hyper::Client<HttpsConnector<HttpConnector>>,
+        method: Option<Method>,
+        url: String,
+        headers: Vec<(HeaderName, HeaderValue)>,
+        body: serde_json::Value,
+    }
+
+    macro_rules! gen_method_func {
+        ($func:ident, $method: ident) => {
+            fn $func(mut self, url: impl AsRef<str>) -> Self {
+                self.method = Some(Method::$method);
+                self.url = String::from(url.as_ref());
+                self
+            }
+        }
     }
 
     #[async_trait::async_trait]
-    impl HttpRequest for HyperRequest {
+    impl HttpClient for HyperClient {
+        /// The JSON response received from the server.
         type Response = serde_json::Value;
-        type Error = Error<hyper::Error>;
+        type Error = Error;
 
-        fn connect(url: impl AsRef<str>) -> Self {
-            let req = hyper::Request::builder()
-                .method(Method::CONNECT)
-                .uri(url.as_ref());
+        /// Create a new `HttpClient`.
+        fn new() -> Self {
+            let https = HttpsConnector::new();
+            let client = hyper::Client::builder()
+                .build::<_, Body>(https);
 
-            Self { req: InnerRequest::Builder(req) }
+            Self {
+                client,
+                method: None,
+                url: String::default(),
+                headers: vec![],
+                body: serde_json::Value::Null,
+            }
         }
 
-        fn delete(url: impl AsRef<str>) -> Self {
-            let req = hyper::Request::builder()
-                .method(Method::DELETE)
-                .uri(url.as_ref());
+        gen_method_func!(connect, CONNECT);
+        gen_method_func!(delete, DELETE);
+        gen_method_func!(get, GET);
+        gen_method_func!(head, HEAD);
+        gen_method_func!(patch, PATCH);
+        gen_method_func!(post, POST);
+        gen_method_func!(put, PUT);
+        gen_method_func!(trace, TRACE);
 
-            Self { req: InnerRequest::Builder(req) }
-        }
-
-        fn get(url: impl AsRef<str>) -> Self {
-            let req = hyper::Request::builder()
-                .method(Method::GET)
-                .uri(url.as_ref());
-
-            Self { req: InnerRequest::Builder(req) }
-        }
-
-        fn head(url: impl AsRef<str>) -> Self {
-            let req = hyper::Request::builder()
-                .method(Method::HEAD)
-                .uri(url.as_ref());
-
-            Self { req: InnerRequest::Builder(req) }
-        }
-
-        fn patch(url: impl AsRef<str>) -> Self {
-            let req = hyper::Request::builder()
-                .method(Method::PATCH)
-                .uri(url.as_ref());
-
-            Self { req: InnerRequest::Builder(req) }
-        }
-
-        fn post(url: impl AsRef<str>) -> Self {
-            let req = hyper::Request::builder()
-                .method(Method::POST)
-                .uri(url.as_ref());
-
-            Self { req: InnerRequest::Builder(req) }
-        }
-
-        fn put(url: impl AsRef<str>) -> Self {
-            let req = hyper::Request::builder()
-                .method(Method::PUT)
-                .uri(url.as_ref());
-
-            Self { req: InnerRequest::Builder(req) }
-        }
-
-        fn trace(url: impl AsRef<str>) -> Self {
-            let req = hyper::Request::builder()
-                .method(Method::TRACE)
-                .uri(url.as_ref());
-
-            Self { req: InnerRequest::Builder(req) }
-        }
-
+        /// Add a header to the request.
         fn with_header<S: AsRef<str>>(mut self, name: S, value: S) -> Self {
             use std::str::FromStr as _;
             use hyper::header::{HeaderName, HeaderValue};
 
-            // TODO: Return Result - errors on invalid name/values.
+            // TODO: These errors need to be reported.
             let name = HeaderName::from_str(name.as_ref()).unwrap();
             let value = HeaderValue::from_str(value.as_ref()).unwrap();
 
-            match self.req {
-                InnerRequest::Builder(r) => {
-                    let req = r.header(name, value);
-                    self.req = InnerRequest::Builder(req);
-                },
-                InnerRequest::Request(ref mut r) => {
-                    let headers = r.headers_mut();
-                    headers.insert(name, value);
-                },
-            }
-
+            self.headers.push((name, value));
             self
         }
 
+        /// Use the given [serde_json::Value] as the request's body.
+        // TODO: Take ownership of body?
         fn with_body(mut self, body: &serde_json::Value) -> Self {
-            match self.req {
-                InnerRequest::Builder(r) => {
-                    // Unwrap: Serializing from string won't fail.
-                    let req = r.body(Body::from(body.to_string())).unwrap();
-                    self.req = InnerRequest::Request(req);
-                },
-                InnerRequest::Request(ref mut r) => {
-                    let b = r.body_mut();
-                    *b = Body::from(body.to_string());
-                },
-            }
-
+            self.body = body.to_owned();
             self
         }
 
-        async fn send(self) -> Result<Self::Response, Self::Error> {
-            use hyper::client::Client;
+        /// Send the previously-constructed request and return a response.
+        ///
+        /// # Errors
+        ///
+        /// * If a request has not been created, returns [Error::NoRequest].
+        /// * Returns any underlying HTTP client errors in [Error::Client].
+        async fn send(&mut self) -> Result<Self::Response, Self::Error> {
+            if self.method.is_none() {
+                return Err(Error::NoRequest);
+            }
 
-            let client = Client::new();
+            let mut req = hyper::Request::builder()
+                .method(self.method.as_ref().unwrap())
+                .uri(&self.url);
 
-            let req = match self.req {
-                InnerRequest::Builder(r) => {
-                    // Unwrap: The empty body will never fail to serialize.
-                    r.body(Body::empty()).unwrap()
-                },
-                InnerRequest::Request(r) => r,
-            };
+            for (name, value) in &self.headers {
+                req = req.header(name, value);
+            }
 
-            let res = client.request(req).await?
+            let body = Body::from(self.body.to_string());
+            // Unwrap: Serializing from string won't fail.
+            let req = req.body(body).unwrap();
+
+            let res = self.client.request(req).await?
                 .into_body();
             let res = hyper::body::to_bytes(res).await?;
+
+            self.method = None;
+            self.url = String::default();
+            self.headers.clear();
+            self.body = serde_json::Value::Null;
 
             serde_json::from_slice(&res)
                 .map_err(Error::from_json)
@@ -320,7 +280,7 @@ mod hyper_client {
 }
 
 #[cfg(feature = "with_hyper")]
-pub use hyper_client::HyperRequest;
+pub use hyper_client::HyperClient;
 
 // TODO: Implement for isahc
 #[cfg(feature = "with_isahc")]

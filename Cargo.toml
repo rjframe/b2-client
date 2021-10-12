@@ -9,13 +9,14 @@ edition = "2021"
 [features]
 default = [ "with_surf" ]
 # These features can only be enabled exclusively of each other:
-with_surf = [ "surf", "async-std" ]
-with_hyper = [ "hyper", "tokio", "http" ]
+with_surf = [ "surf", "async-std", "url" ]
+with_hyper = [ "hyper", "hyper-tls", "tokio", "http" ]
 with_isahc = [ "isahc" ]
 
 [dependencies]
 surf = { version = "2.3.1", optional = true }
 async-std = { version = "1.10.0", optional = true }
+url = { version = "2.2.2", optional = true }
 
 # TODO: Can I remove runtime?
 hyper = { version = "0.14.13", optional = true, features = [
@@ -23,6 +24,7 @@ hyper = { version = "0.14.13", optional = true, features = [
     "http1",
     "runtime",
 ] }
+hyper-tls = { version = "0.5.0", optional = true }
 # TODO: Figure out what features I actually need.
 tokio = { version = "1.12.0", optional = true }
 http = { version = "0.2.5", optional = true }
@@ -38,3 +40,4 @@ base64 = "0.13.0"
 
 [dev-dependencies]
 surf-vcr = "0.1.2"
+async-std = { version = "1.10.0", features = [ "attributes" ] }

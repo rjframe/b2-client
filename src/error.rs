@@ -1,13 +1,19 @@
+//! Error types for b2-client
+
 use std::fmt;
 
 use serde::{Serialize, Deserialize};
 
 
+#[cfg(feature = "with_surf")]
+type E = surf::Error;
+
+#[cfg(feature = "with_hyper")]
+type E = hyper::Error;
+
 /// Errors that can be returned by `b2-client` function calls.
 #[derive(Debug)]
-pub enum Error<E>
-    // Surf's Error doesn't impl StdError.
-    where E: fmt::Debug + fmt::Display,
+pub enum Error
 {
     /// An error from the underlying HTTP client.
     Client(E),
@@ -15,23 +21,22 @@ pub enum Error<E>
     B2(B2Error),
     /// An error de/serializing data that's expected to be a valid JSON string.
     Format(serde_json::Error),
+    /// Failure to parse a URL.
+    ///
+    /// The string is a short description of the failure.
+    BadUrl(String),
+    NoRequest,
 }
 
-impl<E> std::error::Error for Error<E>
-    where E: fmt::Debug + fmt::Display,
-{}
+impl std::error::Error for Error {}
 
-impl<E> fmt::Display for Error<E>
-    where E: fmt::Debug + fmt::Display,
-{
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", *self)
     }
 }
 
-impl<E> Error<E>
-    where E: fmt::Debug + fmt::Display,
-{
+impl Error {
     /// Create an [Error] from a [B2Error].
     pub fn from_b2(e: B2Error) -> Self { Self::B2(e) }
 
@@ -42,11 +47,17 @@ impl<E> Error<E>
     }
 }
 
-impl<E> From<E> for Error<E>
-    where E: fmt::Debug + fmt::Display,
-{
-    /// Convert an error from an HTTP client to an [Error].
-    fn from(e: E) -> Self { Self::Client(e) }
+impl From<E> for Error {
+    fn from(e: E) -> Self {
+        Self::Client(e)
+    }
+}
+
+#[cfg(feature = "url")]
+impl From<url::ParseError> for Error {
+    fn from(e: url::ParseError) -> Self {
+        Self::BadUrl(format!("{}", e))
+    }
 }
 
 /// An error code from the B2 API.

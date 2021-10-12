@@ -3,13 +3,9 @@ pub mod client;
 pub mod error;
 
 #[cfg(feature = "with_surf")]
-pub(crate) type Requestor = client::SurfRequest;
-
-#[cfg(feature = "with_surf")]
-pub(crate) type Error = error::Error<surf::Error>;
+pub(crate) type Requestor = client::SurfClient;
 
 #[cfg(feature = "with_hyper")]
-pub(crate) type Requestor = client::HyperRequest;
+pub(crate) type Requestor = client::HyperClient;
 
-#[cfg(feature = "with_hyper")]
-pub(crate) type Error = error::Error<hyper::Error>;
+pub use error::Error;

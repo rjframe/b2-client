@@ -1,7 +1,7 @@
 //! Account-related B2 API calls.
 
 use crate::{
-    client::HttpRequest,
+    client::HttpClient,
     error::B2Error,
     Error,
 };
@@ -11,12 +11,20 @@ use serde::{Serialize, Deserialize};
 
 const B2_AUTH_URL: &'static str = "https://api.backblazeb2.com/b2api/v2/";
 
-/// Authorization information obtained from [authorize_account].
-// TODO: Make the fields private if feasible. Some fields will likely need to be
-// readable.
+fn default_client<C: HttpClient>() -> Option<C> { None }
+
+/// Authorization token and related information obtained from
+/// [authorize_account].
+// TODO: Make the fields private if feasible. Most (all?) fields will likely
+// need to be readable, but should not be writable.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Authorization {
+pub struct Authorization<C>
+    where C: HttpClient,
+{
+    #[serde(skip)]
+    #[serde(default = "default_client")]
+    pub(crate) client: Option<C>,
     /// The ID for the account.
     pub account_id: String,
     /// The authorization token to use for all future calls.
@@ -29,12 +37,10 @@ pub struct Authorization {
     pub api_url: String,
     /// The base URL to use for downloading files.
     pub download_url: String,
-    /// The recommended size for each part of a large file.
-    ///
-    /// TODO: confirm this is in bytes.
+    /// The recommended size in bytes for each part of a large file.
     pub recommended_part_size: u64,
-    /// The smallest possible size of a part of a large file, except the final
-    /// part.
+    /// The smallest possible size in bytes of a part of a large file, except
+    /// the final part.
     pub absolute_minimum_part_size: u64,
     /// The base URL to use for all API calls using the AWS S3-compatible API.
     pub s3_api_url: String,
@@ -42,6 +48,8 @@ pub struct Authorization {
 
 /// The set of capabilities and associated information granted by an
 /// authorization token.
+// TODO: Make the fields private if feasible. Most (all?) fields will likely
+// need to be readable, but should not be writable.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Capabilities {
@@ -61,7 +69,6 @@ pub struct Capabilities {
 /// A capability potentially granted by an authorization token.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-// TODO: If this list is extended, add validation to CreateKeyBuilder.
 pub enum Capability {
     ListKeys,
     WriteKeys,
@@ -96,32 +103,37 @@ pub enum Capability {
 ///
 /// See <https://www.backblaze.com/b2/docs/b2_authorize_account.html> for
 /// further information.
-pub async fn authorize_account(key_id: &str, key: &str)
--> Result<Authorization, Error> {
+pub async fn authorize_account<C>(client: C, key_id: &str, key: &str)
+-> Result<Authorization<C>, Error>
+    // TODO: The use of this error type precludes using arbitrary HTTP clients.
+    where C: HttpClient<Response=serde_json::Value, Error=Error>,
+{
     let id_and_key = format!("{}:{}", key_id, key);
     let id_and_key = base64::encode(id_and_key.as_bytes());
 
     let mut auth = String::from("Basic ");
     auth.push_str(&id_and_key);
 
-    // TODO: We want to allow user code to bring their own backend.
-    let res = crate::Requestor::post(
+    let mut client = client.get(
         format!("{}b2_authorize_account", B2_AUTH_URL)
-    ).with_header("Authorization", &auth)
-        // TODO: I shouldn't need a body.
-        .with_body(&serde_json::from_str("{}").unwrap())
-        .send().await?;
+    ).with_header("Authorization", &auth);
 
-    // TODO: Can I avoid the clone? from_slice doesn't take ownership.
-    // If I have an enum of Authorization|B2Error I should be able to
+    let res = client.send().await?;
+
+    // TODO: Avoid the clone. `from_slice` doesn't take ownership.
+    // If I have an enum of `Authorization`|`B2Error` I should be able to
     // deserialize it in one step then match on it. The code would be much
     // clearer too.
-    let json: Result<Authorization, _> = serde_json::from_value(res.clone());
+    let json: Result<Authorization<_>, _> = serde_json::from_value(res.clone());
 
     match json {
-        Ok(r) => Ok(r),
+        Ok(mut r) => {
+            r.client = Some(client);
+            Ok(r)
+        },
         Err(_) => {
-            let err: Result<B2Error, _> = serde_json::from_value(res);
+            // TODO: Same avoidance of `clone()` as above.
+            let err: Result<B2Error, _> = serde_json::from_value(res.clone());
 
             match err {
                 Ok(e) => Err(Error::B2(e)),
@@ -272,7 +284,10 @@ impl CreateKeyBuilder {
     }
 }
 
+/*
 // TODO: Return/Error type
-pub async fn create_key(auth: &Authorization) -> Result<(), ()> {
+pub async fn create_key(auth: &Authorization, cap: CreateKey) -> Result<(), ()>
+{
     todo!()
 }
+*/
