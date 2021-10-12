@@ -12,8 +12,10 @@ use serde::{Serialize, Deserialize};
 const B2_AUTH_URL: &'static str = "https://api.backblazeb2.com/b2api/v2/";
 
 /// Authorization information obtained from [authorize_account].
-// TODO: Make the fields private if feasible.
+// TODO: Make the fields private if feasible. Some fields will likely need to be
+// readable.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Authorization {
     /// The ID for the account.
     pub account_id: String,
@@ -41,6 +43,7 @@ pub struct Authorization {
 /// The set of capabilities and associated information granted by an
 /// authorization token.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Capabilities {
     /// The list of capabilities granted.
     pub capabilities: Vec<Capability>,
@@ -57,6 +60,7 @@ pub struct Capabilities {
 
 /// A capability potentially granted by an authorization token.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 // TODO: If this list is extended, add validation to CreateKeyBuilder.
 pub enum Capability {
     ListKeys,
@@ -104,6 +108,8 @@ pub async fn authorize_account(key_id: &str, key: &str)
     let res = crate::Requestor::post(
         format!("{}b2_authorize_account", B2_AUTH_URL)
     ).with_header("Authorization", &auth)
+        // TODO: I shouldn't need a body.
+        .with_body(&serde_json::from_str("{}").unwrap())
         .send().await?;
 
     // TODO: Can I avoid the clone? from_slice doesn't take ownership.
