@@ -7,10 +7,11 @@ Project:
 
     Public Repos:
         ☐ Remove with_surf as default feature; require choice of backend
-        ☐ Run clippy, fix warnings
+        ✓ Run clippy, fix warnings @done(2021-10-13 16:01) @project(Project \ Public Repos)
         ☐ Review/update generated docs
         ☐ Set up issue tracker
         ☐ Sync to Github, SourceHut
+        ☐ Add CI - stable and nightly Rust
 
 API:
     ☐ Implement account endpoints

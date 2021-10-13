@@ -14,7 +14,7 @@ use crate::{
 use serde::{Serialize, Deserialize};
 
 
-const B2_AUTH_URL: &'static str = "https://api.backblazeb2.com/b2api/v2/";
+const B2_AUTH_URL: &str = "https://api.backblazeb2.com/b2api/v2/";
 
 fn default_client<C: HttpClient>() -> Option<C> { None }
 
@@ -137,8 +137,7 @@ pub async fn authorize_account<C>(client: C, key_id: &str, key: &str)
             Ok(r)
         },
         Err(_) => {
-            // TODO: Same avoidance of `clone()` as above.
-            let err: Result<B2Error, _> = serde_json::from_value(res.clone());
+            let err: Result<B2Error, _> = serde_json::from_value(res);
 
             match err {
                 Ok(e) => Err(Error::B2(e)),
@@ -201,7 +200,7 @@ impl CreateKeyBuilder {
     -> Result<Self, &'static str> {
         let caps = caps.into();
 
-        if caps.len() == 0 {
+        if caps.is_empty() {
             return Err("Key must have at least one capability.");
         }
 
@@ -267,16 +266,14 @@ impl CreateKeyBuilder {
                     | Capability::ReadFileRetentions
                     | Capability::WriteFileRetentions
                     | Capability::BypassGovernance => {},
-                    cap @ _ =>
+                    cap =>
                         return Err(format!("Invalid capability: {:?}", cap)),
                 }
             }
-        } else {
-            if self.name_prefix.is_some() {
-                return Err(
-                    "bucket_id must be set when name_prefix is given".into()
-                );
-            }
+        } else if self.name_prefix.is_some() {
+            return Err(
+                "bucket_id must be set when name_prefix is given".into()
+            );
         }
 
         Ok(CreateKey {
@@ -309,8 +306,8 @@ mod tests {
     use surf_vcr::{VcrMiddleware, VcrMode, VcrError};
 
 
-    const AUTH_KEY_ID: &'static str = "B2_KEY_ID";
-    const AUTH_KEY: &'static str = "B2_AUTH_KEY";
+    const AUTH_KEY_ID: &str = "B2_KEY_ID";
+    const AUTH_KEY: &str = "B2_AUTH_KEY";
 
     async fn create_test_client(mode: VcrMode, cassette: &'static str)
     -> std::result::Result<SurfClient, VcrError> {
@@ -368,7 +365,7 @@ mod tests {
             // The B2 documentation says we'll receive `unauthorized`, but this
             // is what we get.
             Error::B2(e) => assert_eq!(e.code(), ErrorCode::BadAuthToken),
-            e @ _ => panic!("Unexpected error type: {:?}", e),
+            e => panic!("Unexpected error type: {:?}", e),
         }
 
         Ok(())
