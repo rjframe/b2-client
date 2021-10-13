@@ -2,7 +2,7 @@
 name = "b2-client"
 description = "HTTP client-agnostic Backblaze B2 client library"
 version = "0.1.0"
-edition = "2021"
+edition = "2018"
 
 # TODO: TLS support for all clients.
 # TODO: Add awc?
