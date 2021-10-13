@@ -67,7 +67,7 @@ pub struct Capabilities {
 }
 
 /// A capability potentially granted by an authorization token.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Capability {
     ListKeys,
@@ -291,3 +291,81 @@ pub async fn create_key(auth: &Authorization, cap: CreateKey) -> Result<(), ()>
     todo!()
 }
 */
+
+// TODO: Find a good way to mock responses for any/all backends.
+#[cfg(feature = "with_surf")]
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        client::SurfClient,
+        error::ErrorCode,
+    };
+    use surf_vcr::{VcrMiddleware, VcrMode, VcrError};
+
+
+    const AUTH_KEY_ID: &'static str = "B2_KEY_ID";
+    const AUTH_KEY: &'static str = "B2_AUTH_KEY";
+
+    async fn create_test_client(mode: VcrMode, cassette: &'static str)
+    -> std::result::Result<SurfClient, VcrError> {
+        let surf = surf::Client::new()
+            .with(VcrMiddleware::new(mode, cassette).await?);
+
+        let client = SurfClient::new()
+            .with_client(surf);
+
+        Ok(client)
+    }
+
+    #[async_std::test]
+    async fn test_authorize_account() -> Result<(), anyhow::Error> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/auth_account.yaml"
+        ).await?;
+
+        let auth = authorize_account(client, AUTH_KEY_ID, AUTH_KEY).await?;
+        assert!(auth.allowed.capabilities.contains(&Capability::ListBuckets));
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn authorize_account_bad_key() -> Result<(), anyhow::Error> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/auth_account.yaml"
+        ).await?;
+
+        let auth = authorize_account(client, AUTH_KEY_ID, "wrong-key").await;
+
+        match auth.unwrap_err() {
+            // The B2 documentation says we'll receive `unauthorized`, but this
+            // is what we get.
+            Error::B2(e) => assert_eq!(e.code(), ErrorCode::BadAuthToken),
+            _ => panic!("Unexpected error type"),
+        }
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn authorize_account_bad_key_id() -> Result<(), anyhow::Error> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/auth_account.yaml"
+        ).await?;
+
+        let auth = authorize_account(client, "wrong-id", AUTH_KEY).await;
+
+        match auth.unwrap_err() {
+            // The B2 documentation says we'll receive `unauthorized`, but this
+            // is what we get.
+            Error::B2(e) => assert_eq!(e.code(), ErrorCode::BadAuthToken),
+            e @ _ => panic!("Unexpected error type: {:?}", e),
+        }
+
+        Ok(())
+    }
+}

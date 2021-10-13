@@ -61,9 +61,10 @@ impl From<url::ParseError> for Error {
 }
 
 /// An error code from the B2 API.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ErrorCode {
     BadRequest,
+    BadAuthToken,
     Unauthorized,
     Unsupported,
     TransactionCapExceeded,
@@ -75,6 +76,7 @@ impl ErrorCode {
     fn from_api_code<S: AsRef<str>>(code: S) -> Result<Self, String> {
         match code.as_ref() {
             "bad_request" => Ok(Self::BadRequest),
+            "bad_auth_token" => Ok(Self::BadAuthToken),
             "unauthorized" => Ok(Self::Unauthorized),
             "unsupported" => Ok(Self::Unsupported),
             "transaction_cap_exceeded" => Ok(Self::TransactionCapExceeded),
@@ -86,6 +88,7 @@ impl ErrorCode {
     fn status(&self) -> u16 {
         match self {
             Self::BadRequest => 400,
+            Self::BadAuthToken => 401,
             Self::Unauthorized => 401,
             Self::Unsupported => 401,
             Self::TransactionCapExceeded => 403,

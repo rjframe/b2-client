@@ -63,6 +63,14 @@ pub mod surf_client {
         url_err: Option<url::ParseError>,
     }
 
+    impl SurfClient {
+        /// Use the provided [surf::Client] instead of a new one.
+        pub fn with_client(mut self, client: surf::Client) -> Self {
+            self.client = client;
+            self
+        }
+    }
+
     macro_rules! gen_method_func {
         ($func:ident, $method:ident) => {
             fn $func(mut self, url: impl AsRef<str>) -> Self {
@@ -188,6 +196,16 @@ mod hyper_client {
                 self.url = String::from(url.as_ref());
                 self
             }
+        }
+    }
+
+    impl HyperClient {
+        pub fn with_client(
+            mut self,
+            client: hyper::Client<HttpsConnector<HttpConnector>>
+        ) -> Self {
+            self.client = client;
+            self
         }
     }
 
