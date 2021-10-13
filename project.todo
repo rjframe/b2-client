@@ -5,6 +5,17 @@ Project:
     ☐ Allow (require?) setting user-agent
     ☐ Work with B2 metadata headers
 
+    Public Repos:
+        ☐ Add license file, notifications to source files.
+        ☐ Remove with_surf as default feature; require choice of backend
+        ☐ Run clippy, fix warnings
+        ✓ README @done(2021-10-13 15:52) @project(Project \ Public Repos)
+            ✓ README: Link to public mailbox @done(2021-10-13 15:52) @project(Project \ Public Repos)
+        ✓ Add contributing file @done(2021-10-13 15:52) @project(Project \ Public Repos)
+        ☐ Review/update generated docs
+        ☐ Set up issue tracker
+        ☐ Sync to Github, SourceHut
+
 API:
     ☐ Implement account endpoints
     ☐ Implement bucket endpoints
