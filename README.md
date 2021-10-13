@@ -62,14 +62,18 @@ and add it as a path-based dependency.
 b2-client = { path = "../b2-client" }
 ```
 
-If using a pre-packaged HTTP client, choose the backend via the `with_*name*`
+If using a pre-packaged HTTP client, choose the backend via the relevant
 feature. Supported features are
 
 * `with_surf`
 * `with_hyper`
 * `with_isahc` (soon)
 
-For alternative backends, once supported, implement the `HttpClient` trait.
+Surf is currently selected by default. To use a different backend, supply the
+`--no-default-features` flag as well as the feature for the backend you desire.
+
+Once arbitrary backends are fully supported, you'll simply need to implement the
+`HttpClient` trait to use your HTTP client.
 
 
 ### Testing

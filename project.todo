@@ -6,8 +6,6 @@ Project:
     ☐ Work with B2 metadata headers
 
     Public Repos:
-        ☐ Remove with_surf as default feature; require choice of backend
-        ✓ Run clippy, fix warnings @done(2021-10-13 16:01) @project(Project \ Public Repos)
         ☐ Review/update generated docs
         ☐ Set up issue tracker
         ☐ Sync to Github, SourceHut
@@ -54,6 +52,8 @@ API:
 
 ＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿
 Archive:
+    ✘ Remove with_surf as default feature; require choice of backend @cancelled(2021-10-13 16:06) @project(Project \ Public Repos)
+    ✓ Run clippy, fix warnings @done(2021-10-13 16:01) @project(Project \ Public Repos)
     ✓ Add license file, notifications to source files. @done(2021-10-13 15:54) @project(Project \ Public Repos)
     ✓ README @done(2021-10-13 15:52) @project(Project \ Public Repos)
     ✓ README: Link to public mailbox @done(2021-10-13 15:52) @project(Project \ Public Repos)
