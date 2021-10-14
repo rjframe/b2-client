@@ -26,27 +26,27 @@ pub trait HttpClient
     fn new() -> Self;
 
     /// Create an HTTP `CONNECT` request to the specified URL.
-    fn connect(self, url: impl AsRef<str>) -> Self;
+    fn connect(&mut self, url: impl AsRef<str>) -> &mut Self;
     /// Create an HTTP `DELETE` request to the specified URL.
-    fn delete(self, url: impl AsRef<str>) -> Self;
+    fn delete(&mut self, url: impl AsRef<str>) -> &mut Self;
     /// Create an HTTP `GET` request to the specified URL.
-    fn get(self, url: impl AsRef<str>) -> Self;
+    fn get(&mut self, url: impl AsRef<str>) -> &mut Self;
     /// Create an HTTP `HEAD` request to the specified URL.
-    fn head(self, url: impl AsRef<str>) -> Self;
+    fn head(&mut self, url: impl AsRef<str>) -> &mut Self;
     /// Create an HTTP `PATCH` request to the specified URL.
-    fn patch(self, url: impl AsRef<str>) -> Self;
+    fn patch(&mut self, url: impl AsRef<str>) -> &mut Self;
     /// Create an HTTP `POST` request to the specified URL.
-    fn post(self, url: impl AsRef<str>) -> Self;
+    fn post(&mut self, url: impl AsRef<str>) -> &mut Self;
     /// Create an HTTP `PUT` request to the specified URL.
-    fn put(self, url: impl AsRef<str>) -> Self;
+    fn put(&mut self, url: impl AsRef<str>) -> &mut Self;
     /// Create an HTTP `TRACE` request to the specified URL.
-    fn trace(self, url: impl AsRef<str>) -> Self;
+    fn trace(&mut self, url: impl AsRef<str>) -> &mut Self;
 
     /// Add a header to the request.
-    fn with_header<S: AsRef<str>>(self, name: S, value: S) -> Self;
+    fn with_header<S: AsRef<str>>(&mut self, name: S, value: S) -> &mut Self;
     /// Use the given [serde_json::Value] as the request's body.
     // TODO: Take ownership of body?
-    fn with_body(self, body: &serde_json::Value) -> Self;
+    fn with_body(&mut self, body: &serde_json::Value) -> &mut Self;
 
     /// Send the previously-constructed request and return a response.
     async fn send(&mut self) -> Result<Self::Response, Self::Error>;
@@ -78,7 +78,7 @@ pub mod surf_client {
 
     macro_rules! gen_method_func {
         ($func:ident, $method:ident) => {
-            fn $func(mut self, url: impl AsRef<str>) -> Self {
+            fn $func(&mut self, url: impl AsRef<str>) -> &mut Self {
                 match Url::parse(url.as_ref()) {
                     Ok(url) => {
                         self.req = Some(Request::new(Method::$method, url));
@@ -119,7 +119,8 @@ pub mod surf_client {
         /// Add a header to the request.
         ///
         /// If an HTTP method has not been set, this method does nothing.
-        fn with_header<S: AsRef<str>>(mut self, name: S, value: S) -> Self {
+        fn with_header<S: AsRef<str>>(&mut self, name: S, value: S)
+        -> &mut Self {
             if let Some(req) = &mut self.req {
                 req.insert_header(name.as_ref(), value.as_ref());
             }
@@ -129,7 +130,7 @@ pub mod surf_client {
         /// Use the given [serde_json::Value] as the request's body.
         ///
         /// If an HTTP method has not been set, this method does nothing.
-        fn with_body(mut self, body: &serde_json::Value) -> Self {
+        fn with_body(&mut self, body: &serde_json::Value) -> &mut Self {
             if let Some(req) = &mut self.req {
                 // Unwrap: serde_json is used internally, so isn't going to fail
                 // except for bugs within serde_json.
@@ -196,7 +197,7 @@ mod hyper_client {
 
     macro_rules! gen_method_func {
         ($func:ident, $method: ident) => {
-            fn $func(mut self, url: impl AsRef<str>) -> Self {
+            fn $func(&mut self, url: impl AsRef<str>) -> &mut Self {
                 self.method = Some(Method::$method);
                 self.url = String::from(url.as_ref());
                 self
@@ -245,7 +246,8 @@ mod hyper_client {
         gen_method_func!(trace, TRACE);
 
         /// Add a header to the request.
-        fn with_header<S: AsRef<str>>(mut self, name: S, value: S) -> Self {
+        fn with_header<S: AsRef<str>>(&mut self, name: S, value: S)
+        -> &mut Self {
             use std::str::FromStr as _;
             use hyper::header::{HeaderName, HeaderValue};
 
@@ -259,7 +261,7 @@ mod hyper_client {
 
         /// Use the given [serde_json::Value] as the request's body.
         // TODO: Take ownership of body?
-        fn with_body(mut self, body: &serde_json::Value) -> Self {
+        fn with_body(&mut self, body: &serde_json::Value) -> &mut Self {
             self.body = body.to_owned();
             self
         }

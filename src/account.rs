@@ -16,20 +16,16 @@ use serde::{Serialize, Deserialize};
 
 const B2_AUTH_URL: &str = "https://api.backblazeb2.com/b2api/v2/";
 
-fn default_client<C: HttpClient>() -> Option<C> { None }
-
 /// Authorization token and related information obtained from
 /// [authorize_account].
 // TODO: Make the fields private if feasible. Most (all?) fields will likely
 // need to be readable, but should not be writable.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+// TODO: We probably do need to make this serializable.
+#[derive(Debug)]
 pub struct Authorization<C>
     where C: HttpClient,
 {
-    #[serde(skip)]
-    #[serde(default = "default_client")]
-    pub(crate) client: Option<C>,
+    pub(crate) client: C,
     /// The ID for the account.
     pub account_id: String,
     /// The authorization token to use for all future calls.
@@ -49,6 +45,39 @@ pub struct Authorization<C>
     pub absolute_minimum_part_size: u64,
     /// The base URL to use for all API calls using the AWS S3-compatible API.
     pub s3_api_url: String,
+}
+
+/// The authorization information received from B2
+///
+/// The public [Authorization] object contains everything here, plus private
+/// data used by this API implementation, such as the HTTP client.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProtoAuthorization {
+    account_id: String,
+    authorization_token: String,
+    allowed: Capabilities,
+    api_url: String,
+    download_url: String,
+    recommended_part_size: u64,
+    absolute_minimum_part_size: u64,
+    s3_api_url: String,
+}
+
+impl ProtoAuthorization {
+    fn create_authorization<C: HttpClient>(self, c: C) -> Authorization<C> {
+        Authorization {
+            client: c,
+            account_id: self.account_id,
+            authorization_token: self.authorization_token,
+            allowed: self.allowed,
+            api_url: self.api_url,
+            download_url: self.download_url,
+            recommended_part_size: self.recommended_part_size,
+            absolute_minimum_part_size: self.absolute_minimum_part_size,
+            s3_api_url: self.s3_api_url,
+        }
+    }
 }
 
 /// The set of capabilities and associated information granted by an
@@ -108,7 +137,7 @@ pub enum Capability {
 ///
 /// See <https://www.backblaze.com/b2/docs/b2_authorize_account.html> for
 /// further information.
-pub async fn authorize_account<C>(client: C, key_id: &str, key: &str)
+pub async fn authorize_account<C>(mut client: C, key_id: &str, key: &str)
 -> Result<Authorization<C>, Error>
     // TODO: The use of this error type precludes using arbitrary HTTP clients.
     where C: HttpClient<Response=serde_json::Value, Error=Error>,
@@ -119,22 +148,23 @@ pub async fn authorize_account<C>(client: C, key_id: &str, key: &str)
     let mut auth = String::from("Basic ");
     auth.push_str(&id_and_key);
 
-    let mut client = client.get(
+    let req = client.get(
         format!("{}b2_authorize_account", B2_AUTH_URL)
     ).with_header("Authorization", &auth);
 
-    let res = client.send().await?;
+    let res = req.send().await?;
 
     // TODO: Avoid the clone. `from_slice` doesn't take ownership.
     // If I have an enum of `Authorization`|`B2Error` I should be able to
     // deserialize it in one step then match on it. The code would be much
     // clearer too.
-    let json: Result<Authorization<_>, _> = serde_json::from_value(res.clone());
+    let auth: Result<ProtoAuthorization, _>
+        = serde_json::from_value(res.clone());
 
-    match json {
-        Ok(mut r) => {
-            r.client = Some(client);
-            Ok(r)
+    // TODO: Map instead of match.
+    match auth {
+        Ok(r) => {
+            Ok(r.create_authorization(client))
         },
         Err(_) => {
             let err: Result<B2Error, _> = serde_json::from_value(res);
