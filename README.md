@@ -1,7 +1,7 @@
 # b2-client - Backend-agnostic Backblaze B2 API Client
 
-b2-client provides a Rust API to B2 services, backed by any HTTP client (though
-see [Known Issues](#known-issues).
+b2-client provides a Rust API to Backblaze B2 services, backed by any HTTP
+client (though see [Known Issues](#known-issues)).
 
 Support for [Hyper](https://crates.io/crates/hyper),
 [Isahc](https://crates.io/crates/isahc) (soon), and
@@ -57,8 +57,8 @@ All source code is licensed under the terms of the
 ### Installation
 
 I will not be registering b2-client on crates.io until I've implemented enough
-to be useful. To use this library now, you'll need to clone the git repository
-and add it as a path-based dependency.
+that I believe the library can be useful. To use this library now, you'll need
+to clone the git repository and add it as a path-based dependency.
 
 ```toml
 [dependencies]
@@ -72,11 +72,14 @@ feature. Supported features are
 * `with_hyper`
 * `with_isahc` (soon)
 
+This list will eventually use the lower-level client libraries instead (e.g., h1
+and h2 instead of hyper).
+
 Surf is currently selected by default. To use a different backend, supply the
 `--no-default-features` flag as well as the feature for the backend you desire.
 
 Once arbitrary backends are fully supported, you'll simply need to implement the
-`HttpClient` trait to use your HTTP client.
+`HttpClient` trait to use an alternative HTTP client.
 
 
 ### Testing
