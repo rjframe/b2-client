@@ -30,6 +30,9 @@ pub enum Error
     ///
     /// The string is a short description of the failure.
     BadUrl(String),
+    /// Data failed validation. The string is a short description of the
+    /// failure.
+    Invalid(String),
     NoRequest,
 }
 

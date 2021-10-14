@@ -1,12 +1,17 @@
 Project:
     ☐ Support Isahc
     ☐ Support arbitrary backends
-    ☐ Add readme/other docs
+    ✓ Add readme/other docs @done(2021-10-13 16:14) @project(Project)
     ☐ Allow (require?) setting user-agent
     ☐ Work with B2 metadata headers
+    ☐ Fix feature incompatibility; at least enough to generate documentation for all features
+    ☐ Default clients: use low-level libraries (h1, h2, etc.) rather than the libraries built on top of them.
+
+    Maybe Upstream:
+        ☐ When the surf-vcr middleware errors, we're getting a stack overflow rather than the error reported. It's probably a problem with surf-vcr - determine that for certain and fix.
 
     Public Repos:
-        ☐ Review/update generated docs
+        ✓ Review/update generated docs @done(2021-10-13 16:22) @project(Project \ Public Repos)
         ☐ Set up issue tracker
         ☐ Sync to Github, SourceHut
         ☐ Add CI - stable and nightly Rust
@@ -17,7 +22,8 @@ API:
     ☐ Implement file endpoints
 
     Account:
-        ☐ create_key
+        ✓ authorize_account @done(2021-10-13 15:01) @project(API \ Account)
+        ✓ create_key @done(2021-10-14 14:55) @project(API \ Account)
         ☐ delete_key
         ☐ get_download_authorization
         ☐ list_keys
@@ -58,5 +64,4 @@ Archive:
     ✓ README @done(2021-10-13 15:52) @project(Project \ Public Repos)
     ✓ README: Link to public mailbox @done(2021-10-13 15:52) @project(Project \ Public Repos)
     ✓ Add contributing file @done(2021-10-13 15:52) @project(Project \ Public Repos)
-    ✓ authorize_account @done(2021-10-13 15:01) @project(API \ Account)
     ✓ Wrap HTTP clients @done(2021-10-12 11:30) @project(Project)

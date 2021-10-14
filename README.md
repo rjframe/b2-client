@@ -42,6 +42,9 @@ runtime) I happen to be using.
 
 I intend to support the full API.
 
+Note that most (if not all) of these functions will incur charges to your
+account. You will want to mock the B2 servers in your code's tests.
+
 
 ## License
 

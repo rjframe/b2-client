@@ -65,6 +65,7 @@ pub mod surf_client {
     pub struct SurfClient {
         client: surf::Client,
         req: Option<Request>,
+        body: Option<serde_json::Value>,
         url_err: Option<url::ParseError>,
     }
 
@@ -104,6 +105,7 @@ pub mod surf_client {
                 client: surf::Client::new(),
                 req: None,
                 url_err: None,
+                body: None,
             }
         }
 
@@ -131,11 +133,9 @@ pub mod surf_client {
         ///
         /// If an HTTP method has not been set, this method does nothing.
         fn with_body(&mut self, body: &serde_json::Value) -> &mut Self {
-            if let Some(req) = &mut self.req {
-                // Unwrap: serde_json is used internally, so isn't going to fail
-                // except for bugs within serde_json.
-                req.body_json(body).unwrap();
-            }
+            // Nothing I've tried will actually save the body in the req.
+            // We store it and set it in send().
+            self.body = Some(body.to_owned());
             self
         }
 
@@ -152,7 +152,11 @@ pub mod surf_client {
                 return Err(Error::from(e));
             }
 
-            if let Some(req) = self.req.to_owned() {
+            if let Some(mut req) = self.req.to_owned() {
+                if let Some(body) = &self.body {
+                    req.body_json(body)?;
+                }
+
                 let res = self.client.send(req).await?
                     .body_json().await?;
 
@@ -180,11 +184,6 @@ mod hyper_client {
     };
     use hyper_tls::HttpsConnector;
 
-    enum InnerRequest {
-        Empty,
-        Builder(http::request::Builder),
-        Request(http::Request<Body>),
-    }
 
     #[derive(Debug)]
     pub struct HyperClient {

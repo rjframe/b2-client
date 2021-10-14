@@ -4,6 +4,9 @@
 */
 
 //! Account-related B2 API calls.
+// TODO: Timestamps are likely UTC. Is that documented anywhere?
+
+use std::fmt;
 
 use crate::{
     client::HttpClient,
@@ -11,6 +14,7 @@ use crate::{
     Error,
 };
 
+use chrono::{DateTime, Local};
 use serde::{Serialize, Deserialize};
 
 
@@ -45,6 +49,20 @@ pub struct Authorization<C>
     pub absolute_minimum_part_size: u64,
     /// The base URL to use for all API calls using the AWS S3-compatible API.
     pub s3_api_url: String,
+}
+
+impl<C> Authorization<C>
+    where C: HttpClient,
+{
+    /// Return the API url to the specified service endpoint.
+    pub(crate) fn api_url<S: AsRef<str>>(&self, endpoint: S) -> String {
+        format!("{}/b2api/v2/{}", self.api_url, endpoint.as_ref())
+    }
+
+    /// Return the API url to the specified service download endpoint.
+    pub(crate) fn download_url<S: AsRef<str>>(&self, endpoint: S) -> String {
+        format!("{}/b2api/v2/{}", self.download_url, endpoint.as_ref())
+    }
 }
 
 /// The authorization information received from B2
@@ -177,14 +195,73 @@ pub async fn authorize_account<C>(mut client: C, key_id: &str, key: &str)
     }
 }
 
+struct Duration(chrono::Duration);
+
+impl std::ops::Deref for Duration {
+    type Target = chrono::Duration;
+
+    fn deref(&self) -> &Self::Target { &self.0 }
+}
+
+impl From<chrono::Duration> for Duration {
+    fn from(d: chrono::Duration) -> Self {
+        Self(d)
+    }
+}
+
+impl From<Duration> for chrono::Duration {
+    fn from(d: Duration) -> Self { d.0 }
+}
+
+impl Serialize for Duration {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: serde::Serializer,
+    {
+        serializer.serialize_i64(self.num_milliseconds())
+    }
+}
+
+struct DurationVisitor;
+
+impl<'de> serde::de::Visitor<'de> for DurationVisitor {
+    type Value = i64;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            formatter,
+            "the number of milliseconds representing the duration"
+        )
+    }
+
+    fn visit_i64<E>(self, s: i64) -> Result<Self::Value, E>
+        where E: serde::de::Error,
+    {
+        Ok(s)
+    }
+}
+
+impl<'de> Deserialize<'de> for Duration {
+    fn deserialize<D>(deserializer: D) -> Result<Duration, D::Error>
+        where D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_i64(DurationVisitor)
+            .map(|i| Duration(chrono::Duration::milliseconds(i)))
+    }
+}
+
+
 /// An opaque type with the ability to create a B2 API key with certain
 /// capabilities.
 ///
 /// Use [CreateKeyBuilder] to create a `CreateKey` object.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateKey {
+    // account_id is provided by the Authorization object.
+    account_id: Option<String>,
     capabilities: Vec<Capability>,
-    name: String,
-    valid_duration: Option<chrono::Duration>,
+    key_name: String,
+    valid_duration_in_seconds: Option<Duration>,
     bucket_id: Option<String>,
     name_prefix: Option<String>,
 }
@@ -196,25 +273,26 @@ pub struct CreateKey {
 pub struct CreateKeyBuilder {
     capabilities: Option<Vec<Capability>>,
     name: String,
-    valid_duration: Option<chrono::Duration>,
+    valid_duration: Option<Duration>,
     bucket_id: Option<String>,
     name_prefix: Option<String>,
 }
 
-// TODO: Error types.
 impl CreateKeyBuilder {
-    pub fn new<S: Into<String>>(name: S) -> Result<Self, String> {
+    pub fn new<S: Into<String>>(name: S) -> Result<Self, Error> {
+        // TODO: Name must be ASCII?
         let name = name.into();
 
         if name.len() > 100 {
-            // TODO: Name must be ASCII?
-            return Err("Name must be no more than 100 characters.".into());
+            return Err(Error::Invalid(
+                "Name must be no more than 100 characters.".into()
+            ));
         }
 
         let invalid_char = |c: &char| !(c.is_alphanumeric() || *c == '-');
 
         if let Some(ch) = name.chars().find(invalid_char) {
-            return Err(format!("Invalid character: {}", ch));
+            return Err(Error::Invalid(format!("Invalid character: {}", ch)));
         }
 
         Ok(Self {
@@ -227,11 +305,13 @@ impl CreateKeyBuilder {
     }
 
     pub fn with_capabilities<V: Into<Vec<Capability>>>(mut self, caps: V)
-    -> Result<Self, &'static str> {
+    -> Result<Self, Error> {
         let caps = caps.into();
 
         if caps.is_empty() {
-            return Err("Key must have at least one capability.");
+            return Err(
+                Error::Invalid("Key must have at least one capability.".into())
+            );
         }
 
         self.capabilities = Some(caps);
@@ -239,19 +319,23 @@ impl CreateKeyBuilder {
     }
 
     pub fn expires_after(mut self, dur: chrono::Duration)
-    -> Result<Self, &'static str> {
+    -> Result<Self, Error> {
         if dur >= chrono::Duration::days(1000) {
-            return Err("Expiration must be less than 1000 days");
+            return Err(
+                Error::Invalid("Expiration must be less than 1000 days".into())
+            );
         } else if dur < chrono::Duration::seconds(1) {
-            return Err("Expiration must be a positive number of seconds");
+            return Err(Error::Invalid(
+                "Expiration must be a positive number of seconds".into()
+            ));
         }
 
-        self.valid_duration = Some(dur);
+        self.valid_duration = Some(Duration(dur));
         Ok(self)
     }
 
     pub fn limit_to_bucket<S: Into<String>>(mut self, id: S)
-    -> Result<Self, &'static str> {
+    -> Result<Self, Error> {
         let id = id.into();
         // TODO: Validate bucket id.
 
@@ -260,7 +344,7 @@ impl CreateKeyBuilder {
     }
 
     pub fn with_name_prefix<S: Into<String>>(mut self, prefix: S)
-    -> Result<Self, &'static str> {
+    -> Result<Self, Error> {
         let prefix = prefix.into();
         // TODO: Validate prefix
 
@@ -268,13 +352,12 @@ impl CreateKeyBuilder {
         Ok(self)
     }
 
-    pub fn build(self) -> Result<CreateKey, String> {
-        if self.capabilities.is_none() {
-            return Err(
+    pub fn build(self) -> Result<CreateKey, Error> {
+        let capabilities = self.capabilities.ok_or(
+            Error::Invalid(
                 "A list of capabilities for the key is required.".into()
-            );
-        }
-        let capabilities = self.capabilities.unwrap();
+            )
+        )?;
 
         if self.bucket_id.is_some() {
             for cap in &capabilities {
@@ -296,33 +379,122 @@ impl CreateKeyBuilder {
                     | Capability::ReadFileRetentions
                     | Capability::WriteFileRetentions
                     | Capability::BypassGovernance => {},
-                    cap =>
-                        return Err(format!("Invalid capability: {:?}", cap)),
+                    cap => return Err(Error::Invalid(format!(
+                        "Invalid capability when bucket_id is set: {:?}",
+                        cap
+                    ))),
                 }
             }
         } else if self.name_prefix.is_some() {
-            return Err(
+            return Err(Error::Invalid(
                 "bucket_id must be set when name_prefix is given".into()
-            );
+            ));
         }
 
         Ok(CreateKey {
+            account_id: None,
             capabilities,
-            name: self.name,
-            valid_duration: self.valid_duration,
+            key_name: self.name,
+            valid_duration_in_seconds: self.valid_duration,
             bucket_id: self.bucket_id,
             name_prefix: self.name_prefix,
         })
     }
 }
 
-/*
-// TODO: Return/Error type
-pub async fn create_key(auth: &Authorization, cap: CreateKey) -> Result<(), ()>
-{
-    todo!()
+// TODO: Make the fields private if feasible. Most (all?) fields will likely
+// need to be readable, but should not be writable.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Key {
+    pub key_name: String,
+    pub application_key_id: String,
+    pub capabilities: Vec<Capability>,
+    pub account_id: String,
+    pub expiration_timestamp: Option<DateTime<Local>>,
+    pub bucket_id: Option<String>,
+    pub name_prefix: Option<String>,
+    pub options: Option<Vec<String>>,
 }
-*/
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NewlyCreatedKey {
+    // The private part of the key. This is only returned upon key creation, so
+    // must be stored in a safe place.
+    application_key: String,
+
+    // The rest of these are part of (and moved to) the Key.
+    key_name: String,
+    application_key_id: String,
+    capabilities: Vec<Capability>,
+    account_id: String,
+    expiration_timestamp: Option<DateTime<Local>>,
+    bucket_id: Option<String>,
+    name_prefix: Option<String>,
+    options: Option<Vec<String>>,
+}
+
+impl NewlyCreatedKey {
+    fn create_public_key(self) -> (String, Key) {
+        let secret = self.application_key;
+
+        let key = Key {
+            key_name: self.key_name,
+            application_key_id: self.application_key_id,
+            capabilities: self.capabilities,
+            account_id: self.account_id,
+            expiration_timestamp: self.expiration_timestamp,
+            bucket_id: self.bucket_id,
+            name_prefix: self.name_prefix,
+            options: self.options,
+        };
+
+        (secret, key)
+    }
+}
+
+/// Create a new API application key
+///
+/// Returns a tuple of the key secret and the key capability information. The
+/// secret is never obtainable except by this function, so must be stored in a
+/// secure location.
+///
+/// See <https://www.backblaze.com/b2/docs/b2_create_key.html> for further
+/// information.
+pub async fn create_key<C>(auth: &mut Authorization<C>, new_key_info: CreateKey)
+-> Result<(String, Key), Error>
+    // TODO: The use of this error type precludes using arbitrary HTTP clients.
+    where C: HttpClient<Response=serde_json::Value, Error=Error>,
+{
+    let mut new_key_info = new_key_info;
+    new_key_info.account_id = Some(auth.account_id.to_owned());
+
+    let res = auth.client.post(
+        auth.api_url("b2_create_key")
+    ).with_header("Authorization", &auth.authorization_token)
+        .with_body(&serde_json::to_value(new_key_info)
+            .map_err(Error::from_json)?
+        )
+        .send().await?;
+
+    // TODO: Remove the clone. See comment in authorize_account.
+    let json: Result<NewlyCreatedKey, _> = serde_json::from_value(res.clone());
+
+    match json {
+        Ok(r) => {
+            Ok(r.create_public_key())
+        },
+        Err(_) => {
+            let err: Result<B2Error, _> = serde_json::from_value(res);
+
+            match err {
+                Ok(e) => Err(Error::B2(e)),
+                Err(e) => Err(Error::Format(e)),
+            }
+        }
+    }
+}
 
 // TODO: Find a good way to mock responses for any/all backends.
 #[cfg(feature = "with_surf")]
@@ -339,6 +511,7 @@ mod tests {
     const AUTH_KEY_ID: &str = "B2_KEY_ID";
     const AUTH_KEY: &str = "B2_AUTH_KEY";
 
+    /// Create a SurfClient with the surf-vcr middleware.
     async fn create_test_client(mode: VcrMode, cassette: &'static str)
     -> std::result::Result<SurfClient, VcrError> {
         let surf = surf::Client::new()
@@ -348,6 +521,28 @@ mod tests {
             .with_client(surf);
 
         Ok(client)
+    }
+
+    /// Create a fake authorization to allow us to run tests without calling the
+    /// authorize_account function.
+    fn get_test_key(client: SurfClient, capabilities: Vec<Capability>)
+    -> Authorization<SurfClient> {
+        Authorization {
+            client,
+            account_id: "abcdefg".into(),
+            authorization_token: "4_002d2e6b27577ea0000000002_019f9ac2_4af224_acct_BzTNBWOKUVQvIMyHK3tXHG7YqDQ=".into(),
+            allowed: Capabilities {
+                capabilities,
+                bucket_id: None,
+                bucket_name: None,
+                name_prefix: None,
+            },
+            api_url: "https://api002.backblazeb2.com".into(),
+            download_url: "https://f002.backblazeb2.com".into(),
+            recommended_part_size: 100000000,
+            absolute_minimum_part_size: 5000000,
+            s3_api_url: "https://s3.us-west-002.backblazeb2.com".into(),
+        }
     }
 
     #[async_std::test]
@@ -397,6 +592,27 @@ mod tests {
             Error::B2(e) => assert_eq!(e.code(), ErrorCode::BadAuthToken),
             e => panic!("Unexpected error type: {:?}", e),
         }
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_create_key() -> Result<(), anyhow::Error> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/auth_account.yaml"
+        ).await?;
+
+        let mut auth = get_test_key(client, vec![Capability::WriteKeys]);
+
+        let new_key_info = CreateKeyBuilder::new("my-special-key").unwrap()
+            .with_capabilities(vec![Capability::ListFiles]).unwrap()
+            .build().unwrap();
+
+        let (secret, key) = create_key(&mut auth, new_key_info).await?;
+        assert!(! secret.is_empty());
+        assert_eq!(key.capabilities.len(), 1);
+        assert_eq!(key.capabilities[0], Capability::ListFiles);
 
         Ok(())
     }
