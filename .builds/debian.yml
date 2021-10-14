@@ -1,0 +1,29 @@
+image: debian/stable
+packages:
+  - libssl-dev
+  - pkg-config
+sources:
+  - https://git.sr.ht/~rjframe/b2-client
+tasks:
+  - install-rustup: |
+      curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain none -y
+  - install-stable: |
+      $HOME/.cargo/bin/rustup toolchain install stable --allow-downgrade --profile minimal --component clippy
+  - build-stable: |
+      cd $HOME/b2-client
+      $HOME/.cargo/bin/cargo +stable build
+  - test-stable : |
+      cd $HOME/b2-client
+      $HOME/.cargo/bin/cargo +stable test
+  - clippy-stable: |
+      cd $HOME/b2-client
+      $HOME/.cargo/bin/cargo +stable clippy
+  - install-nightly: |
+      cd $HOME/b2-client
+      $HOME/.cargo/bin/rustup toolchain install nightly --allow-downgrade --profile minimal
+  - build-nightly: |
+      cd $HOME/b2-client
+      $HOME/.cargo/bin/cargo +nightly build
+  - test-nightly : |
+      cd $HOME/b2-client
+      $HOME/.cargo/bin/cargo +nightly test

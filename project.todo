@@ -14,7 +14,7 @@ Project:
         ✓ Review/update generated docs @done(2021-10-13 16:22) @project(Project \ Public Repos)
         ☐ Set up issue tracker
         ☐ Sync to Github, SourceHut
-        ☐ Add CI - stable and nightly Rust
+        ✓ Add CI - stable and nightly Rust @done(2021-10-14 16:31) @project(Project \ Public Repos)
 
 API:
     ☐ Implement account endpoints
