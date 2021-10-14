@@ -24,6 +24,14 @@ const B2_AUTH_URL: &str = if cfg!(test) {
     "https://api.backblazeb2.com/b2api/v2/"
 };
 
+// This gives us nice error handling when deserializing JSON responses.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum B2Result<T> {
+    Ok(T),
+    Err(B2Error),
+}
+
 /// Authorization token and related information obtained from
 /// [authorize_account].
 // TODO: Make the fields private if feasible. Most (all?) fields will likely
@@ -176,26 +184,12 @@ pub async fn authorize_account<C>(mut client: C, key_id: &str, key: &str)
 
     let res = req.send().await?;
 
-    // TODO: Avoid the clone. `from_slice` doesn't take ownership.
-    // If I have an enum of `Authorization`|`B2Error` I should be able to
-    // deserialize it in one step then match on it. The code would be much
-    // clearer too.
-    let auth: Result<ProtoAuthorization, _>
-        = serde_json::from_value(res.clone());
+    let auth: B2Result<ProtoAuthorization> = serde_json::from_value(res)
+        .map_err(Error::from_json)?;
 
-    // TODO: Map instead of match.
     match auth {
-        Ok(r) => {
-            Ok(r.create_authorization(client))
-        },
-        Err(_) => {
-            let err: Result<B2Error, _> = serde_json::from_value(res);
-
-            match err {
-                Ok(e) => Err(Error::B2(e)),
-                Err(e) => Err(Error::Format(e)),
-            }
-        }
+        B2Result::Ok(r) => Ok(r.create_authorization(client)),
+        B2Result::Err(e) => Err(Error::B2(e)),
     }
 }
 
@@ -474,29 +468,19 @@ pub async fn create_key<C>(auth: &mut Authorization<C>, new_key_info: CreateKey)
     let mut new_key_info = new_key_info;
     new_key_info.account_id = Some(auth.account_id.to_owned());
 
-    let res = auth.client.post(
-        auth.api_url("b2_create_key")
-    ).with_header("Authorization", &auth.authorization_token)
+    let res = auth.client.post(auth.api_url("b2_create_key"))
+        .with_header("Authorization", &auth.authorization_token)
         .with_body(&serde_json::to_value(new_key_info)
             .map_err(Error::from_json)?
         )
         .send().await?;
 
-    // TODO: Remove the clone. See comment in authorize_account.
-    let json: Result<NewlyCreatedKey, _> = serde_json::from_value(res.clone());
+    let new_key: B2Result<NewlyCreatedKey> = serde_json::from_value(res)
+        .map_err(Error::from_json)?;
 
-    match json {
-        Ok(r) => {
-            Ok(r.create_public_key())
-        },
-        Err(_) => {
-            let err: Result<B2Error, _> = serde_json::from_value(res);
-
-            match err {
-                Ok(e) => Err(Error::B2(e)),
-                Err(e) => Err(Error::Format(e)),
-            }
-        }
+    match new_key {
+        B2Result::Ok(key) => Ok(key.create_public_key()),
+        B2Result::Err(e) => Err(Error::B2(e)),
     }
 }
 
