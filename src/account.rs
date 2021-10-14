@@ -18,7 +18,11 @@ use chrono::{DateTime, Local};
 use serde::{Serialize, Deserialize};
 
 
-const B2_AUTH_URL: &str = "https://api.backblazeb2.com/b2api/v2/";
+const B2_AUTH_URL: &str = if cfg!(test) {
+    "http://localhost:8765/b2api/v2/"
+} else {
+    "https://api.backblazeb2.com/b2api/v2/"
+};
 
 /// Authorization token and related information obtained from
 /// [authorize_account].
@@ -537,11 +541,11 @@ mod tests {
                 bucket_name: None,
                 name_prefix: None,
             },
-            api_url: "https://api002.backblazeb2.com".into(),
-            download_url: "https://f002.backblazeb2.com".into(),
+            api_url: "http://localhost:8765".into(),
+            download_url: "http://localhost:8765/download".into(),
             recommended_part_size: 100000000,
             absolute_minimum_part_size: 5000000,
-            s3_api_url: "https://s3.us-west-002.backblazeb2.com".into(),
+            s3_api_url: "http://localhost:8765/s3api".into(),
         }
     }
 
