@@ -285,13 +285,13 @@ impl<'de> Deserialize<'de> for Duration {
 }
 
 
-/// An opaque type with the ability to create a B2 API key with certain
-/// capabilities.
+/// A request to create a B2 API key with certain capabilities.
 ///
-/// Use [CreateKeyBuilder] to create a `CreateKey` object.
+/// Use [CreateKeyRequestBuilder] to create a `CreateKeyRequest` object, then
+/// pass it to [create_key] to create a new application [Key] from the request.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CreateKey {
+pub struct CreateKeyRequest {
     // account_id is provided by the Authorization object.
     account_id: Option<String>,
     capabilities: Vec<Capability>,
@@ -301,11 +301,14 @@ pub struct CreateKey {
     name_prefix: Option<String>,
 }
 
-/// A builder to create a [CreateKey] object.
+/// A builder to create a [CreateKeyRequest] object.
+///
+/// After creating the `CreateKeyRequest`, pass it to [create_key] to obtain a
+/// new application key.
 ///
 /// See <https://www.backblaze.com/b2/docs/b2_create_key.html> for more
 /// information.
-pub struct CreateKeyBuilder {
+pub struct CreateKeyRequestBuilder {
     capabilities: Option<Vec<Capability>>,
     name: String,
     valid_duration: Option<Duration>,
@@ -313,7 +316,8 @@ pub struct CreateKeyBuilder {
     name_prefix: Option<String>,
 }
 
-impl CreateKeyBuilder {
+impl CreateKeyRequestBuilder {
+    /// Create a new builder, with the key's name provided.
     pub fn new<S: Into<String>>(name: S) -> Result<Self, Error> {
         // TODO: Name must be ASCII?
         let name = name.into();
@@ -339,6 +343,9 @@ impl CreateKeyBuilder {
         })
     }
 
+    /// Create the key with the specified capabilities.
+    ///
+    /// At least one capability must be provided.
     pub fn with_capabilities<V: Into<Vec<Capability>>>(mut self, caps: V)
     -> Result<Self, Error> {
         let caps = caps.into();
@@ -353,6 +360,9 @@ impl CreateKeyBuilder {
         Ok(self)
     }
 
+    /// Set an expiration duration for the key.
+    ///
+    /// If provided, the key must be positive and no more than 1,000 days.
     pub fn expires_after(mut self, dur: chrono::Duration)
     -> Result<Self, Error> {
         if dur >= chrono::Duration::days(1000) {
@@ -369,6 +379,7 @@ impl CreateKeyBuilder {
         Ok(self)
     }
 
+    /// Limit the key's access to the specified bucket.
     pub fn limit_to_bucket<S: Into<String>>(mut self, id: S)
     -> Result<Self, Error> {
         let id = id.into();
@@ -378,6 +389,7 @@ impl CreateKeyBuilder {
         Ok(self)
     }
 
+    /// Limit access to files to those that begin with the specified prefix.
     pub fn with_name_prefix<S: Into<String>>(mut self, prefix: S)
     -> Result<Self, Error> {
         let prefix = prefix.into();
@@ -387,7 +399,8 @@ impl CreateKeyBuilder {
         Ok(self)
     }
 
-    pub fn build(self) -> Result<CreateKey, Error> {
+    /// Create a new [CreateKeyRequest].
+    pub fn build(self) -> Result<CreateKeyRequest, Error> {
         let capabilities = self.capabilities.ok_or_else(|| Error::Invalid(
             "A list of capabilities for the key is required.".into()
         ))?;
@@ -424,7 +437,7 @@ impl CreateKeyBuilder {
             ));
         }
 
-        Ok(CreateKey {
+        Ok(CreateKeyRequest {
             account_id: None,
             capabilities,
             key_name: self.name,
@@ -473,7 +486,7 @@ impl Key {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct NewlyCreatedKey {
     // The private part of the key. This is only returned upon key creation, so
@@ -510,7 +523,7 @@ impl NewlyCreatedKey {
     }
 }
 
-/// Create a new API application key
+/// Create a new API application key.
 ///
 /// Returns a tuple of the key secret and the key capability information. The
 /// secret is never obtainable except by this function, so must be stored in a
@@ -518,8 +531,32 @@ impl NewlyCreatedKey {
 ///
 /// See <https://www.backblaze.com/b2/docs/b2_create_key.html> for further
 /// information.
-pub async fn create_key<C>(auth: &mut Authorization<C>, new_key_info: CreateKey)
--> Result<(String, Key), Error>
+///
+/// # Examples
+///
+/// ```no_run
+/// # use b2_client::{
+/// #     client::{HttpClient, SurfClient},
+/// #     account::{
+/// #         authorize_account, create_key,
+/// #         Capability, CreateKeyRequestBuilder,
+/// #     },
+/// # };
+/// # async fn f() -> anyhow::Result<()> {
+/// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
+///     .await?;
+///
+/// let create_key_request = CreateKeyRequestBuilder::new("my-key")?
+///     .with_capabilities([Capability::ListFiles])?
+///     .build()?;
+///
+/// let (secret, new_key) = create_key(&mut auth, create_key_request).await?;
+/// # Ok(()) }
+/// ```
+pub async fn create_key<C>(
+    auth: &mut Authorization<C>,
+    new_key_info: CreateKeyRequest
+) -> Result<(String, Key), Error>
     // TODO: The use of this error type precludes using arbitrary HTTP clients.
     where C: HttpClient<Response=serde_json::Value, Error=Error>,
 {
@@ -937,7 +974,8 @@ mod tests {
 
         let mut auth = get_test_key(client, vec![Capability::WriteKeys]);
 
-        let new_key_info = CreateKeyBuilder::new("my-special-key").unwrap()
+        let new_key_info = CreateKeyRequestBuilder::new("my-special-key")
+            .unwrap()
             .with_capabilities(vec![Capability::ListFiles]).unwrap()
             .build().unwrap();
 
