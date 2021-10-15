@@ -484,6 +484,46 @@ pub async fn create_key<C>(auth: &mut Authorization<C>, new_key_info: CreateKey)
     }
 }
 
+/// Delete the given [Key].
+///
+/// Returns a `Key` describing the just-deleted key.
+///
+/// See <https://www.backblaze.com/b2/docs/b2_delete_key.html> for further
+/// information.
+pub async fn delete_key<C>(auth: &mut Authorization<C>, key: Key)
+-> Result<Key, Error>
+    where C: HttpClient<Response=serde_json::Value, Error=Error>,
+{
+    delete_key_by_id(auth, key.application_key_id).await
+}
+
+/// Delete the key with the specified key ID.
+///
+/// Returns a [Key] describing the just-deleted key.
+///
+/// See <https://www.backblaze.com/b2/docs/b2_delete_key.html> for further
+/// information.
+pub async fn delete_key_by_id<C, S: AsRef<str>>(
+    auth: &mut Authorization<C>,
+    key_id: S
+) -> Result<Key, Error>
+    // TODO: The use of this error type precludes using arbitrary HTTP clients.
+    where C: HttpClient<Response=serde_json::Value, Error=Error>,
+{
+    let res = auth.client.post(auth.api_url("b2_delete_key"))
+        .with_header("Authorization", &auth.authorization_token)
+        .with_body(&serde_json::json!({"applicationKeyId": key_id.as_ref()}))
+        .send().await?;
+
+    let key: B2Result<Key> = serde_json::from_value(res)
+        .map_err(Error::from_json)?;
+
+    match key {
+        B2Result::Ok(key) => Ok(key),
+        B2Result::Err(e) => Err(Error::B2(e)),
+    }
+}
+
 // TODO: Find a good way to mock responses for any/all backends.
 #[cfg(feature = "with_surf")]
 #[cfg(test)]
@@ -601,6 +641,24 @@ mod tests {
         assert!(! secret.is_empty());
         assert_eq!(key.capabilities.len(), 1);
         assert_eq!(key.capabilities[0], Capability::ListFiles);
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_delete_key() -> Result<(), anyhow::Error> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/auth_account.yaml"
+        ).await?;
+
+        let mut auth = get_test_key(client, vec![Capability::DeleteKeys]);
+
+        let removed_key = delete_key_by_id(
+            &mut auth, "002d2e6b27577ea0000000005"
+        ).await?;
+
+        assert_eq!(removed_key.key_name, "my-special-key");
 
         Ok(())
     }

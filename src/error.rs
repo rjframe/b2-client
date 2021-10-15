@@ -76,6 +76,7 @@ pub enum ErrorCode {
     Unauthorized,
     Unsupported,
     TransactionCapExceeded,
+    InternalError,
 }
 
 impl ErrorCode {
@@ -88,6 +89,7 @@ impl ErrorCode {
             "unauthorized" => Ok(Self::Unauthorized),
             "unsupported" => Ok(Self::Unsupported),
             "transaction_cap_exceeded" => Ok(Self::TransactionCapExceeded),
+            "internal_error" => Ok(Self::InternalError),
             _ => Err(String::from(code.as_ref())),
         }
     }
@@ -100,6 +102,7 @@ impl ErrorCode {
             Self::Unauthorized => 401,
             Self::Unsupported => 401,
             Self::TransactionCapExceeded => 403,
+            Self::InternalError => 500,
         }
     }
 }
