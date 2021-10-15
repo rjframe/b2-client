@@ -34,39 +34,50 @@ enum B2Result<T> {
 
 /// Authorization token and related information obtained from
 /// [authorize_account].
-// TODO: Make the fields private if feasible. Most (all?) fields will likely
-// need to be readable, but should not be writable.
+///
+/// The token is valid for no more than 24 hours.
 // TODO: We probably do need to make this serializable.
 #[derive(Debug)]
 pub struct Authorization<C>
     where C: HttpClient,
 {
     pub(crate) client: C,
+    account_id: String,
+    // The authorization token to use for all future API calls.
+    //
+    // The token is valid for no more than 24 hours.
+    authorization_token: String,
+    allowed: Capabilities,
+    // The base URL for all API calls except uploading or downloading files.
+    api_url: String,
+    // The base URL to use for downloading files.
+    download_url: String,
+    recommended_part_size: u64,
+    absolute_minimum_part_size: u64,
+    // The base URL to use for all API calls using the AWS S3-compatible API.
+    s3_api_url: String,
+}
+
+impl<C> Authorization<C>
+    where C: HttpClient,
+{
     /// The ID for the account.
-    pub account_id: String,
-    /// The authorization token to use for all future calls.
-    ///
-    /// The token is valid for no more than 24 hours.
-    pub authorization_token: String,
-    /// The capabilities of this auth token.
-    pub allowed: Capabilities,
-    /// The base URL for all API calls except uploading or downloading files.
-    pub api_url: String,
-    /// The base URL to use for downloading files.
-    pub download_url: String,
+    pub fn account_id(&self) -> &str { &self.account_id }
+    /// The capabilities granted to this auth token.
+    pub fn capabilities(&self) -> &Capabilities { &self.allowed }
     /// The recommended size in bytes for each part of a large file.
-    pub recommended_part_size: u64,
+    pub fn recommended_part_size(&self) -> u64 { self.recommended_part_size }
     /// The smallest possible size in bytes of a part of a large file, except
     /// the final part.
-    pub absolute_minimum_part_size: u64,
-    /// The base URL to use for all API calls using the AWS S3-compatible API.
-    pub s3_api_url: String,
+    pub fn minimum_part_size(&self) -> u64 { self.absolute_minimum_part_size }
 }
 
 impl<C> Authorization<C>
     where C: HttpClient,
 {
     /// Return the API url to the specified service endpoint.
+    ///
+    /// This URL is used for all API calls except downloading files.
     pub(crate) fn api_url<S: AsRef<str>>(&self, endpoint: S) -> String {
         format!("{}/b2api/v2/{}", self.api_url, endpoint.as_ref())
     }
@@ -74,6 +85,12 @@ impl<C> Authorization<C>
     /// Return the API url to the specified service download endpoint.
     pub(crate) fn download_url<S: AsRef<str>>(&self, endpoint: S) -> String {
         format!("{}/b2api/v2/{}", self.download_url, endpoint.as_ref())
+    }
+
+    /// Return the API url to the specified S3-compatible service download
+    /// endpoint.
+    pub(crate) fn s3_api_url<S: AsRef<str>>(&self, endpoint: S) -> String {
+        format!("{}/b2api/v2/{}", self.s3_api_url, endpoint.as_ref())
     }
 }
 
@@ -112,22 +129,33 @@ impl ProtoAuthorization {
 
 /// The set of capabilities and associated information granted by an
 /// authorization token.
-// TODO: Make the fields private if feasible. Most (all?) fields will likely
-// need to be readable, but should not be writable.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Capabilities {
+    capabilities: Vec<Capability>,
+    bucket_id: Option<String>,
+    bucket_name: Option<String>,
+    name_prefix: Option<String>,
+}
+
+impl Capabilities {
     /// The list of capabilities granted.
-    pub capabilities: Vec<Capability>,
+    pub fn capabilities(&self) -> &[Capability] { &self.capabilities }
     /// If the capabilities are limited to a single bucket, this is the bucket's
     /// ID.
-    pub bucket_id: Option<String>,
+    pub fn bucket_id(&self) -> Option<&String> { self.bucket_id.as_ref() }
     /// If the bucket is valid and hasn't been deleted, the name of the bucket
     /// corresponding to `bucket_id`. If the bucket referred to by `bucket_id`
     /// no longer exists, this will be `None`.
-    pub bucket_name: Option<String>,
+    pub fn bucket_name(&self) -> Option<&String> { self.bucket_name.as_ref() }
     /// If set, access is limited to files whose names begin with this prefix.
-    pub name_prefix: Option<String>,
+    pub fn name_prefix(&self) -> Option<&String> { self.name_prefix.as_ref() }
+
+    /// Check if the provided capability is granted to the object containing
+    /// this [Capabilities] object.
+    pub fn has_capability(&self, cap: Capability) -> bool {
+        self.capabilities.iter().any(|&c| c == cap)
+    }
 }
 
 /// A capability potentially granted by an authorization token.
@@ -398,19 +426,42 @@ impl CreateKeyBuilder {
     }
 }
 
-// TODO: Make the fields private if feasible. Most (all?) fields will likely
-// need to be readable, but should not be writable.
+/// An application key and associated information.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Key {
-    pub key_name: String,
-    pub application_key_id: String,
-    pub capabilities: Vec<Capability>,
-    pub account_id: String,
-    pub expiration_timestamp: Option<DateTime<Local>>,
-    pub bucket_id: Option<String>,
-    pub name_prefix: Option<String>,
-    pub options: Option<Vec<String>>,
+    key_name: String,
+    application_key_id: String,
+    capabilities: Vec<Capability>,
+    account_id: String,
+    expiration_timestamp: Option<DateTime<Local>>,
+    bucket_id: Option<String>,
+    name_prefix: Option<String>,
+    options: Option<Vec<String>>, // Currently unused by B2.
+}
+
+impl Key {
+    /// The name assigned to this key.
+    pub fn key_name(&self) -> &str { &self.key_name }
+    /// The list of capabilities granted by this key.
+    pub fn capabilities(&self) -> &[Capability] { &self.capabilities }
+    /// The account this key is for.
+    pub fn account_id(&self) -> &str { &self.account_id }
+    /// If present, this key's capabilities are restricted to the returned
+    /// bucket.
+    pub fn bucket_id(&self) -> Option<&String> { self.bucket_id.as_ref() }
+    /// If set, access is limited to files whose names begin with this prefix.
+    pub fn name_prefix(&self) -> Option<&String> { self.name_prefix.as_ref() }
+
+    /// If present, the expiration date and time of this key.
+    pub fn expiration(&self) -> Option<DateTime<Local>> {
+        self.expiration_timestamp
+    }
+
+    /// Check if the provided capability is granted by this key.
+    pub fn has_capability(&self, cap: Capability) -> bool {
+        self.capabilities.iter().any(|&c| c == cap)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
