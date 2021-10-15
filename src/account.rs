@@ -351,11 +351,9 @@ impl CreateKeyBuilder {
     }
 
     pub fn build(self) -> Result<CreateKey, Error> {
-        let capabilities = self.capabilities.ok_or(
-            Error::Invalid(
-                "A list of capabilities for the key is required.".into()
-            )
-        )?;
+        let capabilities = self.capabilities.ok_or_else(|| Error::Invalid(
+            "A list of capabilities for the key is required.".into()
+        ))?;
 
         if self.bucket_id.is_some() {
             for cap in &capabilities {
