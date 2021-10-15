@@ -73,10 +73,12 @@ impl From<url::ParseError> for Error {
 pub enum ErrorCode {
     BadRequest,
     BadAuthToken,
+    ExpiredAuthToken,
     Unauthorized,
     Unsupported,
     TransactionCapExceeded,
     InternalError,
+    ServiceUnavailable,
 }
 
 impl ErrorCode {
@@ -86,10 +88,12 @@ impl ErrorCode {
         match code.as_ref() {
             "bad_request" => Ok(Self::BadRequest),
             "bad_auth_token" => Ok(Self::BadAuthToken),
+            "expired_auth_token" => Ok(Self::ExpiredAuthToken),
             "unauthorized" => Ok(Self::Unauthorized),
             "unsupported" => Ok(Self::Unsupported),
             "transaction_cap_exceeded" => Ok(Self::TransactionCapExceeded),
             "internal_error" => Ok(Self::InternalError),
+            "service_unavailable" => Ok(Self::ServiceUnavailable),
             _ => Err(String::from(code.as_ref())),
         }
     }
@@ -99,10 +103,12 @@ impl ErrorCode {
         match self {
             Self::BadRequest => 400,
             Self::BadAuthToken => 401,
+            Self::ExpiredAuthToken => 401,
             Self::Unauthorized => 401,
             Self::Unsupported => 401,
             Self::TransactionCapExceeded => 403,
             Self::InternalError => 500,
+            Self::ServiceUnavailable => 503,
         }
     }
 }
