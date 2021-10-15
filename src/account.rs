@@ -107,7 +107,7 @@ impl<C> Authorization<C>
 ///
 /// The public [Authorization] object contains everything here, plus private
 /// data used by this API implementation, such as the HTTP client.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ProtoAuthorization {
     account_id: String,
@@ -204,6 +204,21 @@ pub enum Capability {
 ///
 /// See <https://www.backblaze.com/b2/docs/b2_authorize_account.html> for
 /// further information.
+///
+/// # Examples
+///
+/// ```no_run
+/// # use b2_client::{
+/// #     client::{HttpClient, SurfClient},
+/// #     account::{authorize_account, delete_key_by_id},
+/// # };
+/// # async fn f() -> anyhow::Result<()> {
+/// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
+///     .await?;
+///
+/// let removed_key = delete_key_by_id(&mut auth, "OTHER KEY ID").await?;
+/// # Ok(()) }
+/// ```
 pub async fn authorize_account<C>(mut client: C, key_id: &str, key: &str)
 -> Result<Authorization<C>, Error>
     // TODO: The use of this error type precludes using arbitrary HTTP clients.
@@ -230,6 +245,7 @@ pub async fn authorize_account<C>(mut client: C, key_id: &str, key: &str)
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct Duration(chrono::Duration);
 
 impl std::ops::Deref for Duration {
@@ -585,6 +601,28 @@ pub async fn create_key<C>(
 ///
 /// See <https://www.backblaze.com/b2/docs/b2_delete_key.html> for further
 /// information.
+///
+/// ```no_run
+/// # use b2_client::{
+/// #     client::{HttpClient, SurfClient},
+/// #     account::{
+/// #         authorize_account, create_key, delete_key,
+/// #         Capability, CreateKeyRequestBuilder,
+/// #     },
+/// # };
+/// # async fn f() -> anyhow::Result<()> {
+/// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
+///     .await?;
+///
+/// let create_key_request = CreateKeyRequestBuilder::new("my-key")?
+///     .with_capabilities([Capability::ListFiles])?
+///     .build()?;
+///
+/// let (_secret, new_key) = create_key(&mut auth, create_key_request).await?;
+///
+/// let deleted_key = delete_key(&mut auth, new_key).await?;
+/// # Ok(()) }
+/// ```
 pub async fn delete_key<C>(auth: &mut Authorization<C>, key: Key)
 -> Result<Key, Error>
     where C: HttpClient<Response=serde_json::Value, Error=Error>,
@@ -598,6 +636,21 @@ pub async fn delete_key<C>(auth: &mut Authorization<C>, key: Key)
 ///
 /// See <https://www.backblaze.com/b2/docs/b2_delete_key.html> for further
 /// information.
+///
+/// # Examples
+///
+/// ```no_run
+/// # use b2_client::{
+/// #     client::{HttpClient, SurfClient},
+/// #     account::{authorize_account, delete_key_by_id},
+/// # };
+/// # async fn f() -> anyhow::Result<()> {
+/// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
+///     .await?;
+///
+/// let removed_key = delete_key_by_id(&mut auth, "OTHER KEY ID").await?;
+/// # Ok(()) }
+/// ```
 pub async fn delete_key_by_id<C, S: AsRef<str>>(
     auth: &mut Authorization<C>,
     key_id: S
@@ -619,6 +672,10 @@ pub async fn delete_key_by_id<C, S: AsRef<str>>(
     }
 }
 
+/// A Content-Disposition value.
+///
+/// The grammar is specified in RFC 6266, except parameter names that contain an
+/// '*' are not allowed.
 // TODO: Implement; parse/validate.
 pub struct ContentDisposition(String);
 
@@ -733,15 +790,13 @@ impl DownloadAuthorizationRequestBuilder {
         self
     }
 
-    /// If specified, download requests must have this expiration. The grammar
-    /// is specified in RFC 2616.
+    /// If specified, download requests must have this expiration.
     pub fn with_expiration(mut self, expiration: Expires) -> Self {
         self.b2_expires = Some(expiration.value().to_string());
         self
     }
 
-    /// If specified, download requests must have this cache control. The
-    /// grammar is specified in RFC 2616.
+    /// If specified, download requests must have this cache control.
     pub fn with_cache_control(mut self, directive: CacheDirective) -> Self {
         use http_types::headers::HeaderValue;
 
@@ -749,16 +804,19 @@ impl DownloadAuthorizationRequestBuilder {
         self
     }
 
+    /// If specified, download requests must have this content encoding.
     pub fn with_content_encoding(mut self, encoding: ContentEncoding) -> Self {
         self.b2_content_encoding = Some(format!("{}", encoding.encoding()));
         self
     }
 
+    /// If specified, download requests must have this content type.
     pub fn with_content_type(mut self, content_type: Mime) -> Self {
         self.b2_content_type = Some(content_type.to_string());
         self
     }
 
+    /// Build a [DownloadAuthorizationRequest].
     pub fn build(self) -> Result<DownloadAuthorizationRequest, Error> {
         let bucket_id = self.bucket_id
             .ok_or_else(||
@@ -825,22 +883,19 @@ impl DownloadAuthorization {
 /// #         DownloadAuthorizationRequestBuilder,
 /// #     },
 /// # };
-/// # async {
-///     let mut auth = authorize_account(
-///         SurfClient::new(),
-///         "MY KEY ID",
-///         "MY KEY"
-///     ).await.unwrap();
+/// # async fn f() -> anyhow::Result<()> {
+/// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
+///     .await?;
 ///
-///     let download_req = DownloadAuthorizationRequestBuilder::new()
-///         .for_bucket_id("MY BUCKET ID")
-///         .with_file_name_prefix("my/files/")
-///         .with_duration(chrono::Duration::seconds(60)).unwrap()
-///         .build().unwrap();
+/// let download_req = DownloadAuthorizationRequestBuilder::new()
+///     .for_bucket_id("MY BUCKET ID")
+///     .with_file_name_prefix("my/files/")
+///     .with_duration(chrono::Duration::seconds(60))?
+///     .build()?;
 ///
-///     let download_auth = get_download_authorization(&mut auth, download_req)
-///         .await.unwrap();
-/// # };
+/// let download_auth = get_download_authorization(&mut auth, download_req)
+///     .await?;
+/// # Ok(()) }
 /// ```
 // TODO: Once download endpoints are implemented, add one to the example above.
 pub async fn get_download_authorization<C>(

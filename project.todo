@@ -5,6 +5,8 @@ Project:
     ☐ Work with B2 metadata headers
     ☐ Fix feature incompatibility; at least enough to generate documentation for all features
     ☐ Default clients: use low-level libraries (h1, h2, etc.) rather than the libraries built on top of them.
+    ☐ Check derived traits on objects - ensure consistency.
+    ☐ Probably add builder() associated function to types that have one. Ensure consistent APIS.
 
     Maybe Upstream:
         ☐ When the surf-vcr middleware errors, we're getting a stack overflow rather than the error reported. It's probably a problem with surf-vcr - determine that for certain and fix.
