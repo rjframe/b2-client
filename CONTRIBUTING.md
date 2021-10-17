@@ -9,6 +9,7 @@ issue/PR or start a discussion.
 
 * [Quick Reference to Websites](#quick-reference)
 * [How Can I Contribute?](#how-can-i-contribute)
+* [PR Checklist](#pr-checklist)
 * [Style Guidelines](#style-guidelines)
     * [Commit and PR Style](#commit-and-pr-style)
     * [Code Style](#code-style)
@@ -33,6 +34,25 @@ issue/PR or start a discussion.
 * Improve tests -- in particular, we should be testing against multiple HTTP
   clients.
 * Help implement the B2 API.
+
+
+## PR Checklist
+
+Before submitting a PR or patchset, be sure to check that you haven't broken
+various feature combinations:
+
+* Can you build documentation with all HTTP client backends?
+    - `cargo doc --no-deps --features=with_surf,with_hyper`
+* Can you run tests with no default features?
+    - `cargo test --no-default-features`
+* Can you run tests with all HTTP client backends?
+    - `cargo test --features=with_surf,with_hyper`
+
+All new tests related to sending and receiving data from the B2 service need to
+be based on real communication with the service, rather than generated solely
+from their documentation; creating those tests will potentially result in
+monetary charges; if you submit tests that have not been based on a real session
+with B2, please let me know in the PR so that I can do so.
 
 
 ## Style Guidelines

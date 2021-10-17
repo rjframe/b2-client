@@ -1,7 +1,7 @@
 # b2-client - Backend-agnostic Backblaze B2 API Client
 
 b2-client provides a Rust API to Backblaze B2 services, backed by any HTTP
-client (though see [Known Issues](#known-issues)).
+client.
 
 Support for [Hyper](https://crates.io/crates/hyper),
 [Isahc](https://crates.io/crates/isahc) (soon), and
@@ -37,12 +37,12 @@ SourceHut.
 
 I wanted a type-safe, backend-agnostic interface to the B2 API; I don't want to
 potentially end up with two HTTP clients linked into my applications, and I
-don't want the B2 library I need to be determined by the HTTP client (or async
+don't want the B2 library I use to be determined by the HTTP client (or async
 runtime) I happen to be using.
 
 I intend to support the full API.
 
-Note that most (if not all) of these functions will incur charges to your
+Note that most (if not all) of these functions can incur charges to your
 account. You will want to mock the B2 servers in your code's tests.
 
 
@@ -78,8 +78,8 @@ and h2 instead of hyper).
 Surf is currently selected by default. To use a different backend, supply the
 `--no-default-features` flag as well as the feature for the backend you desire.
 
-Once arbitrary backends are fully supported, you'll simply need to implement the
-`HttpClient` trait to use an alternative HTTP client.
+To use your own HTTP backend, implement the `HttpClient` trait and build with
+the `--no-default-features` flag.
 
 
 ### Testing
@@ -90,11 +90,14 @@ Tests currently only work with surf:
 cargo test --features=with_surf
 ```
 
+Because `with_surf` is a default feature, it does not need to be specified
+explicitly.
+
 
 ### Known Issues
 
-* Error types are currently tied to the error types of the implemented HTTP
-  clients, so arbitrary HTTP clients are not yet supported.
+* Some test failures result in stack overflow. This may be an interaction
+  between Surf's Error and anyhow.
 
 
 ## Contributing

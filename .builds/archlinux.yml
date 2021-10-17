@@ -8,19 +8,25 @@ tasks:
       $HOME/.cargo/bin/rustup toolchain install stable --allow-downgrade --profile minimal --component clippy
   - build-stable: |
       cd $HOME/b2-client
-      $HOME/.cargo/bin/cargo +stable build
-  - test-stable : |
+      $HOME/.cargo/bin/cargo +stable build --features=with_hyper
+  - test-stable: |
       cd $HOME/b2-client
-      $HOME/.cargo/bin/cargo +stable test
+      $HOME/.cargo/bin/cargo +stable test --features=with_hyper
+  - test-stable-no-def-features: |
+      cd $HOME/b2-client
+      $HOME/.cargo/bin/cargo +stable test --features=with_hyper
   - clippy-stable: |
       cd $HOME/b2-client
-      $HOME/.cargo/bin/cargo +stable clippy
+      $HOME/.cargo/bin/cargo +stable clippy --features=with_hyper
   - install-nightly: |
       cd $HOME/b2-client
       $HOME/.cargo/bin/rustup toolchain install nightly --allow-downgrade --profile minimal
   - build-nightly: |
       cd $HOME/b2-client
-      $HOME/.cargo/bin/cargo +nightly build
-  - test-nightly : |
+      $HOME/.cargo/bin/cargo +nightly build --features=with_hyper
+  - test-nightly: |
       cd $HOME/b2-client
-      $HOME/.cargo/bin/cargo +nightly test
+      $HOME/.cargo/bin/cargo +nightly test --features=with_hyper
+  - test-nightly-no-default-features: |
+      cd $HOME/b2-client
+      $HOME/.cargo/bin/cargo +nightly test --no-default-features

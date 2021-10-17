@@ -10,7 +10,7 @@ edition = "2018"
 default = [ "with_surf" ]
 # These features can only be enabled exclusively of each other:
 with_surf = [ "surf", "async-std", "url" ]
-with_hyper = [ "hyper", "hyper-tls", "tokio", "http" ]
+with_hyper = [ "hyper", "hyper-tls", "tokio", "http", "url" ]
 with_isahc = [ "isahc" ]
 
 [dependencies]

@@ -4,67 +4,103 @@
 */
 
 //! Error types for b2-client
+//!
+//! Errors are divided into two types:
+//!
+//! * [ValidationError] for data validation errors prior to sending a request to
+//!   the B2 API.
+//! * [Error] for errors returned by the Backblaze B2 API or the HTTP client.
 
 use std::fmt;
 
 use serde::{Serialize, Deserialize};
 
 
-#[cfg(feature = "with_surf")]
-type E = surf::Error;
-
-#[cfg(feature = "with_hyper")]
-type E = hyper::Error;
-
-/// Errors that can be returned by `b2-client` function calls.
+/// Errors from validating B2 requests prior to making the request.
 #[derive(Debug)]
-pub enum Error
-{
-    /// An error from the underlying HTTP client.
-    Client(E),
-    /// An error from the Backblaze B2 API.
-    B2(B2Error),
-    /// An error de/serializing data that's expected to be a valid JSON string.
-    Format(serde_json::Error),
+pub enum ValidationError {
     /// Failure to parse a URL.
     ///
     /// The string is a short description of the failure.
     BadUrl(String),
-    /// Data failed validation. The string is a short description of the
-    /// failure.
+    /// Data failed validation.
+    ///
+    /// The string is a short description of the failure.
+    // TODO: Separate this into useful variants.
     Invalid(String),
-    NoRequest,
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for ValidationError {}
 
-impl fmt::Display for Error {
+impl fmt::Display for ValidationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", *self)
     }
 }
 
-impl Error {
-    /// Create an [Error] from a [B2Error].
-    pub fn from_b2(e: B2Error) -> Self { Self::B2(e) }
+#[cfg(feature = "url")]
+impl From<url::ParseError> for ValidationError {
+    fn from(e: url::ParseError) -> Self {
+        Self::BadUrl(format!("{}", e))
+    }
+}
 
-    /// Create an [Error] from a [serde_json::Error].
-    // TODO: I don't like this name; we're not converting from JSON.
-    pub fn from_json(e: serde_json::Error) -> Self {
+// TODO: Rename?
+/// Errors related to making B2 API calls.
+#[derive(Debug)]
+pub enum Error<E>
+    // Surf's Error doesn't implement StdError.
+    where E: fmt::Debug + fmt::Display,
+{
+    /// An error from the underlying HTTP client.
+    Client(E),
+    /// An error from the Backblaze B2 API.
+    B2(B2Error),
+    /// An error deserializing the HTTP client's response.
+    Format(serde_json::Error),
+    /// Attempted to send a non-existent request.
+    NoRequest,
+}
+
+impl<E> std::error::Error for Error<E>
+    where E: fmt::Debug + fmt::Display,
+{}
+
+impl<E> fmt::Display for Error<E>
+    where E: fmt::Debug + fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", *self)
+    }
+}
+
+impl<E> From<B2Error> for Error<E>
+    where E: fmt::Debug + fmt::Display,
+{
+    fn from(e: B2Error) -> Self {
+        Self::B2(e)
+    }
+}
+
+impl<E> From<serde_json::Error> for Error<E>
+    where E: fmt::Debug + fmt::Display,
+{
+    fn from(e: serde_json::Error) -> Self {
         Self::Format(e)
     }
 }
 
-impl From<E> for Error {
-    fn from(e: E) -> Self {
+#[cfg(feature = "with_surf")]
+impl From<surf::Error> for Error<surf::Error> {
+    fn from(e: surf::Error) -> Self {
         Self::Client(e)
     }
 }
 
-#[cfg(feature = "url")]
-impl From<url::ParseError> for Error {
-    fn from(e: url::ParseError) -> Self {
-        Self::BadUrl(format!("{}", e))
+#[cfg(feature = "with_hyper")]
+impl From<hyper::Error> for Error<hyper::Error> {
+    fn from(e: hyper::Error) -> Self {
+        Self::Client(e)
     }
 }
 
@@ -94,6 +130,7 @@ impl ErrorCode {
             "transaction_cap_exceeded" => Ok(Self::TransactionCapExceeded),
             "internal_error" => Ok(Self::InternalError),
             "service_unavailable" => Ok(Self::ServiceUnavailable),
+            // TODO: Use an Unknown(code) variant instead.
             _ => Err(String::from(code.as_ref())),
         }
     }

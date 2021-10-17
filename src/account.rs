@@ -19,8 +19,7 @@ use std::fmt;
 
 use crate::{
     client::HttpClient,
-    error::B2Error,
-    Error,
+    error::{B2Error, ValidationError, Error},
 };
 
 use chrono::{DateTime, Local};
@@ -33,7 +32,7 @@ const B2_AUTH_URL: &str = if cfg!(test) {
     "https://api.backblazeb2.com/b2api/v2/"
 };
 
-// This gives us nice error handling when deserializing JSON responses.
+// This gives us nicer error handling when deserializing JSON responses.
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum B2Result<T> {
@@ -208,10 +207,12 @@ pub enum Capability {
 /// # Examples
 ///
 /// ```no_run
+/// # #[cfg(feature = "with_surf")]
 /// # use b2_client::{
 /// #     client::{HttpClient, SurfClient},
 /// #     account::{authorize_account, delete_key_by_id},
 /// # };
+/// # #[cfg(feature = "with_surf")]
 /// # async fn f() -> anyhow::Result<()> {
 /// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
 ///     .await?;
@@ -219,10 +220,10 @@ pub enum Capability {
 /// let removed_key = delete_key_by_id(&mut auth, "OTHER KEY ID").await?;
 /// # Ok(()) }
 /// ```
-pub async fn authorize_account<C>(mut client: C, key_id: &str, key: &str)
--> Result<Authorization<C>, Error>
-    // TODO: The use of this error type precludes using arbitrary HTTP clients.
-    where C: HttpClient<Response=serde_json::Value, Error=Error>,
+pub async fn authorize_account<C, E>(mut client: C, key_id: &str, key: &str)
+-> Result<Authorization<C>, Error<E>>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
 {
     let id_and_key = format!("{}:{}", key_id, key);
     let id_and_key = base64::encode(id_and_key.as_bytes());
@@ -232,13 +233,12 @@ pub async fn authorize_account<C>(mut client: C, key_id: &str, key: &str)
 
     let req = client.get(
         format!("{}b2_authorize_account", B2_AUTH_URL)
-    ).with_header("Authorization", &auth);
+    ).expect("Invalid URL")
+        .with_header("Authorization", &auth);
 
     let res = req.send().await?;
 
-    let auth: B2Result<ProtoAuthorization> = serde_json::from_value(res)
-        .map_err(Error::from_json)?;
-
+    let auth: B2Result<ProtoAuthorization> = serde_json::from_value(res)?;
     match auth {
         B2Result::Ok(r) => Ok(r.create_authorization(client)),
         B2Result::Err(e) => Err(Error::B2(e)),
@@ -334,12 +334,12 @@ pub struct CreateKeyRequestBuilder {
 
 impl CreateKeyRequestBuilder {
     /// Create a new builder, with the key's name provided.
-    pub fn new<S: Into<String>>(name: S) -> Result<Self, Error> {
+    pub fn new<S: Into<String>>(name: S) -> Result<Self, ValidationError> {
         // TODO: Name must be ASCII?
         let name = name.into();
 
         if name.len() > 100 {
-            return Err(Error::Invalid(
+            return Err(ValidationError::Invalid(
                 "Name must be no more than 100 characters.".into()
             ));
         }
@@ -347,7 +347,9 @@ impl CreateKeyRequestBuilder {
         let invalid_char = |c: &char| !(c.is_alphanumeric() || *c == '-');
 
         if let Some(ch) = name.chars().find(invalid_char) {
-            return Err(Error::Invalid(format!("Invalid character: {}", ch)));
+            return Err(
+                ValidationError::Invalid(format!("Invalid character: {}", ch))
+            );
         }
 
         Ok(Self {
@@ -363,13 +365,13 @@ impl CreateKeyRequestBuilder {
     ///
     /// At least one capability must be provided.
     pub fn with_capabilities<V: Into<Vec<Capability>>>(mut self, caps: V)
-    -> Result<Self, Error> {
+    -> Result<Self, ValidationError> {
         let caps = caps.into();
 
         if caps.is_empty() {
-            return Err(
-                Error::Invalid("Key must have at least one capability.".into())
-            );
+            return Err(ValidationError::Invalid(
+                "Key must have at least one capability.".into()
+            ));
         }
 
         self.capabilities = Some(caps);
@@ -380,13 +382,13 @@ impl CreateKeyRequestBuilder {
     ///
     /// If provided, the key must be positive and no more than 1,000 days.
     pub fn expires_after(mut self, dur: chrono::Duration)
-    -> Result<Self, Error> {
+    -> Result<Self, ValidationError> {
         if dur >= chrono::Duration::days(1000) {
-            return Err(
-                Error::Invalid("Expiration must be less than 1000 days".into())
-            );
+            return Err(ValidationError::Invalid(
+                "Expiration must be less than 1000 days".into()
+            ));
         } else if dur < chrono::Duration::seconds(1) {
-            return Err(Error::Invalid(
+            return Err(ValidationError::Invalid(
                 "Expiration must be a positive number of seconds".into()
             ));
         }
@@ -397,7 +399,7 @@ impl CreateKeyRequestBuilder {
 
     /// Limit the key's access to the specified bucket.
     pub fn limit_to_bucket<S: Into<String>>(mut self, id: S)
-    -> Result<Self, Error> {
+    -> Result<Self, ValidationError> {
         let id = id.into();
         // TODO: Validate bucket id.
 
@@ -407,7 +409,7 @@ impl CreateKeyRequestBuilder {
 
     /// Limit access to files to those that begin with the specified prefix.
     pub fn with_name_prefix<S: Into<String>>(mut self, prefix: S)
-    -> Result<Self, Error> {
+    -> Result<Self, ValidationError> {
         let prefix = prefix.into();
         // TODO: Validate prefix
 
@@ -416,10 +418,12 @@ impl CreateKeyRequestBuilder {
     }
 
     /// Create a new [CreateKeyRequest].
-    pub fn build(self) -> Result<CreateKeyRequest, Error> {
-        let capabilities = self.capabilities.ok_or_else(|| Error::Invalid(
-            "A list of capabilities for the key is required.".into()
-        ))?;
+    pub fn build(self) -> Result<CreateKeyRequest, ValidationError> {
+        let capabilities = self.capabilities.ok_or_else(||
+            ValidationError::Invalid(
+                "A list of capabilities for the key is required.".into()
+            )
+        )?;
 
         if self.bucket_id.is_some() {
             for cap in &capabilities {
@@ -441,14 +445,14 @@ impl CreateKeyRequestBuilder {
                     | Capability::ReadFileRetentions
                     | Capability::WriteFileRetentions
                     | Capability::BypassGovernance => {},
-                    cap => return Err(Error::Invalid(format!(
+                    cap => return Err(ValidationError::Invalid(format!(
                         "Invalid capability when bucket_id is set: {:?}",
                         cap
                     ))),
                 }
             }
         } else if self.name_prefix.is_some() {
-            return Err(Error::Invalid(
+            return Err(ValidationError::Invalid(
                 "bucket_id must be set when name_prefix is given".into()
             ));
         }
@@ -551,6 +555,7 @@ impl NewlyCreatedKey {
 /// # Examples
 ///
 /// ```no_run
+/// # #[cfg(feature = "with_surf")]
 /// # use b2_client::{
 /// #     client::{HttpClient, SurfClient},
 /// #     account::{
@@ -558,6 +563,7 @@ impl NewlyCreatedKey {
 /// #         Capability, CreateKeyRequestBuilder,
 /// #     },
 /// # };
+/// # #[cfg(feature = "with_surf")]
 /// # async fn f() -> anyhow::Result<()> {
 /// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
 ///     .await?;
@@ -569,26 +575,23 @@ impl NewlyCreatedKey {
 /// let (secret, new_key) = create_key(&mut auth, create_key_request).await?;
 /// # Ok(()) }
 /// ```
-pub async fn create_key<C>(
+pub async fn create_key<C, E>(
     auth: &mut Authorization<C>,
     new_key_info: CreateKeyRequest
-) -> Result<(String, Key), Error>
-    // TODO: The use of this error type precludes using arbitrary HTTP clients.
-    where C: HttpClient<Response=serde_json::Value, Error=Error>,
+) -> Result<(String, Key), Error<E>>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
 {
     let mut new_key_info = new_key_info;
     new_key_info.account_id = Some(auth.account_id.to_owned());
 
     let res = auth.client.post(auth.api_url("b2_create_key"))
+        .expect("Invalid URL")
         .with_header("Authorization", &auth.authorization_token)
-        .with_body(&serde_json::to_value(new_key_info)
-            .map_err(Error::from_json)?
-        )
+        .with_body(&serde_json::to_value(new_key_info)?)
         .send().await?;
 
-    let new_key: B2Result<NewlyCreatedKey> = serde_json::from_value(res)
-        .map_err(Error::from_json)?;
-
+    let new_key: B2Result<NewlyCreatedKey> = serde_json::from_value(res)?;
     match new_key {
         B2Result::Ok(key) => Ok(key.create_public_key()),
         B2Result::Err(e) => Err(Error::B2(e)),
@@ -603,6 +606,7 @@ pub async fn create_key<C>(
 /// information.
 ///
 /// ```no_run
+/// # #[cfg(feature = "with_surf")]
 /// # use b2_client::{
 /// #     client::{HttpClient, SurfClient},
 /// #     account::{
@@ -610,6 +614,7 @@ pub async fn create_key<C>(
 /// #         Capability, CreateKeyRequestBuilder,
 /// #     },
 /// # };
+/// # #[cfg(feature = "with_surf")]
 /// # async fn f() -> anyhow::Result<()> {
 /// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
 ///     .await?;
@@ -623,9 +628,10 @@ pub async fn create_key<C>(
 /// let deleted_key = delete_key(&mut auth, new_key).await?;
 /// # Ok(()) }
 /// ```
-pub async fn delete_key<C>(auth: &mut Authorization<C>, key: Key)
--> Result<Key, Error>
-    where C: HttpClient<Response=serde_json::Value, Error=Error>,
+pub async fn delete_key<C, E>(auth: &mut Authorization<C>, key: Key)
+-> Result<Key, Error<E>>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
 {
     delete_key_by_id(auth, key.application_key_id).await
 }
@@ -640,10 +646,12 @@ pub async fn delete_key<C>(auth: &mut Authorization<C>, key: Key)
 /// # Examples
 ///
 /// ```no_run
+/// # #[cfg(feature = "with_surf")]
 /// # use b2_client::{
 /// #     client::{HttpClient, SurfClient},
 /// #     account::{authorize_account, delete_key_by_id},
 /// # };
+/// # #[cfg(feature = "with_surf")]
 /// # async fn f() -> anyhow::Result<()> {
 /// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
 ///     .await?;
@@ -651,21 +659,20 @@ pub async fn delete_key<C>(auth: &mut Authorization<C>, key: Key)
 /// let removed_key = delete_key_by_id(&mut auth, "OTHER KEY ID").await?;
 /// # Ok(()) }
 /// ```
-pub async fn delete_key_by_id<C, S: AsRef<str>>(
+pub async fn delete_key_by_id<C, E, S: AsRef<str>>(
     auth: &mut Authorization<C>,
     key_id: S
-) -> Result<Key, Error>
-    // TODO: The use of this error type precludes using arbitrary HTTP clients.
-    where C: HttpClient<Response=serde_json::Value, Error=Error>,
+) -> Result<Key, Error<E>>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
 {
     let res = auth.client.post(auth.api_url("b2_delete_key"))
+        .expect("Invalid URL")
         .with_header("Authorization", &auth.authorization_token)
         .with_body(&serde_json::json!({"applicationKeyId": key_id.as_ref()}))
         .send().await?;
 
-    let key: B2Result<Key> = serde_json::from_value(res)
-        .map_err(Error::from_json)?;
-
+    let key: B2Result<Key> = serde_json::from_value(res)?;
     match key {
         B2Result::Ok(key) => Ok(key),
         B2Result::Err(e) => Err(Error::B2(e)),
@@ -759,11 +766,11 @@ impl DownloadAuthorizationRequestBuilder {
     ///
     /// This must be between one second and one week, inclusive.
     pub fn with_duration(mut self, dur: chrono::Duration)
-    -> Result<Self, Error> {
+    -> Result<Self, ValidationError> {
         if dur < chrono::Duration::seconds(1)
             || dur > chrono::Duration::weeks(1)
         {
-            return Err(Error::Invalid(
+            return Err(ValidationError::Invalid(
                 "Duration must be between 1 and 604,800 seconds, inclusive"
                     .into()
             ));
@@ -817,17 +824,18 @@ impl DownloadAuthorizationRequestBuilder {
     }
 
     /// Build a [DownloadAuthorizationRequest].
-    pub fn build(self) -> Result<DownloadAuthorizationRequest, Error> {
+    pub fn build(self) -> Result<DownloadAuthorizationRequest, ValidationError>
+    {
         let bucket_id = self.bucket_id
-            .ok_or_else(||
-                Error::Invalid("A bucket ID must be provided".into())
-            )?;
+            .ok_or_else(|| ValidationError::Invalid(
+                "A bucket ID must be provided".into()
+            ))?;
         let file_name_prefix = self.file_name_prefix
-            .ok_or_else(||
-                Error::Invalid("A filename prefix must be provided".into())
-            )?;
+            .ok_or_else(|| ValidationError::Invalid(
+                "A filename prefix must be provided".into()
+            ))?;
         let valid_duration_in_seconds = self.valid_duration_in_seconds
-            .ok_or_else(|| Error::Invalid(
+            .ok_or_else(|| ValidationError::Invalid(
                 "The duration of the authorization token must be set".into()
             ))?;
 
@@ -876,6 +884,7 @@ impl DownloadAuthorization {
 /// # Examples
 ///
 /// ```no_run
+/// # #[cfg(feature = "with_surf")]
 /// # use b2_client::{
 /// #     client::{HttpClient, SurfClient},
 /// #     account::{
@@ -883,6 +892,7 @@ impl DownloadAuthorization {
 /// #         DownloadAuthorizationRequestBuilder,
 /// #     },
 /// # };
+/// # #[cfg(feature = "with_surf")]
 /// # async fn f() -> anyhow::Result<()> {
 /// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
 ///     .await?;
@@ -898,21 +908,21 @@ impl DownloadAuthorization {
 /// # Ok(()) }
 /// ```
 // TODO: Once download endpoints are implemented, add one to the example above.
-pub async fn get_download_authorization<C>(
+pub async fn get_download_authorization<C, E>(
     auth: &mut Authorization<C>,
     download_req: DownloadAuthorizationRequest
-) -> Result<DownloadAuthorization, Error>
-    where C: HttpClient<Response=serde_json::Value, Error=Error>,
+) -> Result<DownloadAuthorization, Error<E>>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
 {
     let res = auth.client.post(auth.api_url("b2_get_download_authorization"))
+        .expect("Invalid URL")
         .with_header("Authorization", &auth.authorization_token)
-        .with_body(&serde_json::to_value(download_req)
-            .map_err(Error::from_json)?
-        )
+        .with_body(&serde_json::to_value(download_req)?)
         .send().await?;
 
     let download_auth: B2Result<DownloadAuthorization>
-        = serde_json::from_value(res).map_err(Error::from_json)?;
+        = serde_json::from_value(res)?;
 
     match download_auth {
         B2Result::Ok(auth) => Ok(auth),

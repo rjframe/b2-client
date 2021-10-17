@@ -1,12 +1,11 @@
 Project:
     ☐ Support Isahc
-    ☐ Support arbitrary backends
     ☐ Allow (require?) setting user-agent
     ☐ Work with B2 metadata headers
-    ☐ Fix feature incompatibility; at least enough to generate documentation for all features
     ☐ Default clients: use low-level libraries (h1, h2, etc.) rather than the libraries built on top of them.
     ☐ Check derived traits on objects - ensure consistency.
     ☐ Probably add builder() associated function to types that have one. Ensure consistent APIS.
+    ☐ Wrap surf's Error so our Error<E> can require E: Error.
 
     Maybe Upstream:
         ☐ When the surf-vcr middleware errors, we're getting a stack overflow rather than the error reported. It's probably a problem with surf-vcr - determine that for certain and fix.
@@ -54,6 +53,10 @@ API:
 
 ＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿
 Archive:
+    ✓ Support arbitrary backends @done(2021-10-17 10:00) @project(Project)
+    ✓ Fix feature incompatibility; at least enough to generate documentation for all features @done(2021-10-17 10:05) @project(Project)
+    ✓ Add to CI: test with `--no-default-features` @done(2021-10-17 10:24) @project(Project)
+    ✓ Add to CI: build with `--no-default-features --features=with_hyper` @done(2021-10-17 10:24) @project(Project)
     ✓ Add readme/other docs @done(2021-10-13 16:14) @project(Project)
     ✓ Review/update generated docs @done(2021-10-13 16:22) @project(Project \ Public Repos)
     ✓ Set up issue tracker @done(2021-10-14 16:47) @project(Project \ Public Repos)
