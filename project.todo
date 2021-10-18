@@ -12,16 +12,9 @@ Project:
             - only when using `?` in the test itself - if we print the error instead everything's fine. Some interaction with anyhow - try without anyhow and see.
 
 API:
-    ☐ Implement account endpoints
+    ✓ Implement account endpoints @done(2021-10-18 17:20) @project(API)
     ☐ Implement bucket endpoints
     ☐ Implement file endpoints
-
-    Account:
-        ✓ authorize_account @done(2021-10-13 15:01) @project(API \ Account)
-        ✓ create_key @done(2021-10-14 14:55) @project(API \ Account)
-        ✓ delete_key @done(2021-10-14 20:53) @project(API \ Account)
-        ✓ get_download_authorization @done(2021-10-15 19:02) @project(API \ Account)
-        ☐ list_keys
 
     Buckets:
         ☐ create_bucket
@@ -53,6 +46,11 @@ API:
 
 ＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿
 Archive:
+    ✓ authorize_account @done(2021-10-13 15:01) @project(API \ Account)
+    ✓ create_key @done(2021-10-14 14:55) @project(API \ Account)
+    ✓ delete_key @done(2021-10-14 20:53) @project(API \ Account)
+    ✓ get_download_authorization @done(2021-10-15 19:02) @project(API \ Account)
+    ✓ list_keys @done(2021-10-18 17:18) @project(API \ Account)
     ✓ Support arbitrary backends @done(2021-10-17 10:00) @project(Project)
     ✓ Fix feature incompatibility; at least enough to generate documentation for all features @done(2021-10-17 10:05) @project(Project)
     ✓ Add to CI: test with `--no-default-features` @done(2021-10-17 10:24) @project(Project)

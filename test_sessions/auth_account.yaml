@@ -157,3 +157,26 @@
       cache-control:
         - "max-age=0, no-cache, no-store"
     body: "{\n  \"authorizationToken\": \"3_20211015210824_f86016424582a846be762480_45319fc2d173cae06c73a8918af86fba5feaa07f_002_20211016052824_0006_dnld\",\n  \"bucketId\": \"8d625eb63be2775577c70e1a\",\n  \"fileNamePrefix\": \"files/\"\n}\n"
+---
+- Request:
+    method: POST
+    url: "http://localhost:8765/b2api/v2/b2_list_keys"
+    headers:
+      content-type:
+        - application/json
+      authorization:
+        - 4_002d2e6b27577ea0000000002_019f9ac2_4af224_acct_BzTNBWOKUVQvIMyHK3tXHG7YqDQ=
+    body: "{\"accountId\":\"abcdefg\",\"maxKeyCount\":100,\"startApplicationKeyId\":null}"
+- Response:
+    status: 200
+    version: ~
+    headers:
+      date:
+        - "Mon, 18 Oct 2021 18:18:00 GMT"
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      content-type:
+        - application/json;charset=UTF-8
+      content-length:
+        - "1020"
+    body: "{\n  \"keys\": [\n    {\n      \"accountId\": \"abcdefg\",\n      \"applicationKeyId\": \"opqrstu\",\n      \"bucketId\": \"hijklmn\",\n      \"capabilities\": [\n        \"listBuckets\",\n        \"listFiles\",\n        \"readFiles\",\n        \"shareFiles\",\n        \"writeFiles\",\n        \"deleteFiles\"\n      ],\n      \"expirationTimestamp\": null,\n      \"keyName\": \"my-key-name\",\n      \"namePrefix\": null,\n      \"options\": []\n    },\n    {\n      \"accountId\": \"abcdefg\",\n      \"applicationKeyId\": \"vwxyza\",\n      \"bucketId\": \"bcdefgh\",\n      \"capabilities\": [\n        \"listBuckets\",\n        \"readBuckets\",\n        \"listFiles\",\n        \"readFiles\",\n        \"shareFiles\",\n        \"writeFiles\",\n        \"deleteFiles\",\n        \"readBucketEncryption\",\n        \"writeBucketEncryption\"\n      ],\n      \"expirationTimestamp\": null,\n      \"keyName\": \"other-key-name\",\n      \"namePrefix\": null,\n      \"options\": [\n        \"s3\"\n      ]\n    }\n  ],\n  \"nextApplicationKeyId\": null\n}\n"

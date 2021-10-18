@@ -930,6 +930,155 @@ pub async fn get_download_authorization<C, E>(
     }
 }
 
+/// A request to obtain a list of keys associated with an account.
+///
+/// Use [KeyListRequestBuilder] to create a `KeyListRequest`, then pass it to
+/// [list_keys] to obtain the list of keys.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KeyListRequest {
+    // account_id is provided by an Authorization.
+    account_id: Option<String>,
+    max_key_count: u16,
+    start_application_key_id: Option<String>,
+}
+
+impl KeyListRequest {
+    pub fn builder() -> KeyListRequestBuilder {
+        KeyListRequestBuilder::default()
+    }
+}
+
+/// A builder to create a [KeyListRequest] object.
+///
+/// After creating the `KeyListRequest`, pass it to [list_keys] to obtain the
+/// list.
+///
+/// See <https://www.backblaze.com/b2/docs/b2_list_keys.html> for further
+/// information.
+#[derive(Debug)]
+pub struct KeyListRequestBuilder {
+    max_keys: u16,
+    start_key_id: Option<String>,
+}
+
+impl Default for KeyListRequestBuilder {
+    fn default() -> Self {
+        Self {
+            max_keys: 100,
+            start_key_id: None,
+        }
+    }
+}
+
+impl KeyListRequestBuilder {
+    /// Set the maximum number of keys to return in a single call to
+    /// [list_keys].
+    ///
+    /// The default is 100 and maximum is 10,000.
+    pub fn with_max_keys(mut self, limit: u16) -> Result<Self, ValidationError>
+    {
+        if limit > 10000 {
+            return Err(
+                ValidationError::Invalid("Key listing limit is 10,000".into())
+            );
+        }
+
+        self.max_keys = limit;
+        Ok(self)
+    }
+
+    /// Set the key ID at which to begin listing.
+    pub fn start_at_key(mut self, id: impl Into<String>)
+    -> Result<Self, ValidationError> {
+        // TODO: Validate id
+        self.start_key_id = Some(id.into());
+        Ok(self)
+    }
+
+    /// Create a [KeyListRequest].
+    pub fn build(self) -> KeyListRequest {
+        KeyListRequest {
+            account_id: None,
+            max_key_count: self.max_keys,
+            start_application_key_id: self.start_key_id,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct KeyResult {
+    keys: Vec<Key>,
+    next_application_key_id: Option<String>,
+}
+
+/// List application keys associated with the account of the given
+/// [Authorization].
+///
+/// The `Authorization` must have [Capability::ListKeys].
+///
+/// Returns a tuple of the list of keys and the ID of the next key in the list,
+/// if there are keys that have not been returned.
+///
+/// A single function call can generate multiple Class C transactions, which may
+/// result in charges to your account. See
+/// <https://www.backblaze.com/b2/docs/b2_list_keys.html> for further
+/// information.
+///
+/// # Examples
+///
+/// ```no_run
+/// # #[cfg(feature = "with_surf")]
+/// # use b2_client::{
+/// #     client::{HttpClient, SurfClient},
+/// #     account::{
+/// #         authorize_account, list_keys,
+/// #         Capability, KeyListRequest,
+/// #     },
+/// # };
+/// # #[cfg(feature = "with_surf")]
+/// # async fn f() -> anyhow::Result<()> {
+/// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
+///     .await?;
+///
+/// let req = KeyListRequest::builder()
+///     .with_max_keys(500)?
+///     .build();
+///
+/// let (keys, _next_bucket) = list_keys(&mut auth, req).await?;
+///
+/// for key in keys.iter() {
+///     // ...
+/// }
+/// # Ok(()) }
+/// ```
+// TODO: Borrow the KeyListRequest to make it easy to quickly call this again?
+// TODO: Create a list_all_keys function?
+pub async fn list_keys<C, E>(
+    auth: &mut Authorization<C>,
+    list_req: KeyListRequest
+) -> Result<(Vec<Key>, Option<String>), Error<E>>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    let mut list_req = list_req;
+    list_req.account_id = Some(auth.account_id.to_owned());
+
+    let res = auth.client.post(auth.api_url("b2_list_keys"))
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .with_body(&serde_json::to_value(list_req)?)
+        .send().await?;
+
+    let keys: B2Result<KeyResult> = serde_json::from_value(res)?;
+    match keys {
+        B2Result::Ok(keys) => Ok((keys.keys, keys.next_application_key_id)),
+        B2Result::Err(e) => Err(Error::B2(e)),
+    }
+}
+
+
 // TODO: Find a good way to mock responses for any/all backends.
 #[cfg(feature = "with_surf")]
 #[cfg(test)]
@@ -1114,6 +1263,23 @@ mod tests {
 
         let download_auth = get_download_authorization(&mut auth, req).await?;
         assert_eq!(download_auth.bucket_id(), "8d625eb63be2775577c70e1a");
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_list_keys() -> Result<(), anyhow::Error> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/auth_account.yaml"
+        ).await?;
+
+        let mut auth = get_test_key(client, vec![Capability::ListKeys]);
+        let req = KeyListRequest::builder().build();
+
+        let (keys, next) = list_keys(&mut auth, req).await?;
+        assert_eq!(keys.len(), 2);
+        assert_eq!(next, None);
 
         Ok(())
     }
