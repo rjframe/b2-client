@@ -96,9 +96,6 @@ explicitly.
 
 ### Known Issues
 
-* Some test failures result in stack overflow. This may be an interaction
-  between Surf's Error and anyhow.
-
 
 ## Contributing
 

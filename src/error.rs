@@ -34,7 +34,10 @@ impl std::error::Error for ValidationError {}
 
 impl fmt::Display for ValidationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", *self)
+        match self {
+            Self::BadUrl(s) => write!(f, "Error parsing URL: {}", s),
+            Self::Invalid(s) => write!(f, "{}", s),
+        }
     }
 }
 
@@ -70,7 +73,14 @@ impl<E> fmt::Display for Error<E>
     where E: fmt::Debug + fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", *self)
+        use fmt::Display;
+
+        match self {
+            Self::Client(e) => Display::fmt(&e, f),
+            Self::B2(e) => Display::fmt(&e, f),
+            Self::Format(e) => e.fmt(f),
+            Self::NoRequest => write!(f, "No request was created"),
+        }
     }
 }
 

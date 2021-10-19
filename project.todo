@@ -7,10 +7,6 @@ Project:
     ☐ Probably add builder() associated function to types that have one. Ensure consistent APIS.
     ☐ Wrap surf's Error so our Error<E> can require E: Error.
 
-    Maybe Upstream:
-        ☐ When the surf-vcr middleware errors, we're getting a stack overflow rather than the error reported. It's probably a problem with surf-vcr - determine that for certain and fix.
-            - only when using `?` in the test itself - if we print the error instead everything's fine. Some interaction with anyhow - try without anyhow and see.
-
 API:
     ✓ Implement account endpoints @done(2021-10-18 17:20) @project(API)
     ☐ Implement bucket endpoints
@@ -46,6 +42,7 @@ API:
 
 ＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿
 Archive:
+    ✓ Fix stack overflow on error. @done(2021-10-18 21:10) @project(Project \ Maybe Upstream)
     ✓ authorize_account @done(2021-10-13 15:01) @project(API \ Account)
     ✓ create_key @done(2021-10-14 14:55) @project(API \ Account)
     ✓ delete_key @done(2021-10-14 20:53) @project(API \ Account)
