@@ -23,11 +23,22 @@ pub enum ValidationError {
     ///
     /// The string is a short description of the failure.
     BadUrl(String),
-    /// Data failed validation.
+    /// The name is not valid.
     ///
     /// The string is a short description of the failure.
-    // TODO: Separate this into useful variants.
-    Invalid(String),
+    BadName(String),
+    /// Required information was not provided.
+    ///
+    /// The string is a short description of the failure.
+    MissingData(String),
+    /// The data is outside its valid range.
+    ///
+    /// The string is a short description of the failure.
+    OutOfBounds(String),
+    /// Two pieces of data are incompatible together.
+    ///
+    /// The string is a short description of the failure.
+    Incompatible(String),
 }
 
 impl std::error::Error for ValidationError {}
@@ -36,7 +47,10 @@ impl fmt::Display for ValidationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::BadUrl(s) => write!(f, "Error parsing URL: {}", s),
-            Self::Invalid(s) => write!(f, "{}", s),
+            Self::BadName(s) => write!(f, "{}", s),
+            Self::MissingData(s) => write!(f, "{}", s),
+            Self::OutOfBounds(s) => write!(f, "{}", s),
+            Self::Incompatible(s) => write!(f, "{}", s),
         }
     }
 }

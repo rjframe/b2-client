@@ -339,7 +339,7 @@ impl CreateKeyRequestBuilder {
         let name = name.into();
 
         if name.len() > 100 {
-            return Err(ValidationError::Invalid(
+            return Err(ValidationError::BadName(
                 "Name must be no more than 100 characters.".into()
             ));
         }
@@ -348,7 +348,7 @@ impl CreateKeyRequestBuilder {
 
         if let Some(ch) = name.chars().find(invalid_char) {
             return Err(
-                ValidationError::Invalid(format!("Invalid character: {}", ch))
+                ValidationError::BadName(format!("Invalid character: {}", ch))
             );
         }
 
@@ -369,8 +369,8 @@ impl CreateKeyRequestBuilder {
         let caps = caps.into();
 
         if caps.is_empty() {
-            return Err(ValidationError::Invalid(
-                "Key must have at least one capability.".into()
+            return Err(ValidationError::MissingData(
+                "A key must have at least one capability.".into()
             ));
         }
 
@@ -384,11 +384,11 @@ impl CreateKeyRequestBuilder {
     pub fn expires_after(mut self, dur: chrono::Duration)
     -> Result<Self, ValidationError> {
         if dur >= chrono::Duration::days(1000) {
-            return Err(ValidationError::Invalid(
+            return Err(ValidationError::OutOfBounds(
                 "Expiration must be less than 1000 days".into()
             ));
         } else if dur < chrono::Duration::seconds(1) {
-            return Err(ValidationError::Invalid(
+            return Err(ValidationError::OutOfBounds(
                 "Expiration must be a positive number of seconds".into()
             ));
         }
@@ -420,7 +420,7 @@ impl CreateKeyRequestBuilder {
     /// Create a new [CreateKeyRequest].
     pub fn build(self) -> Result<CreateKeyRequest, ValidationError> {
         let capabilities = self.capabilities.ok_or_else(||
-            ValidationError::Invalid(
+            ValidationError::MissingData(
                 "A list of capabilities for the key is required.".into()
             )
         )?;
@@ -445,14 +445,14 @@ impl CreateKeyRequestBuilder {
                     | Capability::ReadFileRetentions
                     | Capability::WriteFileRetentions
                     | Capability::BypassGovernance => {},
-                    cap => return Err(ValidationError::Invalid(format!(
+                    cap => return Err(ValidationError::Incompatible(format!(
                         "Invalid capability when bucket_id is set: {:?}",
                         cap
                     ))),
                 }
             }
         } else if self.name_prefix.is_some() {
-            return Err(ValidationError::Invalid(
+            return Err(ValidationError::MissingData(
                 "bucket_id must be set when name_prefix is given".into()
             ));
         }
@@ -770,7 +770,7 @@ impl DownloadAuthorizationRequestBuilder {
         if dur < chrono::Duration::seconds(1)
             || dur > chrono::Duration::weeks(1)
         {
-            return Err(ValidationError::Invalid(
+            return Err(ValidationError::OutOfBounds(
                 "Duration must be between 1 and 604,800 seconds, inclusive"
                     .into()
             ));
@@ -827,15 +827,15 @@ impl DownloadAuthorizationRequestBuilder {
     pub fn build(self) -> Result<DownloadAuthorizationRequest, ValidationError>
     {
         let bucket_id = self.bucket_id
-            .ok_or_else(|| ValidationError::Invalid(
+            .ok_or_else(|| ValidationError::MissingData(
                 "A bucket ID must be provided".into()
             ))?;
         let file_name_prefix = self.file_name_prefix
-            .ok_or_else(|| ValidationError::Invalid(
+            .ok_or_else(|| ValidationError::MissingData(
                 "A filename prefix must be provided".into()
             ))?;
         let valid_duration_in_seconds = self.valid_duration_in_seconds
-            .ok_or_else(|| ValidationError::Invalid(
+            .ok_or_else(|| ValidationError::MissingData(
                 "The duration of the authorization token must be set".into()
             ))?;
 
@@ -979,9 +979,9 @@ impl KeyListRequestBuilder {
     pub fn with_max_keys(mut self, limit: u16) -> Result<Self, ValidationError>
     {
         if limit > 10000 {
-            return Err(
-                ValidationError::Invalid("Key listing limit is 10,000".into())
-            );
+            return Err(ValidationError::OutOfBounds(
+                "Key listing limit is 10,000".into()
+            ));
         }
 
         self.max_keys = limit;
