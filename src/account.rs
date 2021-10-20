@@ -339,7 +339,7 @@ impl CreateKeyRequestBuilder {
         let name = name.into();
 
         if name.len() > 100 {
-            return Err(ValidationError::BadName(
+            return Err(ValidationError::BadFormat(
                 "Name must be no more than 100 characters.".into()
             ));
         }
@@ -348,7 +348,7 @@ impl CreateKeyRequestBuilder {
 
         if let Some(ch) = name.chars().find(invalid_char) {
             return Err(
-                ValidationError::BadName(format!("Invalid character: {}", ch))
+                ValidationError::BadFormat(format!("Invalid character: {}", ch))
             );
         }
 

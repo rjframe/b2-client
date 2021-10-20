@@ -23,10 +23,10 @@ pub enum ValidationError {
     ///
     /// The string is a short description of the failure.
     BadUrl(String),
-    /// The name is not valid.
+    /// The data is an invalid format or contains invalid information.
     ///
     /// The string is a short description of the failure.
-    BadName(String),
+    BadFormat(String),
     /// Required information was not provided.
     ///
     /// The string is a short description of the failure.
@@ -47,7 +47,7 @@ impl fmt::Display for ValidationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::BadUrl(s) => write!(f, "Error parsing URL: {}", s),
-            Self::BadName(s) => write!(f, "{}", s),
+            Self::BadFormat(s) => write!(f, "{}", s),
             Self::MissingData(s) => write!(f, "{}", s),
             Self::OutOfBounds(s) => write!(f, "{}", s),
             Self::Incompatible(s) => write!(f, "{}", s),
