@@ -10,4 +10,12 @@ pub mod account;
 pub mod client;
 pub mod error;
 
+pub mod prelude {
+    pub use super::{
+        account::Authorization,
+    };
+}
+
+pub use account::*;
+pub use client::HttpClient;
 pub use error::Error;
