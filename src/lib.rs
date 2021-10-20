@@ -7,8 +7,10 @@
 //! clients.
 
 pub mod account;
+pub mod bucket;
 pub mod client;
 pub mod error;
+mod validate;
 
 pub mod prelude {
     pub use super::{
@@ -17,5 +19,6 @@ pub mod prelude {
 }
 
 pub use account::*;
+pub use bucket::*;
 pub use client::HttpClient;
 pub use error::Error;

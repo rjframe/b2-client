@@ -11,11 +11,17 @@
 //!   the B2 API.
 //! * [Error] for errors returned by the Backblaze B2 API or the HTTP client.
 
-use std::fmt;
+use std::{
+    collections::HashMap,
+    fmt,
+};
 
 use serde::{Serialize, Deserialize};
 
 
+// TODO: Splitting these up will provide nicer error handling when the user
+// actually wants to handle them, rather than merely print them. It also means
+// many error types, so may make learning/using the library more difficult.
 /// Errors from validating B2 requests prior to making the request.
 #[derive(Debug)]
 pub enum ValidationError {
@@ -39,6 +45,12 @@ pub enum ValidationError {
     ///
     /// The string is a short description of the failure.
     Incompatible(String),
+    /// Multiple [LifecycleRule](crate::bucket::LifecycleRule)s exist for the
+    /// same file.
+    ///
+    /// Returns a map of conflicting filename prefixes; the most broad prefix
+    /// (the base path) for each group of conflicts is the key.
+    ConflictingRules(HashMap<String, Vec<String>>),
 }
 
 impl std::error::Error for ValidationError {}
@@ -51,6 +63,8 @@ impl fmt::Display for ValidationError {
             Self::MissingData(s) => write!(f, "{}", s),
             Self::OutOfBounds(s) => write!(f, "{}", s),
             Self::Incompatible(s) => write!(f, "{}", s),
+            Self::ConflictingRules(_) => write!(f,
+                "Only one lifecycle rule can apply to any given set of files"),
         }
     }
 }
