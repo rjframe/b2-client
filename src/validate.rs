@@ -97,7 +97,7 @@ pub(crate) fn validated_lifecycle_rules(rules: impl Into<Vec<LifecycleRule>>)
                 map.insert(key, val);
             });
 
-        if map.len() > 0 {
+        if ! map.is_empty() {
             Err(ValidationError::ConflictingRules(map))
         } else {
             Ok(rules)

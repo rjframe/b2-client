@@ -85,6 +85,7 @@ impl CorsRule {
 ///
 /// See <https://www.backblaze.com/b2/docs/cors_rules.html> for further
 /// information on CORS and file access via the B2 service.
+#[derive(Debug, Default)]
 pub struct CorsRuleBuilder {
     name: Option<String>,
     allowed_origins: Vec<String>,
@@ -92,19 +93,6 @@ pub struct CorsRuleBuilder {
     allowed_headers: Option<Vec<String>>,
     expose_headers: Option<Vec<String>>,
     max_age: Option<u16>,
-}
-
-impl Default for CorsRuleBuilder {
-    fn default() -> Self {
-        Self {
-            name: None,
-            allowed_origins: vec![],
-            allowed_operations: vec![],
-            allowed_headers: None,
-            expose_headers: None,
-            max_age: None,
-        }
-    }
 }
 
 impl CorsRuleBuilder {
@@ -231,7 +219,7 @@ impl CorsRuleBuilder {
     -> Result<Self, ValidationError> {
         let header = header.into();
         // TODO: Validate header
-        let headers = self.allowed_headers.get_or_insert_with(|| vec![]);
+        let headers = self.allowed_headers.get_or_insert_with(Vec::new);
         headers.push(header);
         Ok(self)
     }
@@ -260,7 +248,7 @@ impl CorsRuleBuilder {
     -> Result<Self, ValidationError> {
         let header = header.into();
         // TODO: Validate header
-        let headers = self.expose_headers.get_or_insert_with(|| vec![]);
+        let headers = self.expose_headers.get_or_insert_with(Vec::new);
         headers.push(header);
         Ok(self)
     }
@@ -283,13 +271,17 @@ impl CorsRuleBuilder {
 
     /// Create a [CorsRule] object.
     pub fn build(self) -> Result<CorsRule, ValidationError> {
-        let cors_rule_name = self.name.ok_or(ValidationError::MissingData(
-            "The CORS rule must have a name".into()
-        ))?;
+        let cors_rule_name = self.name.ok_or_else(||
+            ValidationError::MissingData(
+                "The CORS rule must have a name".into()
+            )
+        )?;
 
-        let max_age_seconds = self.max_age.ok_or(ValidationError::MissingData(
-            "A maximum age for client caching must be specified".into()
-        ))?;
+        let max_age_seconds = self.max_age.ok_or_else(||
+            ValidationError::MissingData(
+                "A maximum age for client caching must be specified".into()
+            )
+        )?;
 
         if self.allowed_origins.is_empty() {
             Err(ValidationError::MissingData(
@@ -352,20 +344,11 @@ impl LifecycleRule {
 ///
 /// See <https://www.backblaze.com/b2/docs/lifecycle_rules.html> for information
 /// on bucket lifecycles.
+#[derive(Default)]
 pub struct LifecycleRuleBuilder {
     prefix: Option<String>,
     delete_after: Option<u16>,
     hide_after: Option<u16>,
-}
-
-impl Default for LifecycleRuleBuilder {
-    fn default() -> Self {
-        Self {
-            prefix: None,
-            delete_after: None,
-            hide_after: None,
-        }
-    }
 }
 
 impl LifecycleRuleBuilder {
@@ -558,7 +541,7 @@ impl CreateBucketRequestBuilder {
         let rules = rules.into();
 
         if ! rules.is_empty() {
-            self.cors_rules = Some(rules.into());
+            self.cors_rules = Some(rules);
         }
 
         self
@@ -646,7 +629,7 @@ impl CreateBucketRequestBuilder {
     /// ```
     pub fn with_lifecycle_rules(mut self, rules: impl Into<Vec<LifecycleRule>>)
     -> Result<Self, ValidationError> {
-        let rules = validated_lifecycle_rules(rules)?.into();
+        let rules = validated_lifecycle_rules(rules)?;
         self.lifecycle_rules = Some(rules);
         Ok(self)
     }
