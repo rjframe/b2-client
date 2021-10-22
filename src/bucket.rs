@@ -443,6 +443,54 @@ impl LifecycleRuleBuilder {
     }
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+pub enum EncryptionAlgorithm {
+    #[serde(rename = "AES256")]
+    Aes256,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "serialization::InnerSelfEncryption")]
+#[serde(into = "serialization::InnerSelfEncryption")]
+pub struct SelfManagedEncryption {
+    algorithm: EncryptionAlgorithm,
+    key: String,
+    digest: String,
+}
+
+impl SelfManagedEncryption {
+    pub fn new(algorithm: EncryptionAlgorithm, key: impl Into<String>)
+    -> Self {
+        let key = key.into();
+
+        let digest = md5::compute(key.as_bytes());
+        let digest = base64::encode(digest.0);
+
+        let key = base64::encode(key.as_bytes());
+
+        Self {
+            algorithm,
+            key,
+            digest,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "serialization::InnerEncryptionConfig")]
+#[serde(into = "serialization::InnerEncryptionConfig")]
+pub enum DefaultServerSideEncryption {
+    B2Managed(EncryptionAlgorithm),
+    SelfManaged(SelfManagedEncryption),
+    NoEncryption,
+}
+
+impl Default for DefaultServerSideEncryption {
+    fn default() -> Self {
+        Self::NoEncryption
+    }
+}
+
 /// A request to create a new bucket.
 ///
 /// Use [CreateBucketRequestBuilder] to create a `CreateBucketRequest`, then
@@ -458,8 +506,7 @@ pub struct CreateBucketRequest {
     cors_rules: Option<Vec<CorsRule>>,
     file_lock_enabled: bool,
     lifecycle_rules: Option<Vec<LifecycleRule>>,
-    // TODO: Type the structure
-    default_server_side_encryption: Option<serde_json::Value>,
+    default_server_side_encryption: Option<DefaultServerSideEncryption>,
 }
 
 impl CreateBucketRequest {
@@ -481,8 +528,7 @@ pub struct CreateBucketRequestBuilder {
     cors_rules: Option<Vec<CorsRule>>,
     file_lock_enabled: bool,
     lifecycle_rules: Option<Vec<LifecycleRule>>,
-    // TODO: Type the structure
-    default_server_side_encryption: Option<serde_json::Value>,
+    default_server_side_encryption: Option<DefaultServerSideEncryption>,
 }
 
 impl Default for CreateBucketRequestBuilder {
@@ -635,12 +681,12 @@ impl CreateBucketRequestBuilder {
     }
 
     /// Use the provided encryption settings on the bucket.
-    // TODO: settings type
-    pub fn with_encryption_settings(mut self, settings: serde_json::Value)
-    -> Result<Self, ValidationError> {
-        // TODO: Validate settings
+    pub fn with_encryption_settings(
+        mut self,
+        settings: DefaultServerSideEncryption
+    ) -> Self {
         self.default_server_side_encryption = Some(settings);
-        Ok(self)
+        self
     }
 
     /// Create a [CreateBucketRequest].
@@ -667,5 +713,219 @@ impl CreateBucketRequestBuilder {
             lifecycle_rules: self.lifecycle_rules,
             default_server_side_encryption: self.default_server_side_encryption,
         })
+    }
+}
+
+mod serialization {
+    //! Our public encryption configuration type is sufficiently different from
+    //! the JSON that we cannot simply deserialize it. We use the types here as
+    //! an intermediate step.
+    //!
+    //! I think we could use a manual Serialize impl; we're using these anyway
+    //! for consistency.
+
+    use std::convert::TryFrom;
+    use serde::{Serialize, Deserialize};
+
+
+    #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+    enum Mode {
+        #[serde(rename = "SSE-B2")]
+        B2Managed,
+        #[serde(rename = "SSE-C")]
+        SelfManaged,
+    }
+
+    #[derive(Debug, Default, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub(crate) struct InnerEncryptionConfig {
+        mode: Option<Mode>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        algorithm: Option<super::EncryptionAlgorithm>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        customer_key: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        customer_key_md5: Option<String>,
+    }
+
+    impl TryFrom<InnerEncryptionConfig> for super::DefaultServerSideEncryption {
+        type Error = &'static str;
+
+        fn try_from(other: InnerEncryptionConfig) -> Result<Self, Self::Error> {
+            if let Some(mode) = other.mode {
+                if mode == Mode::B2Managed {
+                    let algo = other.algorithm
+                        .ok_or("Missing encryption algorithm")?;
+
+                    Ok(Self::B2Managed(algo))
+                } else { // Mode::SelfManaged
+                    let algorithm = other.algorithm
+                        .ok_or("Missing encryption algorithm")?;
+                    let key = other.customer_key
+                        .ok_or("Missing encryption key")?;
+                    let digest = other.customer_key_md5
+                        .ok_or("Missing encryption key digest")?;
+
+                    Ok(Self::SelfManaged(
+                        super::SelfManagedEncryption {
+                            algorithm,
+                            key,
+                            digest,
+                        }
+                    ))
+                }
+            } else {
+                Ok(Self::NoEncryption)
+            }
+        }
+    }
+
+    impl From<super::DefaultServerSideEncryption> for InnerEncryptionConfig {
+        fn from(other: super::DefaultServerSideEncryption) -> Self {
+            match other {
+                super::DefaultServerSideEncryption::B2Managed(algorithm) => {
+                    Self {
+                        mode: Some(Mode::B2Managed),
+                        algorithm: Some(algorithm),
+                        ..Default::default()
+                    }
+                },
+                super::DefaultServerSideEncryption::SelfManaged(enc) => {
+                    Self {
+                        mode: Some(Mode::SelfManaged),
+                        algorithm: Some(enc.algorithm),
+                        customer_key: Some(enc.key),
+                        customer_key_md5: Some(enc.digest),
+                    }
+                },
+                super::DefaultServerSideEncryption::NoEncryption => {
+                    Self::default()
+                },
+            }
+        }
+    }
+
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub(crate) struct InnerSelfEncryption {
+        mode: Mode,
+        algorithm: super::EncryptionAlgorithm,
+        customer_key: String,
+        customer_key_md5: String,
+    }
+
+    impl TryFrom<InnerSelfEncryption> for super::SelfManagedEncryption {
+        type Error = &'static str;
+
+        fn try_from(other: InnerSelfEncryption) -> Result<Self, Self::Error> {
+            if other.mode != Mode::SelfManaged {
+                Err("Not a self-managed encryption configuration")
+            } else {
+                Ok(Self {
+                    algorithm: other.algorithm,
+                    key: other.customer_key,
+                    digest: other.customer_key_md5,
+                })
+            }
+        }
+    }
+
+    impl From<super::SelfManagedEncryption> for InnerSelfEncryption {
+        fn from(other: super::SelfManagedEncryption) -> Self {
+            Self {
+                mode: Mode::SelfManaged,
+                algorithm: other.algorithm,
+                customer_key: other.key,
+                customer_key_md5: other.digest,
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::{json, from_value, to_value};
+
+    #[test]
+    fn no_encryption_to_json() {
+        assert_eq!(
+            to_value(DefaultServerSideEncryption::NoEncryption).unwrap(),
+            json!({ "mode": Option::<String>::None })
+        );
+    }
+
+    #[test]
+    fn no_encryption_from_json() {
+        let enc: DefaultServerSideEncryption = from_value(
+            json!({ "mode": Option::<String>::None })
+        ).unwrap();
+
+        assert_eq!(enc, DefaultServerSideEncryption::NoEncryption);
+    }
+
+    #[test]
+    fn b2_encryption_to_json() {
+        let json = to_value(
+            DefaultServerSideEncryption::B2Managed(EncryptionAlgorithm::Aes256)
+        ).unwrap();
+
+        assert_eq!(json, json!({ "mode": "SSE-B2", "algorithm": "AES256" }));
+    }
+
+    #[test]
+    fn b2_encryption_from_json() {
+        let enc: DefaultServerSideEncryption = from_value(
+            json!({ "mode": "SSE-B2", "algorithm": "AES256" })
+        ).unwrap();
+
+        assert_eq!(
+            enc,
+            DefaultServerSideEncryption::B2Managed(EncryptionAlgorithm::Aes256)
+        );
+    }
+
+    #[test]
+    fn self_encryption_to_json() {
+        let json = to_value(DefaultServerSideEncryption::SelfManaged(
+            SelfManagedEncryption {
+                algorithm: EncryptionAlgorithm::Aes256,
+                key: "MY-ENCODED-KEY".into(),
+                digest: "ENCODED-DIGEST".into(),
+            }
+        )).unwrap();
+
+        assert_eq!(
+            json,
+            json!({
+                "mode": "SSE-C",
+                "algorithm": "AES256",
+                "customerKey": "MY-ENCODED-KEY",
+                "customerKeyMd5": "ENCODED-DIGEST",
+            })
+        );
+    }
+
+    #[test]
+    fn self_encryption_from_json() {
+        let enc: DefaultServerSideEncryption = from_value(
+            json!({
+                "mode": "SSE-C",
+                "algorithm": "AES256",
+                "customerKey": "MY-ENCODED-KEY",
+                "customerKeyMd5": "ENCODED-DIGEST",
+            })
+        ).unwrap();
+
+        assert_eq!(
+            enc,
+            DefaultServerSideEncryption::SelfManaged(
+                SelfManagedEncryption {
+                    algorithm: EncryptionAlgorithm::Aes256,
+                    key: "MY-ENCODED-KEY".into(),
+                    digest: "ENCODED-DIGEST".into(),
+                }
+            )
+        );
     }
 }
