@@ -521,6 +521,7 @@ impl CreateBucketRequest {
 ///
 /// See <https://www.backblaze.com/b2/docs/b2_create_bucket.html> for further
 /// information.
+#[derive(Default)]
 pub struct CreateBucketRequestBuilder {
     bucket_name: Option<String>,
     bucket_type: Option<BucketType>,
@@ -529,12 +530,6 @@ pub struct CreateBucketRequestBuilder {
     file_lock_enabled: bool,
     lifecycle_rules: Option<Vec<LifecycleRule>>,
     default_server_side_encryption: Option<DefaultServerSideEncryption>,
-}
-
-impl Default for CreateBucketRequestBuilder {
-    fn default() -> Self {
-        todo!()
-    }
 }
 
 impl CreateBucketRequestBuilder {

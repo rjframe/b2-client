@@ -72,11 +72,7 @@ impl<C> Authorization<C>
     /// The smallest possible size in bytes of a part of a large file, except
     /// the final part.
     pub fn minimum_part_size(&self) -> u64 { self.absolute_minimum_part_size }
-}
 
-impl<C> Authorization<C>
-    where C: HttpClient,
-{
     /// Return the API url to the specified service endpoint.
     ///
     /// This URL is used for all API calls except downloading files.
