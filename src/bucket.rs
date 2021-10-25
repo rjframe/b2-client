@@ -35,7 +35,7 @@ pub enum BucketType {
 }
 
 /// A valid CORS operation for B2 buckets.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum CorsOperation {
     #[serde(rename = "b2_download_file_by_name")]
@@ -63,7 +63,7 @@ pub enum CorsOperation {
 ///
 /// See <https://www.backblaze.com/b2/docs/cors_rules.html> for further
 /// information on CORS and file access via the B2 service.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CorsRule {
     cors_rule_name: String,
@@ -308,16 +308,16 @@ impl CorsRuleBuilder {
 ///
 /// See <https://www.backblaze.com/b2/docs/lifecycle_rules.html> for further
 /// information.
-#[derive(Debug, Serialize, Eq, PartialEq, Hash)]
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct LifecycleRule {
     pub(crate) file_name_prefix: String,
     // The B2 docs don't give an upper limit. I can't imagine a reasonable rule
     // requiring anything close to u16::max() but if necessary we can make these
     // u32 in the future.
-    #[serde(rename = "days_from_hiding_to_deleting")]
+    #[serde(rename = "daysFromHidingToDeleting")]
     delete_after: Option<u16>,
-    #[serde(rename = "days_from_uploading_to_hiding")]
+    #[serde(rename = "daysFromUploadingToHiding")]
     hide_after: Option<u16>,
 }
 
@@ -709,6 +709,64 @@ impl CreateBucketRequestBuilder {
             default_server_side_encryption: self.default_server_side_encryption,
         })
     }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct FileLockConfiguration {
+    #[serde(rename = "isClientAuthorizedToRead")]
+    can_read: bool, // TODO: Is this even worth keeping?
+    #[serde(rename = "isFileLockEnabled")]
+    file_lock_enabled: bool,
+    #[serde(rename = "value")]
+    retention: FileRetentionPolicy,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub enum FileRetentionMode {
+    Governance,
+    Compliance,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+enum PeriodUnit { Days, Years }
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+struct Period { duration: u32, unit: PeriodUnit }
+
+impl From<Period> for chrono::Duration {
+    fn from(other: Period) -> Self {
+        match other.unit {
+            PeriodUnit::Days => Self::days(other.duration as i64),
+            PeriodUnit::Years => Self::weeks(other.duration as i64 * 52),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct FileRetentionPolicy {
+    mode: FileRetentionMode,
+    period: Period,
+}
+
+impl FileRetentionPolicy {
+    pub fn mode(&self) -> FileRetentionMode { self.mode }
+    pub fn period(&self) -> chrono::Duration { self.period.into() }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Bucket {
+    account_id: Option<String>,
+    bucket_id: String,
+    bucket_name: String,
+    bucket_type: BucketType,
+    bucket_info: serde_json::Value,
+    cors_rules: Vec<CorsRule>,
+    file_lock_configuration: FileRetentionPolicy,
+    default_server_side_encryption: serde_json::Value, // TODO: Type
+    lifecycle_rules: Vec<LifecycleRule>,
+    revision: u64, // TODO: Type?
+    options: Option<String>, // TODO: Type?
 }
 
 mod serialization {
