@@ -63,6 +63,32 @@ pub struct Authorization<C>
 impl<C> Authorization<C>
     where C: HttpClient,
 {
+    // Allow tests to create fake Authorizations.
+    #[cfg(test)]
+    pub(crate) fn new(
+        client: C,
+        account_id: String,
+        authorization_token: String,
+        allowed: Capabilities,
+        api_url: String,
+        download_url: String,
+        recommended_part_size: u64,
+        absolute_minimum_part_size: u64,
+        s3_api_url: String,
+    ) -> Self {
+        Self {
+            client,
+            account_id,
+            authorization_token,
+            allowed,
+            api_url,
+            download_url,
+            recommended_part_size,
+            absolute_minimum_part_size,
+            s3_api_url,
+        }
+    }
+
     /// The ID for the account.
     pub fn account_id(&self) -> &str { &self.account_id }
     /// The capabilities granted to this auth token.
@@ -137,6 +163,22 @@ pub struct Capabilities {
 }
 
 impl Capabilities {
+    // Allow tests to create Capabilities.
+    #[cfg(test)]
+    pub(crate) fn new(
+        capabilities: Vec<Capability>,
+        bucket_id: Option<String>,
+        bucket_name: Option<String>,
+        name_prefix: Option<String>,
+    ) -> Self {
+        Self {
+            capabilities,
+            bucket_id,
+            bucket_name,
+            name_prefix,
+        }
+    }
+
     /// The list of capabilities granted.
     pub fn capabilities(&self) -> &[Capability] { &self.capabilities }
     /// If the capabilities are limited to a single bucket, this is the bucket's
@@ -1021,46 +1063,13 @@ mod tests {
     use crate::{
         client::SurfClient,
         error::ErrorCode,
+        test_utils::{create_test_client, get_test_key},
     };
-    use surf_vcr::{VcrMiddleware, VcrMode, VcrError};
+    use surf_vcr::VcrMode;
 
 
     const AUTH_KEY_ID: &str = "B2_KEY_ID";
     const AUTH_KEY: &str = "B2_AUTH_KEY";
-
-    /// Create a SurfClient with the surf-vcr middleware.
-    async fn create_test_client(mode: VcrMode, cassette: &'static str)
-    -> std::result::Result<SurfClient, VcrError> {
-        let surf = surf::Client::new()
-            .with(VcrMiddleware::new(mode, cassette).await?);
-
-        let client = SurfClient::new()
-            .with_client(surf);
-
-        Ok(client)
-    }
-
-    /// Create a fake authorization to allow us to run tests without calling the
-    /// authorize_account function.
-    fn get_test_key(client: SurfClient, capabilities: Vec<Capability>)
-    -> Authorization<SurfClient> {
-        Authorization {
-            client,
-            account_id: "abcdefg".into(),
-            authorization_token: "4_002d2e6b27577ea0000000002_019f9ac2_4af224_acct_BzTNBWOKUVQvIMyHK3tXHG7YqDQ=".into(),
-            allowed: Capabilities {
-                capabilities,
-                bucket_id: None,
-                bucket_name: None,
-                name_prefix: None,
-            },
-            api_url: "http://localhost:8765".into(),
-            download_url: "http://localhost:8765/download".into(),
-            recommended_part_size: 100000000,
-            absolute_minimum_part_size: 5000000,
-            s3_api_url: "http://localhost:8765/s3api".into(),
-        }
-    }
 
     #[async_std::test]
     async fn test_authorize_account() -> Result<(), anyhow::Error> {
