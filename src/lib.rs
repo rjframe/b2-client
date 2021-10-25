@@ -10,11 +10,19 @@ pub mod account;
 pub mod bucket;
 pub mod client;
 pub mod error;
+mod types;
 mod validate;
 
 pub mod prelude {
+    #![allow(unused_imports)]
+
     pub use super::{
         account::Authorization,
+    };
+
+    pub(crate) use super::types::{
+        B2Result,
+        Duration,
     };
 }
 

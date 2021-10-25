@@ -8,7 +8,7 @@
 use crate::{
     prelude::*,
     client::HttpClient,
-    error::{B2Error, ValidationError, Error},
+    error::{ValidationError, Error},
     validate::{
         validated_bucket_name,
         validated_cors_rule_name,
