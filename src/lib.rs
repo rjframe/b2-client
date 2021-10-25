@@ -31,7 +31,7 @@ pub use bucket::*;
 pub use client::HttpClient;
 pub use error::Error;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "with_surf"))]
 pub(crate) mod test_utils {
     use crate::{
         account::{Authorization, Capability, Capabilities},

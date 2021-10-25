@@ -929,12 +929,15 @@ mod tests {
     use crate::{
         account::Capability,
         error::ErrorCode,
-        test_utils::{create_test_client, get_test_key},
     };
     use serde_json::{json, from_value, to_value};
     use surf_vcr::VcrMode;
 
+    #[cfg(feature = "with_surf")]
+    use crate::test_utils::{create_test_client, get_test_key};
 
+
+    #[cfg(feature = "with_surf")]
     #[async_std::test]
     async fn create_bucket_success() -> anyhow::Result<()> {
         let client = create_test_client(
@@ -961,6 +964,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "with_surf")]
     #[async_std::test]
     async fn create_bucket_already_exists() -> anyhow::Result<()> {
         let client = create_test_client(
