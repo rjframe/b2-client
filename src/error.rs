@@ -145,13 +145,24 @@ impl From<hyper::Error> for Error<hyper::Error> {
 /// An error code from the B2 API.
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ErrorCode {
+    // 400
     BadRequest,
+    DuplicateBucketName,
+    TooManyBuckets,
+
+    // 401
     BadAuthToken,
     ExpiredAuthToken,
     Unauthorized,
     Unsupported,
+
+    // 403
     TransactionCapExceeded,
+
+    // 500
     InternalError,
+
+    // 503
     ServiceUnavailable,
 }
 
@@ -161,12 +172,18 @@ impl ErrorCode {
     fn from_api_code<S: AsRef<str>>(code: S) -> Result<Self, String> {
         match code.as_ref() {
             "bad_request" => Ok(Self::BadRequest),
+            "duplicate_bucket_name" => Ok(Self::DuplicateBucketName),
+            "too_many_buckets" => Ok(Self::TooManyBuckets),
+
             "bad_auth_token" => Ok(Self::BadAuthToken),
             "expired_auth_token" => Ok(Self::ExpiredAuthToken),
             "unauthorized" => Ok(Self::Unauthorized),
             "unsupported" => Ok(Self::Unsupported),
+
             "transaction_cap_exceeded" => Ok(Self::TransactionCapExceeded),
+
             "internal_error" => Ok(Self::InternalError),
+
             "service_unavailable" => Ok(Self::ServiceUnavailable),
             // TODO: Use an Unknown(code) variant instead.
             _ => Err(String::from(code.as_ref())),
@@ -177,6 +194,8 @@ impl ErrorCode {
     fn status(&self) -> u16 {
         match self {
             Self::BadRequest => 400,
+            Self::DuplicateBucketName => 400,
+            Self::TooManyBuckets => 400,
             Self::BadAuthToken => 401,
             Self::ExpiredAuthToken => 401,
             Self::Unauthorized => 401,

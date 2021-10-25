@@ -5,6 +5,8 @@
 
 //! B2 API calls for managing buckets.
 
+use std::fmt;
+
 use crate::{
     prelude::*,
     client::HttpClient,
@@ -744,13 +746,16 @@ impl From<Period> for chrono::Duration {
 
 #[derive(Debug, Deserialize)]
 pub struct FileRetentionPolicy {
-    mode: FileRetentionMode,
-    period: Period,
+    mode: Option<FileRetentionMode>,
+    period: Option<Period>,
 }
 
 impl FileRetentionPolicy {
-    pub fn mode(&self) -> FileRetentionMode { self.mode }
-    pub fn period(&self) -> chrono::Duration { self.period.into() }
+    pub fn mode(&self) -> Option<FileRetentionMode> { self.mode }
+
+    pub fn period(&self) -> Option<chrono::Duration> {
+        self.period.map(|p| p.into())
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -765,8 +770,31 @@ pub struct Bucket {
     file_lock_configuration: FileRetentionPolicy,
     default_server_side_encryption: serde_json::Value, // TODO: Type
     lifecycle_rules: Vec<LifecycleRule>,
-    revision: u64, // TODO: Type?
-    options: Option<String>, // TODO: Type?
+    revision: u16,
+    options: Option<Vec<String>>,
+}
+
+pub async fn create_bucket<C, E>(
+    auth: &mut Authorization<C>,
+    new_bucket_info: CreateBucketRequest
+) -> Result<Bucket, Error<E>>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    let mut new_bucket_info = new_bucket_info;
+    new_bucket_info.account_id = Some(auth.account_id.to_owned());
+
+    let res = auth.client.post(auth.api_url("b2_create_bucket"))
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .with_body(&serde_json::to_value(new_bucket_info)?)
+        .send().await?;
+
+    let new_bucket: B2Result<Bucket> = serde_json::from_value(res)?;
+    match new_bucket {
+        B2Result::Ok(b) => Ok(b),
+        B2Result::Err(e) => Err(Error::B2(e)),
+    }
 }
 
 mod serialization {
@@ -898,7 +926,69 @@ mod serialization {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        account::Capability,
+        error::ErrorCode,
+        test_utils::{create_test_client, get_test_key},
+    };
     use serde_json::{json, from_value, to_value};
+    use surf_vcr::VcrMode;
+
+
+    #[async_std::test]
+    async fn create_bucket_success() -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/buckets.yaml"
+        ).await?;
+
+        let mut auth = get_test_key(client, vec![Capability::WriteBuckets]);
+
+        let req = CreateBucketRequest::builder()
+            .with_name("testing-new-b2-client")?
+            .with_type(BucketType::Private)?
+            .with_lifecycle_rules(vec![
+                LifecycleRule::builder()
+                    .with_filename_prefix("my-files/")
+                    .delete_after_hide(chrono::Duration::days(5))?
+                    .build()?
+            ])?
+            .build()?;
+
+        let bucket: Bucket = create_bucket(&mut auth, req).await?;
+        assert_eq!(bucket.bucket_name, "testing-new-b2-client");
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn create_bucket_already_exists() -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/buckets.yaml"
+        ).await?;
+
+        let mut auth = get_test_key(client, vec![Capability::WriteBuckets]);
+
+        let req = CreateBucketRequest::builder()
+            .with_name("testing-b2-client")?
+            .with_type(BucketType::Private)?
+            .with_lifecycle_rules(vec![
+                LifecycleRule::builder()
+                    .with_filename_prefix("my-files/")
+                    .delete_after_hide(chrono::Duration::days(5))?
+                    .build()?
+            ])?
+            .build()?;
+
+        match create_bucket(&mut auth, req).await.unwrap_err() {
+            Error::B2(e) =>
+                assert_eq!(e.code(), ErrorCode::DuplicateBucketName),
+            e => panic!("Unexpected error: {:?}", e),
+        }
+
+        Ok(())
+    }
 
     #[test]
     fn no_encryption_to_json() {
@@ -980,5 +1070,45 @@ mod tests {
                 }
             )
         );
+    }
+
+    #[test]
+    fn deserialize_new_bucket_response() {
+        let info = json!({
+            "accountId": "abcdefg",
+            "bucketId": "hijklmno",
+            "bucketInfo": {},
+            "bucketName": "some-bucket-name",
+            "bucketType": "allPrivate",
+            "corsRules": [],
+            "defaultServerSideEncryption": {
+                "isClientAuthorizedToRead": true,
+                "value": {
+                    "algorithm": null,
+                    "mode": null,
+                },
+            },
+            "fileLockConfiguration": {
+                "isClientAuthorizedToRead": true,
+                "value": {
+                    "defaultRetention": {
+                        "mode": null,
+                        "period": null,
+                    },
+                    "isFileLockEnabled": false,
+                },
+            },
+            "lifecycleRules": [
+                {
+                    "daysFromHidingToDeleting": 5,
+                    "daysFromUploadingToHiding": null,
+                    "fileNamePrefix": "my-files",
+                },
+            ],
+            "options": ["s3"],
+            "revision": 2,
+        });
+
+        let _: Bucket = from_value(info).unwrap();
     }
 }

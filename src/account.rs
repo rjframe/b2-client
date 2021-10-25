@@ -38,17 +38,16 @@ const B2_AUTH_URL: &str = if cfg!(test) {
 /// [authorize_account].
 ///
 /// The token is valid for no more than 24 hours.
-// TODO: We probably do need to make this serializable.
 #[derive(Debug)]
 pub struct Authorization<C>
     where C: HttpClient,
 {
     pub(crate) client: C,
-    account_id: String,
+    pub(crate) account_id: String,
     // The authorization token to use for all future API calls.
     //
     // The token is valid for no more than 24 hours.
-    authorization_token: String,
+    pub(crate) authorization_token: String,
     allowed: Capabilities,
     // The base URL for all API calls except uploading or downloading files.
     api_url: String,
