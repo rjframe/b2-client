@@ -14,7 +14,7 @@ tasks:
       $HOME/.cargo/bin/cargo +stable test --features=with_hyper
   - test-stable-no-def-features: |
       cd $HOME/b2-client
-      $HOME/.cargo/bin/cargo +stable test --features=with_hyper
+      $HOME/.cargo/bin/cargo +stable test --no-default-features
   - clippy-stable: |
       cd $HOME/b2-client
       $HOME/.cargo/bin/cargo +stable clippy --features=with_hyper
