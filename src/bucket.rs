@@ -4,6 +4,12 @@
 */
 
 //! B2 API calls for managing buckets.
+//!
+//! These functions deal with creating, deleting, and managing buckets (e.g.,
+//! setting server-side encryption and file retention rules).
+//!
+//! A B2 account has a limit of 100 buckets. All bucket names must be globally
+//! unique (unique across all accounts).
 
 use std::fmt;
 
@@ -15,6 +21,7 @@ use crate::{
         validated_bucket_name,
         validated_cors_rule_name,
         validated_lifecycle_rules,
+        validated_origins,
     },
 };
 
@@ -32,6 +39,8 @@ pub enum BucketType {
     #[serde(rename = "allPrivate")]
     Private,
     /// A bucket containing B2 snapshots of other buckets.
+    ///
+    /// Snapshot buckets can only be created from the Backblaze web portal.
     #[serde(rename = "snapshot")]
     Snapshot,
 }
@@ -118,24 +127,20 @@ impl CorsRuleBuilder {
     /// * `https://*.example.com`
     /// * `https://*:8765`
     /// * `https://*`
+    /// * `https`
     /// * `*`
     ///
     /// If an entry is `*`, there can be no other entries. There can be no more
-    /// than one `https` entry.
-    // TODO: will I like this origins type?
+    /// than one `https` entry. An entry cannot have more than one '*'.
+    ///
+    /// Note that an origin such as `https` is broader than an origin of
+    /// `https://*` because the latter is limited to the HTTPS scheme's default
+    /// port, but the former is valid for all ports.
+    ///
+    /// At least one origin is required in a CORS rule.
     pub fn with_allowed_origins(mut self, origins: impl Into<Vec<String>>)
     -> Result<Self, ValidationError> {
-        let origins = origins.into();
-
-        if origins.is_empty() {
-            return Err(ValidationError::MissingData(
-                "There must be at least one origin covered by the rule".into()
-            ));
-        }
-
-        // TODO: Validate each origin.
-
-        self.allowed_origins = origins;
+        self.allowed_origins = validated_origins(origins)?;
         Ok(self)
     }
 
@@ -150,12 +155,27 @@ impl CorsRuleBuilder {
     /// * `*`
     ///
     /// If an entry is `*`, there can be no other entries. There can be no more
-    /// than one `https` entry.
+    /// than one `https` entry. An entry cannot have more than one '*'.
+    ///
+    /// Note that an origin such as `https` is broader than an origin of
+    /// `https://*` because the latter is limited to the HTTPS scheme's default
+    /// port, but the former is valid for all ports.
+    ///
+    /// At least one origin is required in a CORS rule.
+    ///
+    /// # Notes
+    ///
+    /// If adding multiple origins, [with_allowed_origins] will validate the
+    /// provided origins more efficiently.
     pub fn add_allowed_origin(mut self, origin: impl Into<String>)
     -> Result<Self, ValidationError> {
         let origin = origin.into();
-        // TODO: Validate origin.
+
+        // We push first because we need a list to be able to properly validate
+        // an added origin.
         self.allowed_origins.push(origin);
+        self.allowed_origins = validated_origins(self.allowed_origins)?;
+
         Ok(self)
     }
 
@@ -192,7 +212,6 @@ impl CorsRuleBuilder {
     /// If an entry is `*`, there can be no other entries.
     ///
     /// The default is an empty list (no headers are allowed).
-    // TODO: will I like this origins type?
     pub fn with_allowed_headers(mut self, headers: impl Into<Vec<String>>)
     -> Result<Self, ValidationError> {
         let headers = headers.into();
@@ -271,6 +290,7 @@ impl CorsRuleBuilder {
         Ok(self)
     }
 
+    // TODO: Doc requirements.
     /// Create a [CorsRule] object.
     pub fn build(self) -> Result<CorsRule, ValidationError> {
         let cors_rule_name = self.name.ok_or_else(||
@@ -294,6 +314,23 @@ impl CorsRuleBuilder {
                 "At least one operation must be specified".into()
             ))
         } else {
+            // Instead of doing all this, we could serialize to a JSON string.
+            // If we then made `CorsRule` a simple wrapper over `Value` we
+            // wouldn't even need to serialize twice.
+            let bytes: usize = cors_rule_name.len()
+                + self.allowed_origins.iter().map(|s| s.len()).sum::<usize>()
+                + self.allowed_operations.iter()
+                    .map(|c| serde_json::to_string(c).unwrap().len())
+                    .sum::<usize>()
+                + self.allowed_headers.iter().map(|s| s.len()).sum::<usize>()
+                + self.expose_headers.iter().map(|s| s.len()).sum::<usize>();
+
+            if bytes >= 1000 {
+                return Err(ValidationError::OutOfBounds(
+                    "Maximum bytes of string data is 999".into()
+                ));
+            }
+
             Ok(CorsRule {
                 cors_rule_name,
                 allowed_origins: self.allowed_origins,
@@ -580,14 +617,19 @@ impl CreateBucketRequestBuilder {
     ///
     /// See <https://www.backblaze.com/b2/docs/cors_rules.html> for further
     /// information.
-    pub fn with_cors_rules(mut self, rules: impl Into<Vec<CorsRule>>) -> Self {
+    pub fn with_cors_rules(mut self, rules: impl Into<Vec<CorsRule>>)
+    -> Result<Self, ValidationError> {
         let rules = rules.into();
 
-        if ! rules.is_empty() {
+        if rules.len() > 100 {
+            return Err(ValidationError::OutOfBounds(
+                "A bucket can have no more than 100 CORS rules".into()
+            ));
+        } else if ! rules.is_empty() {
             self.cors_rules = Some(rules);
         }
 
-        self
+        Ok(self)
     }
 
     /// Enable the file lock on the bucket.
@@ -1136,4 +1178,50 @@ mod tests {
 
         let _: Bucket = from_value(info).unwrap();
     }
+
+    #[test]
+    fn cors_rule_validates_origins() -> anyhow::Result<()> {
+        let valid_origins = [
+            vec!["https://*".into(), "http://*".into()],
+            vec!["*".into()],
+            vec![
+                "https://example.com".into(), "http://example.com:1234".into()
+            ],
+            vec![
+                "https".into(), "http".into(), "http://example.com:1234".into()
+            ],
+            vec![
+                "https://*:8765".into(), "http://www.example.com:4545".into()
+            ],
+            vec![
+                "https://*.example.com".into(), "http://www.example.com".into()
+            ],
+        ];
+
+        for origin_list in valid_origins {
+            let _ = CorsRule::builder()
+                .with_allowed_origins(origin_list)?;
+        }
+
+        let bad_origins = [
+            vec!["*".into(), "https://*".into()],
+            vec!["ftp://example.com".into()],
+            vec!["ftp://*.*.example.com".into()],
+            vec!["https://*:8765".into(), "www.example.com:4545".into()],
+            vec![
+                "https://*:8765".into(), "https://www.example.com:4545".into()
+            ],
+        ];
+
+        for origin_list in bad_origins {
+            let rule = CorsRule::builder()
+                .with_allowed_origins(origin_list);
+
+            assert!(rule.is_err(), "{:?}", rule);
+        }
+
+        Ok(())
+    }
+
+    // TODO: Test CorsRuleBuilder with allowed headers, etc.
 }

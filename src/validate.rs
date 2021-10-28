@@ -105,6 +105,61 @@ pub(crate) fn validated_lifecycle_rules(rules: impl Into<Vec<LifecycleRule>>)
     }
 }
 
+/// Validate a list of origins for a CORS rule.
+///
+/// See [CorsRuleBuilder::with_allowed_origins] for the rules concerning a valid
+/// origin.
+pub(crate) fn validated_origins(origins: impl Into<Vec<String>>)
+-> Result<Vec<String>, ValidationError> {
+    let origins = origins.into();
+
+    if origins.is_empty() {
+        return Err(ValidationError::MissingData(
+            "There must be at least one origin covered by the rule".into()
+        ));
+    }
+
+    if ! (origins.len() == 1 && origins[0] == "*") {
+        let mut found_https = false;
+
+        for origin in origins.iter() {
+            // `http` and `https` are valid origins, but `Url::parse()` won't
+            // parse them, so we check them separately.
+            if origin == "https" {
+                if found_https {
+                    return Err(ValidationError::Incompatible(
+                        "There can only be one HTTPS rule".into()
+                    ));
+                }
+                found_https = true;
+            } else if origin != "http" {
+                if origin.chars().filter(|c| *c == '*').count() > 1 {
+                    return Err(ValidationError::BadFormat(
+                        "A URL cannot have more than one '*'".into()
+                    ));
+                }
+
+                let url = url::Url::parse(origin)?;
+
+                if url.scheme() == "https" {
+                    if found_https {
+                        return Err(ValidationError::Incompatible(
+                            "There can only be one HTTPS rule".into()
+                        ));
+                    }
+                    found_https = true;
+                }
+
+                if ! (url.scheme() == "https" || url.scheme() == "http") {
+                    return Err(ValidationError::BadUrl(url.to_string()));
+                }
+            }
+        }
+    }
+
+    Ok(origins)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

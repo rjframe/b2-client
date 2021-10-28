@@ -22,12 +22,14 @@ use serde::{Serialize, Deserialize};
 // TODO: Splitting these up will provide nicer error handling when the user
 // actually wants to handle them, rather than merely print them. It also means
 // many error types, so may make learning/using the library more difficult.
+// TODO: Some of these would be good for code to be able to inspect; we need
+// data-oriented errors rather than string-oriented errors.
 /// Errors from validating B2 requests prior to making the request.
 #[derive(Debug)]
 pub enum ValidationError {
     /// Failure to parse a URL.
     ///
-    /// The string is a short description of the failure.
+    /// The string the problematic URL.
     BadUrl(String),
     /// The data is an invalid format or contains invalid information.
     ///
@@ -40,7 +42,7 @@ pub enum ValidationError {
     /// The data is outside its valid range.
     ///
     /// The string is a short description of the failure.
-    OutOfBounds(String),
+    OutOfBounds(String), // TODO: I need a better name.
     /// Two pieces of data are incompatible together.
     ///
     /// The string is a short description of the failure.
