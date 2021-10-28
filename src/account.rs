@@ -292,6 +292,12 @@ pub struct CreateKeyRequest {
     name_prefix: Option<String>,
 }
 
+impl CreateKeyRequest {
+    pub fn builder() -> CreateKeyRequestBuilder {
+        CreateKeyRequestBuilder::default()
+    }
+}
+
 /// A builder to create a [CreateKeyRequest] object.
 ///
 /// After creating the `CreateKeyRequest`, pass it to [create_key] to obtain a
@@ -299,9 +305,10 @@ pub struct CreateKeyRequest {
 ///
 /// See <https://www.backblaze.com/b2/docs/b2_create_key.html> for more
 /// information.
+#[derive(Default)]
 pub struct CreateKeyRequestBuilder {
     capabilities: Option<Vec<Capability>>,
-    name: String,
+    name: Option<String>,
     valid_duration: Option<Duration>,
     bucket_id: Option<String>,
     name_prefix: Option<String>,
@@ -309,11 +316,19 @@ pub struct CreateKeyRequestBuilder {
 
 impl CreateKeyRequestBuilder {
     /// Create a new builder, with the key's name provided.
-    pub fn new<S: Into<String>>(name: S) -> Result<Self, ValidationError> {
-        // TODO: Name must be ASCII?
+    pub fn name<S: Into<String>>(mut self, name: S)
+    -> Result<Self, ValidationError> {
+        // TODO: Validation: name must be ASCII (not explicitly documented).
         let name = name.into();
 
-        if name.len() > 100 {
+        if name.len() < 1 {
+            // I don't know the minimum name size, whether all characters can be
+            // '-', etc. They're not documented but I wouldn't be surprised if
+            // there are such restrictions.
+            return Err(ValidationError::MissingData(
+                "A key name must be present".into()
+            ));
+        } else if name.len() > 100 {
             return Err(ValidationError::BadFormat(
                 "Name must be no more than 100 characters.".into()
             ));
@@ -327,19 +342,14 @@ impl CreateKeyRequestBuilder {
             );
         }
 
-        Ok(Self {
-            capabilities: None,
-            name,
-            valid_duration: None,
-            bucket_id: None,
-            name_prefix: None,
-        })
+        self.name = Some(name);
+        Ok(self)
     }
 
     /// Create the key with the specified capabilities.
     ///
     /// At least one capability must be provided.
-    pub fn with_capabilities<V: Into<Vec<Capability>>>(mut self, caps: V)
+    pub fn capabilities<V: Into<Vec<Capability>>>(mut self, caps: V)
     -> Result<Self, ValidationError> {
         let caps = caps.into();
 
@@ -383,7 +393,7 @@ impl CreateKeyRequestBuilder {
     }
 
     /// Limit access to files to those that begin with the specified prefix.
-    pub fn with_name_prefix<S: Into<String>>(mut self, prefix: S)
+    pub fn name_prefix<S: Into<String>>(mut self, prefix: S)
     -> Result<Self, ValidationError> {
         let prefix = prefix.into();
         // TODO: Validate prefix
@@ -394,6 +404,12 @@ impl CreateKeyRequestBuilder {
 
     /// Create a new [CreateKeyRequest].
     pub fn build(self) -> Result<CreateKeyRequest, ValidationError> {
+        let name = self.name.ok_or_else(||
+            ValidationError::MissingData(
+                "A name for the key must be provided".into()
+            )
+        )?;
+
         let capabilities = self.capabilities.ok_or_else(||
             ValidationError::MissingData(
                 "A list of capabilities for the key is required.".into()
@@ -435,7 +451,7 @@ impl CreateKeyRequestBuilder {
         Ok(CreateKeyRequest {
             account_id: None,
             capabilities,
-            key_name: self.name,
+            key_name: name,
             valid_duration_in_seconds: self.valid_duration,
             bucket_id: self.bucket_id,
             name_prefix: self.name_prefix,
@@ -535,7 +551,7 @@ impl NewlyCreatedKey {
 /// #     client::{HttpClient, SurfClient},
 /// #     account::{
 /// #         authorize_account, create_key,
-/// #         Capability, CreateKeyRequestBuilder,
+/// #         Capability, CreateKeyRequest,
 /// #     },
 /// # };
 /// # #[cfg(feature = "with_surf")]
@@ -543,8 +559,9 @@ impl NewlyCreatedKey {
 /// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
 ///     .await?;
 ///
-/// let create_key_request = CreateKeyRequestBuilder::new("my-key")?
-///     .with_capabilities([Capability::ListFiles])?
+/// let create_key_request = CreateKeyRequest::builder()
+///     .name("my-key")?
+///     .capabilities([Capability::ListFiles])?
 ///     .build()?;
 ///
 /// let (secret, new_key) = create_key(&mut auth, create_key_request).await?;
@@ -586,7 +603,7 @@ pub async fn create_key<C, E>(
 /// #     client::{HttpClient, SurfClient},
 /// #     account::{
 /// #         authorize_account, create_key, delete_key,
-/// #         Capability, CreateKeyRequestBuilder,
+/// #         Capability, CreateKeyRequest,
 /// #     },
 /// # };
 /// # #[cfg(feature = "with_surf")]
@@ -594,8 +611,9 @@ pub async fn create_key<C, E>(
 /// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
 ///     .await?;
 ///
-/// let create_key_request = CreateKeyRequestBuilder::new("my-key")?
-///     .with_capabilities([Capability::ListFiles])?
+/// let create_key_request = CreateKeyRequest::builder()
+///     .name("my-key")?
+///     .capabilities([Capability::ListFiles])?
 ///     .build()?;
 ///
 /// let (_secret, new_key) = create_key(&mut auth, create_key_request).await?;
@@ -682,6 +700,12 @@ pub struct DownloadAuthorizationRequest {
     b2_content_type: Option<String>,
 }
 
+impl DownloadAuthorizationRequest {
+    pub fn builder() -> DownloadAuthorizationRequestBuilder {
+        DownloadAuthorizationRequestBuilder::default()
+    }
+}
+
 /// A builder to create a [DownloadAuthorizationRequest].
 ///
 /// After building the `DownloadAuthorizationRequest`, pass it to
@@ -691,6 +715,7 @@ pub struct DownloadAuthorizationRequest {
 ///
 /// See <https://www.backblaze.com/b2/docs/b2_get_download_authorization.html>
 /// for furter information.
+#[derive(Default)]
 pub struct DownloadAuthorizationRequestBuilder {
     // Required:
     bucket_id: Option<String>,
@@ -706,23 +731,8 @@ pub struct DownloadAuthorizationRequestBuilder {
 }
 
 impl DownloadAuthorizationRequestBuilder {
-    /// Create a new `DownloadAuthorizationRequestBuilder`.
-    pub fn new() -> Self {
-        Self {
-            bucket_id: None,
-            file_name_prefix: None,
-            valid_duration_in_seconds: None,
-            b2_content_disposition: None,
-            b2_content_language: None,
-            b2_expires: None,
-            b2_cache_control: None,
-            b2_content_encoding: None,
-            b2_content_type: None,
-        }
-    }
-
     /// Create a download authorization for the specified bucket ID.
-    pub fn for_bucket_id<S: Into<String>>(mut self, id: S) -> Self {
+    pub fn bucket_id<S: Into<String>>(mut self, id: S) -> Self {
         // TODO: Validate id.
         self.bucket_id = Some(id.into());
         self
@@ -730,7 +740,7 @@ impl DownloadAuthorizationRequestBuilder {
 
     /// Use the given file name prefix to determine what files the
     /// [DownloadAuthorization] will allow access to.
-    pub fn with_file_name_prefix<S: Into<String>>(mut self, name: S) -> Self {
+    pub fn file_name_prefix<S: Into<String>>(mut self, name: S) -> Self {
         // TODO: Validate prefix.
         self.file_name_prefix = Some(name.into());
         self
@@ -740,7 +750,7 @@ impl DownloadAuthorizationRequestBuilder {
     /// valid.
     ///
     /// This must be between one second and one week, inclusive.
-    pub fn with_duration(mut self, dur: chrono::Duration)
+    pub fn duration(mut self, dur: chrono::Duration)
     -> Result<Self, ValidationError> {
         if dur < chrono::Duration::seconds(1)
             || dur > chrono::Duration::weeks(1)
@@ -758,7 +768,7 @@ impl DownloadAuthorizationRequestBuilder {
     /// If specified, download requests must have this content disposition. The
     /// grammar is specified in RFC 6266, except that parameter names containing
     /// a '*' are not allowed.
-    pub fn with_content_disposition(mut self, disposition: ContentDisposition)
+    pub fn content_disposition(mut self, disposition: ContentDisposition)
     -> Self {
         self.b2_content_disposition = Some(disposition.0);
         self
@@ -766,20 +776,20 @@ impl DownloadAuthorizationRequestBuilder {
 
     /// If specified, download requests must have this content language. The
     /// grammar is specified in RFC 2616.
-    pub fn with_content_language<S: Into<String>>(mut self, lang: S) -> Self {
+    pub fn content_language<S: Into<String>>(mut self, lang: S) -> Self {
         // TODO: Validate language.
         self.b2_content_language = Some(lang.into());
         self
     }
 
     /// If specified, download requests must have this expiration.
-    pub fn with_expiration(mut self, expiration: Expires) -> Self {
+    pub fn expiration(mut self, expiration: Expires) -> Self {
         self.b2_expires = Some(expiration.value().to_string());
         self
     }
 
     /// If specified, download requests must have this cache control.
-    pub fn with_cache_control(mut self, directive: CacheDirective) -> Self {
+    pub fn cache_control(mut self, directive: CacheDirective) -> Self {
         use http_types::headers::HeaderValue;
 
         self.b2_cache_control = Some(HeaderValue::from(directive).to_string());
@@ -787,13 +797,13 @@ impl DownloadAuthorizationRequestBuilder {
     }
 
     /// If specified, download requests must have this content encoding.
-    pub fn with_content_encoding(mut self, encoding: ContentEncoding) -> Self {
+    pub fn content_encoding(mut self, encoding: ContentEncoding) -> Self {
         self.b2_content_encoding = Some(format!("{}", encoding.encoding()));
         self
     }
 
     /// If specified, download requests must have this content type.
-    pub fn with_content_type(mut self, content_type: Mime) -> Self {
+    pub fn content_type(mut self, content_type: Mime) -> Self {
         self.b2_content_type = Some(content_type.to_string());
         self
     }
@@ -864,7 +874,7 @@ impl DownloadAuthorization {
 /// #     client::{HttpClient, SurfClient},
 /// #     account::{
 /// #         authorize_account, get_download_authorization,
-/// #         DownloadAuthorizationRequestBuilder,
+/// #         DownloadAuthorizationRequest,
 /// #     },
 /// # };
 /// # #[cfg(feature = "with_surf")]
@@ -872,10 +882,10 @@ impl DownloadAuthorization {
 /// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
 ///     .await?;
 ///
-/// let download_req = DownloadAuthorizationRequestBuilder::new()
-///     .for_bucket_id("MY BUCKET ID")
-///     .with_file_name_prefix("my/files/")
-///     .with_duration(chrono::Duration::seconds(60))?
+/// let download_req = DownloadAuthorizationRequest::builder()
+///     .bucket_id("MY BUCKET ID")
+///     .file_name_prefix("my/files/")
+///     .duration(chrono::Duration::seconds(60))?
 ///     .build()?;
 ///
 /// let download_auth = get_download_authorization(&mut auth, download_req)
@@ -951,8 +961,7 @@ impl KeyListRequestBuilder {
     /// [list_keys].
     ///
     /// The default is 100 and maximum is 10,000.
-    pub fn with_max_keys(mut self, limit: u16) -> Result<Self, ValidationError>
-    {
+    pub fn max_keys(mut self, limit: u16) -> Result<Self, ValidationError> {
         if limit > 10000 {
             return Err(ValidationError::OutOfBounds(
                 "Key listing limit is 10,000".into()
@@ -1018,7 +1027,7 @@ struct KeyResult {
 ///     .await?;
 ///
 /// let req = KeyListRequest::builder()
-///     .with_max_keys(500)?
+///     .max_keys(500)?
 ///     .build();
 ///
 /// let (keys, _next_bucket) = list_keys(&mut auth, req).await?;
@@ -1130,9 +1139,10 @@ mod tests {
 
         let mut auth = get_test_key(client, vec![Capability::WriteKeys]);
 
-        let new_key_info = CreateKeyRequestBuilder::new("my-special-key")
+        let new_key_info = CreateKeyRequest::builder()
+            .name("my-special-key")
             .unwrap()
-            .with_capabilities(vec![Capability::ListFiles]).unwrap()
+            .capabilities(vec![Capability::ListFiles]).unwrap()
             .build().unwrap();
 
         let (secret, key) = create_key(&mut auth, new_key_info).await?;
@@ -1170,15 +1180,15 @@ mod tests {
 
         let mut auth = get_test_key(client, vec![Capability::ShareFiles]);
 
-        let req = DownloadAuthorizationRequestBuilder::new()
-            .for_bucket_id("8d625eb63be2775577c70e1a")
-            .with_file_name_prefix("files/")
-            .with_duration(chrono::Duration::seconds(30))?
-            .with_content_disposition(
+        let req = DownloadAuthorizationRequest::builder()
+            .bucket_id("8d625eb63be2775577c70e1a")
+            .file_name_prefix("files/")
+            .duration(chrono::Duration::seconds(30))?
+            .content_disposition(
                 ContentDisposition("Attachment; filename=example.html".into())
             )
-            //.with_expiration(Expires::new(std::time::Duration::from_secs(60)))
-            .with_cache_control(CacheDirective::MustRevalidate)
+            //.expiration(Expires::new(std::time::Duration::from_secs(60)))
+            .cache_control(CacheDirective::MustRevalidate)
             .build()?;
 
         let download_auth = get_download_authorization(&mut auth, req).await?;
@@ -1197,10 +1207,10 @@ mod tests {
 
         let mut auth = get_test_key(client, vec![Capability::ShareFiles]);
 
-        let req = DownloadAuthorizationRequestBuilder::new()
-            .for_bucket_id("8d625eb63be2775577c70e1a")
-            .with_file_name_prefix("files/")
-            .with_duration(chrono::Duration::seconds(30))?
+        let req = DownloadAuthorizationRequest::builder()
+            .bucket_id("8d625eb63be2775577c70e1a")
+            .file_name_prefix("files/")
+            .duration(chrono::Duration::seconds(30))?
             .build()?;
 
         let download_auth = get_download_authorization(&mut auth, req).await?;

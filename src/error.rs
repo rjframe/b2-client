@@ -71,7 +71,6 @@ impl fmt::Display for ValidationError {
     }
 }
 
-#[cfg(feature = "url")]
 impl From<url::ParseError> for ValidationError {
     fn from(e: url::ParseError) -> Self {
         Self::BadUrl(format!("{}", e))

@@ -1,10 +1,11 @@
 Project:
+    ✓ Remove with_ prefixes from builder methods @done(2021-10-28 11:34) @project(Project)
     ☐ Support Isahc
     ☐ Allow (require?) setting user-agent
     ☐ Work with B2 metadata headers
     ☐ Default clients: use low-level libraries (h1, h2, etc.) rather than the libraries built on top of them.
     ☐ Check derived traits on objects - ensure consistency.
-    ☐ Probably add builder() associated function to types that have one. Ensure consistent APIS.
+    ✓ Probably add builder() associated function to types that have one. Ensure consistent APIS. @done(2021-10-28 11:34) @project(Project)
     ☐ Wrap surf's Error so our Error<E> can require E: Error.
 
 API:

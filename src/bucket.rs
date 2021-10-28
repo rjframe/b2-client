@@ -107,19 +107,19 @@ pub struct CorsRuleBuilder {
 }
 
 impl CorsRuleBuilder {
-    /// A human-recognizeable name for the CORS rule.
+    /// Create a human-recognizeable name for the CORS rule.
     ///
     /// Names can contains any ASCII letters, numbers, and '-'. It must be
     /// between 6 and 50 characters, inclusive. Names beginning with "b2-" are
     /// reserved.
-    pub fn with_name(mut self, name: impl Into<String>)
+    pub fn name(mut self, name: impl Into<String>)
     -> Result<Self, ValidationError> {
         let name = validated_cors_rule_name(name)?;
         self.name = Some(name);
         Ok(self)
     }
 
-    /// A list of origins covered by this rule.
+    /// Set the list of origins covered by this rule.
     ///
     /// Examples of valid origins:
     ///
@@ -138,7 +138,7 @@ impl CorsRuleBuilder {
     /// port, but the former is valid for all ports.
     ///
     /// At least one origin is required in a CORS rule.
-    pub fn with_allowed_origins(mut self, origins: impl Into<Vec<String>>)
+    pub fn allowed_origins(mut self, origins: impl Into<Vec<String>>)
     -> Result<Self, ValidationError> {
         self.allowed_origins = validated_origins(origins)?;
         Ok(self)
@@ -182,7 +182,7 @@ impl CorsRuleBuilder {
     /// Set the list of operations the CORS rule allows.
     ///
     /// If the provided list is empty, returns [ValidationError::MissingData].
-    pub fn with_allowed_operations(mut self, ops: Vec<CorsOperation>)
+    pub fn allowed_operations(mut self, ops: Vec<CorsOperation>)
     -> Result<Self, ValidationError> {
         if ops.is_empty() {
             return Err(ValidationError::MissingData(
@@ -212,7 +212,7 @@ impl CorsRuleBuilder {
     /// If an entry is `*`, there can be no other entries.
     ///
     /// The default is an empty list (no headers are allowed).
-    pub fn with_allowed_headers(mut self, headers: impl Into<Vec<String>>)
+    pub fn allowed_headers(mut self, headers: impl Into<Vec<String>>)
     -> Result<Self, ValidationError> {
         let headers = headers.into();
 
@@ -250,7 +250,7 @@ impl CorsRuleBuilder {
     ///
     /// Each entry must be a complete header name. If the list is empty, no
     /// headers will be exposed.
-    pub fn with_exposed_headers(mut self, headers: impl Into<Vec<String>>)
+    pub fn exposed_headers(mut self, headers: impl Into<Vec<String>>)
     -> Result<Self, ValidationError> {
         let headers = headers.into();
 
@@ -278,7 +278,7 @@ impl CorsRuleBuilder {
     /// preflight request.
     ///
     /// The age must be non-negative and no more than one day.
-    pub fn with_max_age(mut self, age: chrono::Duration)
+    pub fn max_age(mut self, age: chrono::Duration)
     -> Result<Self, ValidationError> {
         if age < chrono::Duration::zero() || age > chrono::Duration::days(1) {
             return Err(ValidationError::OutOfBounds(
@@ -395,7 +395,7 @@ impl LifecycleRuleBuilder {
     ///
     /// A prefix of `""` will apply to all files, allowing the creation of rules
     /// that could delete **all** files.
-    pub fn with_filename_prefix(mut self, prefix: impl Into<String>) -> Self {
+    pub fn filename_prefix(mut self, prefix: impl Into<String>) -> Self {
         self.prefix = Some(prefix.into());
         self
     }
@@ -580,7 +580,7 @@ impl CreateBucketRequestBuilder {
     /// * cmust be ontain only ASCII alphanumeric text and `-`
     /// * must be between 6 and 50 characters inclusive
     /// * must not begin with `b2-`
-    pub fn with_name(mut self, name: impl Into<String>)
+    pub fn name(mut self, name: impl Into<String>)
     -> Result<Self, ValidationError> {
         let name = validated_bucket_name(name)?;
         self.bucket_name = Some(name);
@@ -588,8 +588,8 @@ impl CreateBucketRequestBuilder {
     }
 
     /// Create the bucket with the given [BucketType].
-    pub fn with_type(mut self, typ: BucketType) -> Result<Self, ValidationError>
-    {
+    pub fn bucket_type(mut self, typ: BucketType)
+    -> Result<Self, ValidationError> {
         if matches!(typ, BucketType::Snapshot) {
             return Err(ValidationError::OutOfBounds(
                 "Bucket type must be either Public or Private".into()
@@ -605,19 +605,19 @@ impl CreateBucketRequestBuilder {
     /// This can contain arbitrary metadata for your own use. You can also set
     /// cache-control settings from here (but see
     /// [CreateBucketRequestBuilder::with_cache_control]).
-    pub fn with_bucket_info(mut self, info: serde_json::Value)
+    pub fn bucket_info(mut self, info: serde_json::Value)
     -> Result<Self, ValidationError> {
         self.bucket_info = Some(info);
         Ok(self)
     }
 
-    // TODO: pub fn with_cache_control()
+    // TODO: pub fn cache_control()
 
     /// Use the provided CORS rules for the bucket.
     ///
     /// See <https://www.backblaze.com/b2/docs/cors_rules.html> for further
     /// information.
-    pub fn with_cors_rules(mut self, rules: impl Into<Vec<CorsRule>>)
+    pub fn cors_rules(mut self, rules: impl Into<Vec<CorsRule>>)
     -> Result<Self, ValidationError> {
         let rules = rules.into();
 
@@ -712,7 +712,7 @@ impl CreateBucketRequestBuilder {
     ///     "Docs/Photos/": [ "Docs/Photos/Vacations/" ],
     /// }
     /// ```
-    pub fn with_lifecycle_rules(mut self, rules: impl Into<Vec<LifecycleRule>>)
+    pub fn lifecycle_rules(mut self, rules: impl Into<Vec<LifecycleRule>>)
     -> Result<Self, ValidationError> {
         let rules = validated_lifecycle_rules(rules)?;
         self.lifecycle_rules = Some(rules);
@@ -720,10 +720,8 @@ impl CreateBucketRequestBuilder {
     }
 
     /// Use the provided encryption settings on the bucket.
-    pub fn with_encryption_settings(
-        mut self,
-        settings: ServerSideEncryption
-    ) -> Self {
+    pub fn encryption_settings(mut self, settings: ServerSideEncryption) -> Self
+    {
         self.default_server_side_encryption = Some(settings);
         self
     }
@@ -1011,11 +1009,11 @@ mod tests {
         let mut auth = get_test_key(client, vec![Capability::WriteBuckets]);
 
         let req = CreateBucketRequest::builder()
-            .with_name("testing-new-b2-client")?
-            .with_type(BucketType::Private)?
-            .with_lifecycle_rules(vec![
+            .name("testing-new-b2-client")?
+            .bucket_type(BucketType::Private)?
+            .lifecycle_rules(vec![
                 LifecycleRule::builder()
-                    .with_filename_prefix("my-files/")
+                    .filename_prefix("my-files/")
                     .delete_after_hide(chrono::Duration::days(5))?
                     .build()?
             ])?
@@ -1038,11 +1036,11 @@ mod tests {
         let mut auth = get_test_key(client, vec![Capability::WriteBuckets]);
 
         let req = CreateBucketRequest::builder()
-            .with_name("testing-b2-client")?
-            .with_type(BucketType::Private)?
-            .with_lifecycle_rules(vec![
+            .name("testing-b2-client")?
+            .bucket_type(BucketType::Private)?
+            .lifecycle_rules(vec![
                 LifecycleRule::builder()
-                    .with_filename_prefix("my-files/")
+                    .filename_prefix("my-files/")
                     .delete_after_hide(chrono::Duration::days(5))?
                     .build()?
             ])?
@@ -1200,7 +1198,7 @@ mod tests {
 
         for origin_list in valid_origins {
             let _ = CorsRule::builder()
-                .with_allowed_origins(origin_list)?;
+                .allowed_origins(origin_list)?;
         }
 
         let bad_origins = [
@@ -1215,7 +1213,7 @@ mod tests {
 
         for origin_list in bad_origins {
             let rule = CorsRule::builder()
-                .with_allowed_origins(origin_list);
+                .allowed_origins(origin_list);
 
             assert!(rule.is_err(), "{:?}", rule);
         }

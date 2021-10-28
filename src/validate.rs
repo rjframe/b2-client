@@ -166,7 +166,7 @@ mod tests {
 
     fn make_rule(prefix: &str) -> LifecycleRule {
         LifecycleRule::builder()
-            .with_filename_prefix(prefix)
+            .filename_prefix(prefix)
             .delete_after_hide(chrono::Duration::days(3)).unwrap()
             .build().unwrap()
     }

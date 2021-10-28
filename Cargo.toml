@@ -9,14 +9,13 @@ edition = "2018"
 [features]
 default = [ "with_surf" ]
 # These features can only be enabled exclusively of each other:
-with_surf = [ "surf", "async-std", "url" ]
-with_hyper = [ "hyper", "hyper-tls", "tokio", "http", "url" ]
+with_surf = [ "surf", "async-std" ]
+with_hyper = [ "hyper", "hyper-tls", "tokio", "http" ]
 with_isahc = [ "isahc" ]
 
 [dependencies]
 surf = { version = "2.3.1", optional = true }
 async-std = { version = "1.10.0", optional = true }
-url = { version = "2.2.2", optional = true }
 
 # TODO: Can I remove runtime?
 hyper = { version = "0.14.13", optional = true, features = [
@@ -38,6 +37,7 @@ serde = { version = "1.0.130", features = [ "derive" ] }
 serde_json = "1.0.68"
 base64 = "0.13.0"
 md5 = "0.7.0"
+url = "2.2.2"
 
 [dev-dependencies]
 surf-vcr = "0.1.2"
