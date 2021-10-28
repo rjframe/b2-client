@@ -481,13 +481,13 @@ impl SelfManagedEncryption {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(try_from = "serialization::InnerEncryptionConfig")]
 #[serde(into = "serialization::InnerEncryptionConfig")]
-pub enum DefaultServerSideEncryption {
+pub enum ServerSideEncryption {
     B2Managed(EncryptionAlgorithm),
     SelfManaged(SelfManagedEncryption),
     NoEncryption,
 }
 
-impl Default for DefaultServerSideEncryption {
+impl Default for ServerSideEncryption {
     fn default() -> Self {
         Self::NoEncryption
     }
@@ -508,7 +508,7 @@ pub struct CreateBucketRequest {
     cors_rules: Option<Vec<CorsRule>>,
     file_lock_enabled: bool,
     lifecycle_rules: Option<Vec<LifecycleRule>>,
-    default_server_side_encryption: Option<DefaultServerSideEncryption>,
+    default_server_side_encryption: Option<ServerSideEncryption>,
 }
 
 impl CreateBucketRequest {
@@ -531,7 +531,7 @@ pub struct CreateBucketRequestBuilder {
     cors_rules: Option<Vec<CorsRule>>,
     file_lock_enabled: bool,
     lifecycle_rules: Option<Vec<LifecycleRule>>,
-    default_server_side_encryption: Option<DefaultServerSideEncryption>,
+    default_server_side_encryption: Option<ServerSideEncryption>,
 }
 
 impl CreateBucketRequestBuilder {
@@ -680,7 +680,7 @@ impl CreateBucketRequestBuilder {
     /// Use the provided encryption settings on the bucket.
     pub fn with_encryption_settings(
         mut self,
-        settings: DefaultServerSideEncryption
+        settings: ServerSideEncryption
     ) -> Self {
         self.default_server_side_encryption = Some(settings);
         self
@@ -758,6 +758,27 @@ impl FileRetentionPolicy {
     }
 }
 
+/// Response from B2 with the configured bucket encryption settings.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BucketEncryptionInfo {
+    is_client_authorized_to_read: bool,
+    value: Option<ServerSideEncryption>,
+}
+
+impl BucketEncryptionInfo {
+    /// True if the authorization token allows access to the encryption
+    /// settings.
+    ///
+    /// If this is `false`, then `settings` will return `None`.
+    pub fn can_read(&self) -> bool { self.is_client_authorized_to_read }
+
+    /// The [ServerSideEncryption] configuration on the bucket.
+    pub fn settings(&self) -> Option<&ServerSideEncryption> {
+        self.value.as_ref()
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Bucket {
@@ -768,7 +789,7 @@ pub struct Bucket {
     bucket_info: serde_json::Value,
     cors_rules: Vec<CorsRule>,
     file_lock_configuration: FileRetentionPolicy,
-    default_server_side_encryption: serde_json::Value, // TODO: Type
+    default_server_side_encryption: BucketEncryptionInfo,
     lifecycle_rules: Vec<LifecycleRule>,
     revision: u16,
     options: Option<Vec<String>>,
@@ -829,7 +850,7 @@ mod serialization {
         customer_key_md5: Option<String>,
     }
 
-    impl TryFrom<InnerEncryptionConfig> for super::DefaultServerSideEncryption {
+    impl TryFrom<InnerEncryptionConfig> for super::ServerSideEncryption {
         type Error = &'static str;
 
         fn try_from(other: InnerEncryptionConfig) -> Result<Self, Self::Error> {
@@ -861,17 +882,17 @@ mod serialization {
         }
     }
 
-    impl From<super::DefaultServerSideEncryption> for InnerEncryptionConfig {
-        fn from(other: super::DefaultServerSideEncryption) -> Self {
+    impl From<super::ServerSideEncryption> for InnerEncryptionConfig {
+        fn from(other: super::ServerSideEncryption) -> Self {
             match other {
-                super::DefaultServerSideEncryption::B2Managed(algorithm) => {
+                super::ServerSideEncryption::B2Managed(algorithm) => {
                     Self {
                         mode: Some(Mode::B2Managed),
                         algorithm: Some(algorithm),
                         ..Default::default()
                     }
                 },
-                super::DefaultServerSideEncryption::SelfManaged(enc) => {
+                super::ServerSideEncryption::SelfManaged(enc) => {
                     Self {
                         mode: Some(Mode::SelfManaged),
                         algorithm: Some(enc.algorithm),
@@ -879,7 +900,7 @@ mod serialization {
                         customer_key_md5: Some(enc.digest),
                     }
                 },
-                super::DefaultServerSideEncryption::NoEncryption => {
+                super::ServerSideEncryption::NoEncryption => {
                     Self::default()
                 },
             }
@@ -997,24 +1018,24 @@ mod tests {
     #[test]
     fn no_encryption_to_json() {
         assert_eq!(
-            to_value(DefaultServerSideEncryption::NoEncryption).unwrap(),
+            to_value(ServerSideEncryption::NoEncryption).unwrap(),
             json!({ "mode": Option::<String>::None })
         );
     }
 
     #[test]
     fn no_encryption_from_json() {
-        let enc: DefaultServerSideEncryption = from_value(
+        let enc: ServerSideEncryption = from_value(
             json!({ "mode": Option::<String>::None })
         ).unwrap();
 
-        assert_eq!(enc, DefaultServerSideEncryption::NoEncryption);
+        assert_eq!(enc, ServerSideEncryption::NoEncryption);
     }
 
     #[test]
     fn b2_encryption_to_json() {
         let json = to_value(
-            DefaultServerSideEncryption::B2Managed(EncryptionAlgorithm::Aes256)
+            ServerSideEncryption::B2Managed(EncryptionAlgorithm::Aes256)
         ).unwrap();
 
         assert_eq!(json, json!({ "mode": "SSE-B2", "algorithm": "AES256" }));
@@ -1022,19 +1043,19 @@ mod tests {
 
     #[test]
     fn b2_encryption_from_json() {
-        let enc: DefaultServerSideEncryption = from_value(
+        let enc: ServerSideEncryption = from_value(
             json!({ "mode": "SSE-B2", "algorithm": "AES256" })
         ).unwrap();
 
         assert_eq!(
             enc,
-            DefaultServerSideEncryption::B2Managed(EncryptionAlgorithm::Aes256)
+            ServerSideEncryption::B2Managed(EncryptionAlgorithm::Aes256)
         );
     }
 
     #[test]
     fn self_encryption_to_json() {
-        let json = to_value(DefaultServerSideEncryption::SelfManaged(
+        let json = to_value(ServerSideEncryption::SelfManaged(
             SelfManagedEncryption {
                 algorithm: EncryptionAlgorithm::Aes256,
                 key: "MY-ENCODED-KEY".into(),
@@ -1055,7 +1076,7 @@ mod tests {
 
     #[test]
     fn self_encryption_from_json() {
-        let enc: DefaultServerSideEncryption = from_value(
+        let enc: ServerSideEncryption = from_value(
             json!({
                 "mode": "SSE-C",
                 "algorithm": "AES256",
@@ -1066,7 +1087,7 @@ mod tests {
 
         assert_eq!(
             enc,
-            DefaultServerSideEncryption::SelfManaged(
+            ServerSideEncryption::SelfManaged(
                 SelfManagedEncryption {
                     algorithm: EncryptionAlgorithm::Aes256,
                     key: "MY-ENCODED-KEY".into(),
