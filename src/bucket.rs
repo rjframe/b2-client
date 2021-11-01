@@ -17,12 +17,7 @@ use crate::{
     prelude::*,
     client::HttpClient,
     error::{ValidationError, Error},
-    validate::{
-        validated_bucket_name,
-        validated_cors_rule_name,
-        validated_lifecycle_rules,
-        validated_origins,
-    },
+    validate::*,
 };
 
 use serde::{Serialize, Deserialize};
@@ -212,12 +207,15 @@ impl CorsRuleBuilder {
     /// If an entry is `*`, there can be no other entries.
     ///
     /// The default is an empty list (no headers are allowed).
-    pub fn allowed_headers(mut self, headers: impl Into<Vec<String>>)
+    pub fn allowed_headers<H>(mut self, headers: impl Into<Vec<String>>)
     -> Result<Self, ValidationError> {
         let headers = headers.into();
 
         if ! headers.is_empty() {
-            // TODO: Validate headers
+            for header in headers.iter() {
+                validated_http_header(header)?;
+            }
+
             self.allowed_headers = Some(headers);
         }
 
@@ -239,7 +237,8 @@ impl CorsRuleBuilder {
     pub fn add_allowed_header(mut self, header: impl Into<String>)
     -> Result<Self, ValidationError> {
         let header = header.into();
-        // TODO: Validate header
+        validated_http_header(&header)?;
+
         let headers = self.allowed_headers.get_or_insert_with(Vec::new);
         headers.push(header);
         Ok(self)
@@ -255,7 +254,10 @@ impl CorsRuleBuilder {
         let headers = headers.into();
 
         if ! headers.is_empty() {
-            // TODO: Validate headers
+            for header in headers.iter() {
+                validated_http_header(header)?;
+            }
+
             self.expose_headers = Some(headers);
         }
 
@@ -268,7 +270,8 @@ impl CorsRuleBuilder {
     pub fn add_exposed_header(mut self, header: impl Into<String>)
     -> Result<Self, ValidationError> {
         let header = header.into();
-        // TODO: Validate header
+        validated_http_header(&header)?;
+
         let headers = self.expose_headers.get_or_insert_with(Vec::new);
         headers.push(header);
         Ok(self)

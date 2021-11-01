@@ -8,6 +8,37 @@ use crate::{
 };
 
 
+/// Returns the provided HTTP header if it's valid; otherwise ValidationError.
+///
+/// An HTTP header:
+///
+/// * must be valid ASCII.
+/// * must not include whitespace.
+/// * must not include ASCII codes outside alphanumeric codes or any of
+///   "!" "#" "$" "%" "&" "'" "*" "+" "-" "." "^" "_" "`" "|" or "~".
+///
+/// # Notes
+///
+/// We validate headers according to
+/// [RFC 7230](https://www.rfc-editor.org/rfc/rfc7230), notably
+/// [Section 3.2.6](https://www.rfc-editor.org/rfc/rfc7230#section-3.2.6). It is
+/// possible that the B2 API is more lenient.
+pub(crate) fn validated_http_header(header: &str)
+-> Result<&str, ValidationError> {
+    let is_valid = |c: char| "!#$%&'*+-.^_`|~".contains(c);
+
+    let invalid = header.chars()
+        .find(|c| !(c.is_ascii_alphanumeric() || is_valid(*c)));
+
+    if let Some(ch) = invalid {
+        Err(ValidationError::BadFormat(
+            format!("Invalid character in header: {}", ch)
+        ))
+    } else {
+        Ok(header)
+    }
+}
+
 pub(crate) fn validated_bucket_name(name: impl Into<String>)
 -> Result<String, ValidationError> {
     let name = name.into();
