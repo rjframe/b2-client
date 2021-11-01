@@ -147,6 +147,7 @@ impl From<hyper::Error> for Error<hyper::Error> {
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ErrorCode {
     // 400
+    BadBucketId,
     BadRequest,
     DuplicateBucketName,
     TooManyBuckets,
@@ -172,6 +173,7 @@ impl ErrorCode {
     /// Convert the error code received from the B2 service to an [ErrorCode].
     fn from_api_code<S: AsRef<str>>(code: S) -> Result<Self, String> {
         match code.as_ref() {
+            "bad_bucket_id" => Ok(Self::BadBucketId),
             "bad_request" => Ok(Self::BadRequest),
             "duplicate_bucket_name" => Ok(Self::DuplicateBucketName),
             "too_many_buckets" => Ok(Self::TooManyBuckets),
@@ -194,6 +196,7 @@ impl ErrorCode {
     /// Get the HTTP status code of this error.
     fn status(&self) -> u16 {
         match self {
+            Self::BadBucketId => 400,
             Self::BadRequest => 400,
             Self::DuplicateBucketName => 400,
             Self::TooManyBuckets => 400,

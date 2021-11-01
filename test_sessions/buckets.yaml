@@ -45,3 +45,51 @@
       content-length:
         - "736"
     body: "{\n  \"accountId\": \"abcdefg\",\n  \"bucketId\": \"6dd25ed6eb22b77577c70e1a\",\n  \"bucketInfo\": {},\n  \"bucketName\": \"testing-new-b2-client\",\n  \"bucketType\": \"allPrivate\",\n  \"corsRules\": [],\n  \"defaultServerSideEncryption\": {\n    \"isClientAuthorizedToRead\": true,\n    \"value\": {\n      \"algorithm\": null,\n      \"mode\": null\n    }\n  },\n  \"fileLockConfiguration\": {\n    \"isClientAuthorizedToRead\": true,\n    \"value\": {\n      \"defaultRetention\": {\n        \"mode\": null,\n        \"period\": null\n      },\n      \"isFileLockEnabled\": false\n    }\n  },\n  \"lifecycleRules\": [\n    {\n      \"daysFromHidingToDeleting\": 5,\n      \"daysFromUploadingToHiding\": null,\n      \"fileNamePrefix\": \"my-files/\"\n    }\n  ],\n  \"options\": [\n    \"s3\"\n  ],\n  \"revision\": 2\n}\n"
+---
+- Request:
+    method: POST
+    url: "http://localhost:8765/b2api/v2/b2_delete_bucket"
+    headers:
+      content-type:
+        - application/json
+      authorization:
+        - 4_002d2e6b27577ea0000000002_019f9ac2_4af224_acct_BzTNBWOKUVQvIMyHK3tXHG7YqDQ=
+    body: "{\"accountId\":\"abcdefg\",\"bucketId\":\"6dd25ed6eb22b77577c70e1a\"}"
+- Response:
+    status: 200
+    version: ~
+    headers:
+      date:
+        - "Mon, 01 Nov 2021 14:44:28 GMT"
+      content-type:
+        - application/json;charset=UTF-8
+      content-length:
+        - "607"
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+    body: "{\n  \"accountId\": \"abcdefg\",\n  \"bucketId\": \"6dd25ed6eb22b77577c70e1a\",\n  \"bucketInfo\": {},\n  \"bucketName\": \"testing-new-b2-client\",\n  \"bucketType\": \"allPrivate\",\n  \"corsRules\": [],\n  \"defaultServerSideEncryption\": {\n    \"isClientAuthorizedToRead\": true,\n    \"value\": {\n      \"algorithm\": null,\n      \"mode\": null\n    }\n  },\n  \"fileLockConfiguration\": {\n    \"isClientAuthorizedToRead\": true,\n    \"value\": {\n      \"defaultRetention\": {\n        \"mode\": null,\n        \"period\": null\n      },\n      \"isFileLockEnabled\": false\n    }\n  },\n  \"lifecycleRules\": [],\n  \"options\": [\n    \"s3\"\n  ],\n  \"revision\": 3\n}\n"
+---
+- Request:
+    method: POST
+    url: "http://localhost:8765/b2api/v2/b2_delete_bucket"
+    headers:
+      authorization:
+        - 4_002d2e6b27577ea0000000002_019f9ac2_4af224_acct_BzTNBWOKUVQvIMyHK3tXHG7YqDQ=
+      content-type:
+        - application/json
+    body: "{\"accountId\":\"abcdefg\",\"bucketId\":\"1234567\"}"
+- Response:
+    status: 400
+    version: ~
+    headers:
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      connection:
+        - close
+      date:
+        - "Mon, 01 Nov 2021 14:39:35 GMT"
+      content-length:
+        - "109"
+      content-type:
+        - application/json;charset=utf-8
+    body: "{\n  \"code\": \"bad_bucket_id\",\n  \"message\": \"Bucket 1234567 does not exist\",\n  \"status\": 400\n}"

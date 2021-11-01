@@ -838,6 +838,7 @@ pub struct Bucket {
     options: Option<Vec<String>>,
 }
 
+/// Create a new [Bucket].
 pub async fn create_bucket<C, E>(
     auth: &mut Authorization<C>,
     new_bucket_info: CreateBucket
@@ -852,6 +853,35 @@ pub async fn create_bucket<C, E>(
         .expect("Invalid URL")
         .with_header("Authorization", &auth.authorization_token)
         .with_body(&serde_json::to_value(new_bucket_info)?)
+        .send().await?;
+
+    let new_bucket: B2Result<Bucket> = serde_json::from_value(res)?;
+    match new_bucket {
+        B2Result::Ok(b) => Ok(b),
+        B2Result::Err(e) => Err(Error::B2(e)),
+    }
+}
+
+/// Delete the bucket with the given ID.
+///
+/// Returns a [Bucket] with the information of the newly-deleted bucket.
+///
+/// See <https://www.backblaze.com/b2/docs/b2_delete_bucket.html> for further
+/// information.
+pub async fn delete_bucket<C, E>(
+    auth: &mut Authorization<C>,
+    bucket_id: impl AsRef<str>
+) -> Result<Bucket, Error<E>>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    let res = auth.client.post(auth.api_url("b2_delete_bucket"))
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .with_body(&serde_json::json!({
+            "accountId": auth.account_id,
+            "bucketId": bucket_id.as_ref(),
+        }))
         .send().await?;
 
     let new_bucket: B2Result<Bucket> = serde_json::from_value(res)?;
@@ -987,21 +1017,19 @@ mod serialization {
     }
 }
 
+#[cfg(feature = "with_surf")]
 #[cfg(test)]
-mod tests {
+mod tests_mocked {
     use super::*;
     use crate::{
         account::Capability,
         error::ErrorCode,
     };
-    use serde_json::{json, from_value, to_value};
     use surf_vcr::VcrMode;
 
-    #[cfg(feature = "with_surf")]
     use crate::test_utils::{create_test_client, get_test_key};
 
 
-    #[cfg(feature = "with_surf")]
     #[async_std::test]
     async fn create_bucket_success() -> anyhow::Result<()> {
         let client = create_test_client(
@@ -1028,7 +1056,6 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(feature = "with_surf")]
     #[async_std::test]
     async fn create_bucket_already_exists() -> anyhow::Result<()> {
         let client = create_test_client(
@@ -1057,6 +1084,51 @@ mod tests {
 
         Ok(())
     }
+
+    #[async_std::test]
+    async fn delete_bucket_success() -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/buckets.yaml"
+        ).await?;
+
+        let mut auth = get_test_key(client, vec![Capability::WriteBuckets]);
+
+        let bucket: Bucket = delete_bucket(
+            &mut auth,
+            "6dd25ed6eb22b77577c70e1a"
+        ).await?;
+
+        assert_eq!(bucket.bucket_name, "testing-new-b2-client");
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn delete_bucket_does_not_exist() -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/buckets.yaml"
+        ).await?;
+
+        let mut auth = get_test_key(client, vec![Capability::WriteBuckets]);
+
+        // B2 documentation says ErrorCode::BadRequest but this is what we get.
+        match delete_bucket(&mut auth, "1234567").await.unwrap_err() {
+            Error::B2(e) =>
+                assert_eq!(e.code(), ErrorCode::BadBucketId),
+            e => panic!("Unexpected error: {:?}", e),
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::{json, from_value, to_value};
+
 
     #[test]
     fn no_encryption_to_json() {
