@@ -64,6 +64,7 @@ impl<C> Authorization<C>
 {
     // Allow tests to create fake Authorizations.
     #[cfg(test)]
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         client: C,
         account_id: String,
@@ -321,7 +322,7 @@ impl CreateKeyRequestBuilder {
         // TODO: Validation: name must be ASCII (not explicitly documented).
         let name = name.into();
 
-        if name.len() < 1 {
+        if name.is_empty() {
             // I don't know the minimum name size, whether all characters can be
             // '-', etc. They're not documented but I wouldn't be surprised if
             // there are such restrictions.
