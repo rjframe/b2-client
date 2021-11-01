@@ -279,11 +279,11 @@ pub async fn authorize_account<C, E>(mut client: C, key_id: &str, key: &str)
 
 /// A request to create a B2 API key with certain capabilities.
 ///
-/// Use [CreateKeyRequestBuilder] to create a `CreateKeyRequest` object, then
-/// pass it to [create_key] to create a new application [Key] from the request.
+/// Use [CreateKeyBuilder] to create a `CreateKey` object, then pass it to
+/// [create_key] to create a new application [Key] from the request.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CreateKeyRequest {
+pub struct CreateKey {
     // account_id is provided by the Authorization object.
     account_id: Option<String>,
     capabilities: Vec<Capability>,
@@ -293,21 +293,21 @@ pub struct CreateKeyRequest {
     name_prefix: Option<String>,
 }
 
-impl CreateKeyRequest {
-    pub fn builder() -> CreateKeyRequestBuilder {
-        CreateKeyRequestBuilder::default()
+impl CreateKey {
+    pub fn builder() -> CreateKeyBuilder {
+        CreateKeyBuilder::default()
     }
 }
 
-/// A builder to create a [CreateKeyRequest] object.
+/// A builder to create a [CreateKey] object.
 ///
-/// After creating the `CreateKeyRequest`, pass it to [create_key] to obtain a
-/// new application key.
+/// After creating the `CreateKey`, pass it to [create_key] to obtain a new
+/// application key.
 ///
 /// See <https://www.backblaze.com/b2/docs/b2_create_key.html> for more
 /// information.
 #[derive(Default)]
-pub struct CreateKeyRequestBuilder {
+pub struct CreateKeyBuilder {
     capabilities: Option<Vec<Capability>>,
     name: Option<String>,
     valid_duration: Option<Duration>,
@@ -315,7 +315,7 @@ pub struct CreateKeyRequestBuilder {
     name_prefix: Option<String>,
 }
 
-impl CreateKeyRequestBuilder {
+impl CreateKeyBuilder {
     /// Create a new builder, with the key's name provided.
     pub fn name<S: Into<String>>(mut self, name: S)
     -> Result<Self, ValidationError> {
@@ -403,8 +403,8 @@ impl CreateKeyRequestBuilder {
         Ok(self)
     }
 
-    /// Create a new [CreateKeyRequest].
-    pub fn build(self) -> Result<CreateKeyRequest, ValidationError> {
+    /// Create a new [CreateKey].
+    pub fn build(self) -> Result<CreateKey, ValidationError> {
         let name = self.name.ok_or_else(||
             ValidationError::MissingData(
                 "A name for the key must be provided".into()
@@ -449,7 +449,7 @@ impl CreateKeyRequestBuilder {
             ));
         }
 
-        Ok(CreateKeyRequest {
+        Ok(CreateKey {
             account_id: None,
             capabilities,
             key_name: name,
@@ -550,17 +550,14 @@ impl NewlyCreatedKey {
 /// # #[cfg(feature = "with_surf")]
 /// # use b2_client::{
 /// #     client::{HttpClient, SurfClient},
-/// #     account::{
-/// #         authorize_account, create_key,
-/// #         Capability, CreateKeyRequest,
-/// #     },
+/// #     account::{authorize_account, create_key, Capability, CreateKey},
 /// # };
 /// # #[cfg(feature = "with_surf")]
 /// # async fn f() -> anyhow::Result<()> {
 /// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
 ///     .await?;
 ///
-/// let create_key_request = CreateKeyRequest::builder()
+/// let create_key_request = CreateKey::builder()
 ///     .name("my-key")?
 ///     .capabilities([Capability::ListFiles])?
 ///     .build()?;
@@ -570,7 +567,7 @@ impl NewlyCreatedKey {
 /// ```
 pub async fn create_key<C, E>(
     auth: &mut Authorization<C>,
-    new_key_info: CreateKeyRequest
+    new_key_info: CreateKey
 ) -> Result<(String, Key), Error<E>>
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
@@ -603,8 +600,7 @@ pub async fn create_key<C, E>(
 /// # use b2_client::{
 /// #     client::{HttpClient, SurfClient},
 /// #     account::{
-/// #         authorize_account, create_key, delete_key,
-/// #         Capability, CreateKeyRequest,
+/// #         authorize_account, create_key, delete_key, Capability, CreateKey,
 /// #     },
 /// # };
 /// # #[cfg(feature = "with_surf")]
@@ -612,7 +608,7 @@ pub async fn create_key<C, E>(
 /// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
 ///     .await?;
 ///
-/// let create_key_request = CreateKeyRequest::builder()
+/// let create_key_request = CreateKey::builder()
 ///     .name("my-key")?
 ///     .capabilities([Capability::ListFiles])?
 ///     .build()?;
@@ -993,7 +989,7 @@ impl KeyListRequestBuilder {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct KeyResult {
+struct KeyList {
     keys: Vec<Key>,
     next_application_key_id: Option<String>,
 }
@@ -1056,7 +1052,7 @@ pub async fn list_keys<C, E>(
         .with_body(&serde_json::to_value(list_req)?)
         .send().await?;
 
-    let keys: B2Result<KeyResult> = serde_json::from_value(res)?;
+    let keys: B2Result<KeyList> = serde_json::from_value(res)?;
     match keys {
         B2Result::Ok(keys) => Ok((keys.keys, keys.next_application_key_id)),
         B2Result::Err(e) => Err(Error::B2(e)),
@@ -1139,7 +1135,7 @@ mod tests {
 
         let mut auth = get_test_key(client, vec![Capability::WriteKeys]);
 
-        let new_key_info = CreateKeyRequest::builder()
+        let new_key_info = CreateKey::builder()
             .name("my-special-key")
             .unwrap()
             .capabilities(vec![Capability::ListFiles]).unwrap()

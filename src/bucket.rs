@@ -535,11 +535,11 @@ impl Default for ServerSideEncryption {
 
 /// A request to create a new bucket.
 ///
-/// Use [CreateBucketRequestBuilder] to create a `CreateBucketRequest`, then
-/// pass it to [create_bucket].
+/// Use [CreateBucketBuilder] to create a `CreateBucket`, then pass it to
+/// [create_bucket].
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CreateBucketRequest {
+pub struct CreateBucket {
     // account_id is provided by an Authorization.
     account_id: Option<String>,
     bucket_name: String,
@@ -551,20 +551,20 @@ pub struct CreateBucketRequest {
     default_server_side_encryption: Option<ServerSideEncryption>,
 }
 
-impl CreateBucketRequest {
-    pub fn builder() -> CreateBucketRequestBuilder {
-        CreateBucketRequestBuilder::default()
+impl CreateBucket {
+    pub fn builder() -> CreateBucketBuilder {
+        CreateBucketBuilder::default()
     }
 }
 
-/// A builder for a [CreateBucketRequest].
+/// A builder for a [CreateBucket].
 ///
 /// After creating the request, pass it to [create_bucket].
 ///
 /// See <https://www.backblaze.com/b2/docs/b2_create_bucket.html> for further
 /// information.
 #[derive(Default)]
-pub struct CreateBucketRequestBuilder {
+pub struct CreateBucketBuilder {
     bucket_name: Option<String>,
     bucket_type: Option<BucketType>,
     bucket_info: Option<serde_json::Value>,
@@ -574,7 +574,7 @@ pub struct CreateBucketRequestBuilder {
     default_server_side_encryption: Option<ServerSideEncryption>,
 }
 
-impl CreateBucketRequestBuilder {
+impl CreateBucketBuilder {
     /// Create the bucket with the specified name.
     ///
     /// Bucket names:
@@ -607,7 +607,7 @@ impl CreateBucketRequestBuilder {
     ///
     /// This can contain arbitrary metadata for your own use. You can also set
     /// cache-control settings from here (but see
-    /// [CreateBucketRequestBuilder::with_cache_control]).
+    /// [CreateBucketBuilder::with_cache_control]).
     pub fn bucket_info(mut self, info: serde_json::Value)
     -> Result<Self, ValidationError> {
         self.bucket_info = Some(info);
@@ -729,8 +729,8 @@ impl CreateBucketRequestBuilder {
         self
     }
 
-    /// Create a [CreateBucketRequest].
-    pub fn build(self) -> Result<CreateBucketRequest, ValidationError> {
+    /// Create a [CreateBucket].
+    pub fn build(self) -> Result<CreateBucket, ValidationError> {
         let bucket_name = self.bucket_name.ok_or_else(||
             ValidationError::MissingData(
                 "The bucket must have a name".into()
@@ -743,7 +743,7 @@ impl CreateBucketRequestBuilder {
             )
         )?;
 
-        Ok(CreateBucketRequest {
+        Ok(CreateBucket {
             account_id: None,
             bucket_name,
             bucket_type,
@@ -840,7 +840,7 @@ pub struct Bucket {
 
 pub async fn create_bucket<C, E>(
     auth: &mut Authorization<C>,
-    new_bucket_info: CreateBucketRequest
+    new_bucket_info: CreateBucket
 ) -> Result<Bucket, Error<E>>
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
@@ -1011,7 +1011,7 @@ mod tests {
 
         let mut auth = get_test_key(client, vec![Capability::WriteBuckets]);
 
-        let req = CreateBucketRequest::builder()
+        let req = CreateBucket::builder()
             .name("testing-new-b2-client")?
             .bucket_type(BucketType::Private)?
             .lifecycle_rules(vec![
@@ -1038,7 +1038,7 @@ mod tests {
 
         let mut auth = get_test_key(client, vec![Capability::WriteBuckets]);
 
-        let req = CreateBucketRequest::builder()
+        let req = CreateBucket::builder()
             .name("testing-b2-client")?
             .bucket_type(BucketType::Private)?
             .lifecycle_rules(vec![
