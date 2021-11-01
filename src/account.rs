@@ -1069,7 +1069,6 @@ pub async fn list_keys<C, E>(
 mod tests {
     use super::*;
     use crate::{
-        client::SurfClient,
         error::ErrorCode,
         test_utils::{create_test_client, get_test_key},
     };
