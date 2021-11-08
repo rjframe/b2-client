@@ -1027,7 +1027,7 @@ mod tests_mocked {
     };
     use surf_vcr::VcrMode;
 
-    use crate::test_utils::{create_test_client, get_test_key};
+    use crate::test_utils::{create_test_auth, create_test_client};
 
 
     #[async_std::test]
@@ -1037,7 +1037,8 @@ mod tests_mocked {
             "test_sessions/buckets.yaml"
         ).await?;
 
-        let mut auth = get_test_key(client, vec![Capability::WriteBuckets]);
+        let mut auth = create_test_auth(client, vec![Capability::WriteBuckets])
+            .await;
 
         let req = CreateBucket::builder()
             .name("testing-new-b2-client")?
@@ -1058,12 +1059,19 @@ mod tests_mocked {
 
     #[async_std::test]
     async fn create_bucket_already_exists() -> anyhow::Result<()> {
+        // Rerunning this against the B2 API will only succeed if the bucket
+        // already exists. An easy way to do it is to rerun the
+        // create_bucket_success test above, then change the name here to match.
+        //
+        // We use a different name in this test so that we can use the same
+        // cassette.
         let client = create_test_client(
             VcrMode::Replay,
             "test_sessions/buckets.yaml"
         ).await?;
 
-        let mut auth = get_test_key(client, vec![Capability::WriteBuckets]);
+        let mut auth = create_test_auth(client, vec![Capability::WriteBuckets])
+            .await;
 
         let req = CreateBucket::builder()
             .name("testing-b2-client")?
@@ -1087,16 +1095,19 @@ mod tests_mocked {
 
     #[async_std::test]
     async fn delete_bucket_success() -> anyhow::Result<()> {
+        // Rerunning this test against the B2 API will require updating the
+        // bucket ID.
         let client = create_test_client(
             VcrMode::Replay,
             "test_sessions/buckets.yaml"
         ).await?;
 
-        let mut auth = get_test_key(client, vec![Capability::WriteBuckets]);
+        let mut auth = create_test_auth(client, vec![Capability::WriteBuckets])
+            .await;
 
         let bucket: Bucket = delete_bucket(
             &mut auth,
-            "6dd25ed6eb22b77577c70e1a"
+            "1df2dee6ab62f7f577c70e1a"
         ).await?;
 
         assert_eq!(bucket.bucket_name, "testing-new-b2-client");
@@ -1111,7 +1122,8 @@ mod tests_mocked {
             "test_sessions/buckets.yaml"
         ).await?;
 
-        let mut auth = get_test_key(client, vec![Capability::WriteBuckets]);
+        let mut auth = create_test_auth(client, vec![Capability::WriteBuckets])
+            .await;
 
         // B2 documentation says ErrorCode::BadRequest but this is what we get.
         match delete_bucket(&mut auth, "1234567").await.unwrap_err() {

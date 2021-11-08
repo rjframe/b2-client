@@ -1,0 +1,23 @@
+---
+- Request:
+    method: GET
+    url: "https://api.backblazeb2.com/b2api/v2/b2_authorize_account"
+    headers:
+      authorization:
+        - Basic hidden-account-id
+    body: ""
+- Response:
+    status: 401
+    version: ~
+    headers:
+      www-authenticate:
+        - "BASIC realm=\"authorize_account\""
+      content-type:
+        - application/json;charset=utf-8
+      content-length:
+        - "64"
+      date:
+        - "Sun, 07 Nov 2021 15:23:40 GMT"
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+    body: "{\"code\":\"bad_auth_token\",\"message\":\"\",\"status\":401}"

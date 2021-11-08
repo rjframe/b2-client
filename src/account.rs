@@ -28,11 +28,7 @@ use chrono::{DateTime, Local};
 use serde::{Serialize, Deserialize};
 
 
-const B2_AUTH_URL: &str = if cfg!(test) {
-    "http://localhost:8765/b2api/v2/"
-} else {
-    "https://api.backblazeb2.com/b2api/v2/"
-};
+const B2_AUTH_URL: &str = "https://api.backblazeb2.com/b2api/v2/";
 
 /// Authorization token and related information obtained from
 /// [authorize_account].
@@ -931,6 +927,12 @@ impl KeyListRequest {
     }
 }
 
+impl Default for KeyListRequest {
+    fn default() -> Self {
+        KeyListRequestBuilder::default().build()
+    }
+}
+
 /// A builder to create a [KeyListRequest] object.
 ///
 /// After creating the `KeyListRequest`, pass it to [list_keys] to obtain the
@@ -1067,13 +1069,25 @@ mod tests {
     use super::*;
     use crate::{
         error::ErrorCode,
-        test_utils::{create_test_client, get_test_key},
+        test_utils::{create_test_auth, create_test_client},
     };
     use surf_vcr::VcrMode;
 
 
-    const AUTH_KEY_ID: &str = "B2_KEY_ID";
-    const AUTH_KEY: &str = "B2_AUTH_KEY";
+    /// Get the (key, id) pair from the environment for authorization tests.
+    ///
+    /// To make a call against the B2 API, the `B2_CLIENT_TEST_KEY` and
+    /// `B2_CLIENT_TEST_KEY_ID` environment variables must be set. Otherwise,
+    /// non-functional strings will be used that are adequate for replaying
+    /// pre-recorded tests.
+    fn get_key() -> (String, String) {
+        let id = std::env::var("B2_CLIENT_TEST_KEY_ID")
+            .unwrap_or_else(|_| "B2_KEY_ID".to_owned());
+        let key = std::env::var("B2_CLIENT_TEST_KEY")
+            .unwrap_or_else(|_| "B2_AUTH_KEY".to_owned());
+
+        (id, key)
+    }
 
     #[async_std::test]
     async fn test_authorize_account() -> Result<(), anyhow::Error> {
@@ -1082,7 +1096,9 @@ mod tests {
             "test_sessions/auth_account.yaml"
         ).await?;
 
-        let auth = authorize_account(client, AUTH_KEY_ID, AUTH_KEY).await?;
+        let (id, key) = get_key();
+
+        let auth = authorize_account(client, &id, &key).await?;
         assert!(auth.allowed.capabilities.contains(&Capability::ListBuckets));
 
         Ok(())
@@ -1092,10 +1108,11 @@ mod tests {
     async fn authorize_account_bad_key() -> Result<(), anyhow::Error> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/auth_account.yaml"
+            "test_sessions/bad_auth_account.yaml"
         ).await?;
 
-        let auth = authorize_account(client, AUTH_KEY_ID, "wrong-key").await;
+        let (id, _) = get_key();
+        let auth = authorize_account(client, &id, "wrong-key").await;
 
         match auth.unwrap_err() {
             // The B2 documentation says we'll receive `unauthorized`, but this
@@ -1111,10 +1128,11 @@ mod tests {
     async fn authorize_account_bad_key_id() -> Result<(), anyhow::Error> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/auth_account.yaml"
+            "test_sessions/bad_auth_account.yaml"
         ).await?;
 
-        let auth = authorize_account(client, "wrong-id", AUTH_KEY).await;
+        let (_, key) = get_key();
+        let auth = authorize_account(client, "wrong-id", &key).await;
 
         match auth.unwrap_err() {
             // The B2 documentation says we'll receive `unauthorized`, but this
@@ -1133,7 +1151,8 @@ mod tests {
             "test_sessions/auth_account.yaml"
         ).await?;
 
-        let mut auth = get_test_key(client, vec![Capability::WriteKeys]);
+        let mut auth = create_test_auth(client, vec![Capability::WriteKeys])
+            .await;
 
         let new_key_info = CreateKey::builder()
             .name("my-special-key")
@@ -1151,15 +1170,19 @@ mod tests {
 
     #[async_std::test]
     async fn test_delete_key() -> Result<(), anyhow::Error> {
+        // To run a real test against the B2 API, a valid key ID needs to be
+        // provided below.
+
         let client = create_test_client(
             VcrMode::Replay,
             "test_sessions/auth_account.yaml"
         ).await?;
 
-        let mut auth = get_test_key(client, vec![Capability::DeleteKeys]);
+        let mut auth = create_test_auth(client, vec![Capability::WriteKeys])
+            .await;
 
         let removed_key = delete_key_by_id(
-            &mut auth, "002d2e6b27577ea0000000005"
+            &mut auth, "002d2e6b27577ea0000000008"
         ).await?;
 
         assert_eq!(removed_key.key_name, "my-special-key");
@@ -1174,7 +1197,8 @@ mod tests {
             "test_sessions/auth_account.yaml"
         ).await?;
 
-        let mut auth = get_test_key(client, vec![Capability::ShareFiles]);
+        let mut auth = create_test_auth(client, vec![Capability::ShareFiles])
+            .await;
 
         let req = DownloadAuthorizationRequest::builder()
             .bucket_id("8d625eb63be2775577c70e1a")
@@ -1183,6 +1207,7 @@ mod tests {
             .content_disposition(
                 ContentDisposition("Attachment; filename=example.html".into())
             )
+            // TODO: Use middleware to modify these so we can test it.
             //.expiration(Expires::new(std::time::Duration::from_secs(60)))
             .cache_control(CacheDirective::MustRevalidate)
             .build()?;
@@ -1201,7 +1226,8 @@ mod tests {
             "test_sessions/auth_account.yaml"
         ).await?;
 
-        let mut auth = get_test_key(client, vec![Capability::ShareFiles]);
+        let mut auth = create_test_auth(client, vec![Capability::ShareFiles])
+            .await;
 
         let req = DownloadAuthorizationRequest::builder()
             .bucket_id("8d625eb63be2775577c70e1a")
@@ -1222,11 +1248,13 @@ mod tests {
             "test_sessions/auth_account.yaml"
         ).await?;
 
-        let mut auth = get_test_key(client, vec![Capability::ListKeys]);
-        let req = KeyListRequest::builder().build();
+        let mut auth = create_test_auth(client, vec![Capability::ListKeys])
+            .await;
+
+        let req = KeyListRequest::default();
 
         let (keys, next) = list_keys(&mut auth, req).await?;
-        assert_eq!(keys.len(), 2);
+        assert_eq!(keys.len(), 1);
         assert_eq!(next, None);
 
         Ok(())

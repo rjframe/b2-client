@@ -1,182 +1,136 @@
 ---
 - Request:
     method: GET
-    url: "http://localhost:8765/b2api/v2/b2_authorize_account"
+    url: "https://api.backblazeb2.com/b2api/v2/b2_authorize_account"
     headers:
       authorization:
-        - Basic QjJfS0VZX0lEOkIyX0FVVEhfS0VZ
+        - Basic hidden-account-id
     body: ""
 - Response:
     status: 200
     version: ~
     headers:
-      cache-control:
-        - "max-age=0, no-cache, no-store"
+      date:
+        - "Sun, 07 Nov 2021 14:36:53 GMT"
       content-type:
         - application/json;charset=UTF-8
-      date:
-        - "Wed, 13 Oct 2021 14:58:56 GMT"
-      content-length:
-        - "720"
-    body: "{\n  \"absoluteMinimumPartSize\": 5000000,\n  \"accountId\": \"abcdefg\",\n  \"allowed\": {\n    \"bucketId\": \"8d625eb63be2775577c70e1a\",\n    \"bucketName\": \"testing-b2-client\",\n    \"capabilities\": [\n      \"listBuckets\",\n      \"readBuckets\",\n      \"listFiles\",\n      \"readFiles\",\n      \"shareFiles\",\n      \"writeFiles\",\n      \"deleteFiles\",\n      \"readBucketEncryption\",\n      \"writeBucketEncryption\"\n    ],\n    \"namePrefix\": null\n  },\n  \"apiUrl\": \"http://localhost:8765\",\n  \"authorizationToken\": \"4_002d2e6b27577ea0000000002_019f9ac2_4af224_acct_BzTNBWOKUVQvIMyHK3tXHG7YqDQ=\",\n  \"downloadUrl\": \"http://localhost:8765/download\",\n  \"recommendedPartSize\": 100000000,\n  \"s3ApiUrl\": \"http://localhost:8765/s3api\"\n}\n"
----
-- Request:
-    method: GET
-    url: "http://localhost:8765/b2api/v2/b2_authorize_account"
-    headers:
-      authorization:
-        - Basic QjJfS0VZX0lEOndyb25nLWtleQ==
-    body: ""
-- Response:
-    status: 401
-    version: ~
-    headers:
       cache-control:
         - "max-age=0, no-cache, no-store"
-      www-authenticate:
-        - "BASIC realm=\"authorize_account\""
       content-length:
-        - "64"
-      content-type:
-        - application/json;charset=utf-8
-      date:
-        - "Wed, 13 Oct 2021 17:51:56 GMT"
-    body: "{\n  \"code\": \"bad_auth_token\",\n  \"message\": \"\",\n  \"status\": 401\n}"
----
-- Request:
-    method: GET
-    url: "http://localhost:8765/b2api/v2/b2_authorize_account"
-    headers:
-      authorization:
-        - Basic d3JvbmctaWQ6QjJfQVVUSF9LRVk=
-    body: ""
-- Response:
-    status: 401
-    version: ~
-    headers:
-      www-authenticate:
-        - "BASIC realm=\"authorize_account\""
-      cache-control:
-        - "max-age=0, no-cache, no-store"
-      content-type:
-        - application/json;charset=utf-8
-      content-length:
-        - "64"
-      date:
-        - "Wed, 13 Oct 2021 17:51:56 GMT"
-    body: "{\n  \"code\": \"bad_auth_token\",\n  \"message\": \"\",\n  \"status\": 401\n}"
+        - "1014"
+    body: "{\"absoluteMinimumPartSize\":5000000,\"accountId\":\"hidden-account-id\",\"allowed\":{\"bucketId\":null,\"bucketName\":null,\"capabilities\":[\"listKeys\",\"writeKeys\",\"deleteKeys\",\"listAllBucketNames\",\"listBuckets\",\"writeBuckets\",\"deleteBuckets\",\"readBuckets\",\"listFiles\",\"readFiles\",\"shareFiles\",\"writeFiles\",\"deleteFiles\",\"readBucketEncryption\",\"writeBucketEncryption\",\"bypassGovernance\",\"readBucketRetentions\",\"writeBucketRetentions\",\"readFileRetentions\",\"writeFileRetentions\",\"readFileLegalHolds\",\"writeFileLegalHolds\"],\"namePrefix\":null},\"apiUrl\":\"https://api002.backblazeb2.com\",\"authorizationToken\":\"hidden-authorization-token\",\"downloadUrl\":\"https://f002.backblazeb2.com\",\"recommendedPartSize\":100000000,\"s3ApiUrl\":\"https://s3.us-west-002.backblazeb2.com\"}"
 ---
 - Request:
     method: POST
-    url: "http://localhost:8765/b2api/v2/b2_create_key"
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_create_key"
     headers:
       content-type:
         - application/json
       authorization:
-        - 4_002d2e6b27577ea0000000002_019f9ac2_4af224_acct_BzTNBWOKUVQvIMyHK3tXHG7YqDQ=
-    body: "{\"accountId\":\"abcdefg\",\"bucketId\":null,\"capabilities\":[\"listFiles\"],\"keyName\":\"my-special-key\",\"namePrefix\":null,\"validDurationInSeconds\":null}"
+        - hidden-authorization-token
+    body: "{\"accountId\":\"hidden-account-id\",\"bucketId\":null,\"capabilities\":[\"listFiles\"],\"keyName\":\"my-special-key\",\"namePrefix\":null,\"validDurationInSeconds\":null}"
 - Response:
     status: 200
     version: ~
     headers:
-      date:
-        - "Thu, 14 Oct 2021 18:18:58 GMT"
-      cache-control:
-        - "max-age=0, no-cache, no-store"
       content-type:
         - application/json;charset=UTF-8
+      date:
+        - "Sun, 07 Nov 2021 14:36:54 GMT"
       content-length:
         - "314"
-    body: "{\n  \"accountId\": \"abcdefg\",\n  \"applicationKey\": \"K002wUnfPSn8rLmHeny6UxCKpPiqRaw\",\n  \"applicationKeyId\": \"002d2e6b27577ea0000000004\",\n  \"bucketId\": null,\n  \"capabilities\": [\n    \"listFiles\"\n  ],\n  \"expirationTimestamp\": null,\n  \"keyName\": \"my-special-key\",\n  \"namePrefix\": null,\n  \"options\": [\n    \"s3\"\n  ]\n}\n"
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+    body: "{\"accountId\":\"hidden-account-id\",\"applicationKey\":\"K0029r3hpMfUhncpS7uLYuIkg3FCMlo\",\"applicationKeyId\":\"002d2e6b27577ea000000000c\",\"authorizationToken\":\"hidden-authorization-token\",\"bucketId\":null,\"capabilities\":[\"listFiles\"],\"expirationTimestamp\":null,\"keyName\":\"my-special-key\",\"namePrefix\":null,\"options\":[\"s3\"]}"
 ---
 - Request:
     method: POST
-    url: "http://localhost:8765/b2api/v2/b2_delete_key"
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_delete_key"
     headers:
-      authorization:
-        - 4_002d2e6b27577ea0000000002_019f9ac2_4af224_acct_BzTNBWOKUVQvIMyHK3tXHG7YqDQ=
       content-type:
         - application/json
-    body: "{\"applicationKeyId\":\"002d2e6b27577ea0000000005\"}"
+      authorization:
+        - hidden-authorization-token
+    body: "{\"applicationKeyId\":\"002d2e6b27577ea0000000008\"}"
 - Response:
     status: 200
     version: ~
     headers:
-      cache-control:
-        - "max-age=0, no-cache, no-store"
-      content-length:
-        - "382"
-      date:
-        - "Fri, 15 Oct 2021 00:44:33 GMT"
       content-type:
         - application/json;charset=UTF-8
-    body: "{\n  \"accountId\": \"abcdefg\",\n  \"applicationKeyId\": \"002d2e6b27577ea0000000005\",\n  \"bucketId\": \"8d625eb63be2775577c70e1a\",\n  \"capabilities\": [\n    \"listBuckets\",\n    \"readBuckets\",\n    \"listFiles\",\n    \"readFiles\",\n    \"shareFiles\",\n    \"readBucketEncryption\"\n  ],\n  \"expirationTimestamp\": null,\n  \"keyName\": \"my-special-key\",\n  \"namePrefix\": null,\n  \"options\": [\n    \"s3\"\n  ]\n}\n"
+      content-length:
+        - "259"
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      date:
+        - "Sun, 07 Nov 2021 16:11:48 GMT"
+    body: "{\"accountId\":\"hidden-account-id\",\"applicationKeyId\":\"002d2e6b27577ea0000000008\",\"bucketId\":null,\"capabilities\":[\"listFiles\"],\"expirationTimestamp\":null,\"keyName\":\"my-special-key\",\"namePrefix\":null,\"options\":[\"s3\"]}"
 ---
 - Request:
     method: POST
-    url: "http://localhost:8765/b2api/v2/b2_get_download_authorization"
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_get_download_authorization"
     headers:
+      authorization:
+        - hidden-authorization-token
       content-type:
         - application/json
-      authorization:
-        - 4_002d2e6b27577ea0000000002_019f9ac2_4af224_acct_BzTNBWOKUVQvIMyHK3tXHG7YqDQ=
     body: "{\"b2CacheControl\":\"must-revalidate\",\"b2ContentDisposition\":\"Attachment; filename=example.html\",\"b2ContentEncoding\":null,\"b2ContentLanguage\":null,\"b2ContentType\":null,\"b2Expires\":null,\"bucketId\":\"8d625eb63be2775577c70e1a\",\"fileNamePrefix\":\"files/\",\"validDurationInSeconds\":30000}"
 - Response:
     status: 200
     version: ~
     headers:
-      content-type:
-        - application/json;charset=UTF-8
-      date:
-        - "Fri, 15 Oct 2021 22:22:57 GMT"
       content-length:
         - "214"
+      date:
+        - "Sun, 07 Nov 2021 16:47:28 GMT"
       cache-control:
         - "max-age=0, no-cache, no-store"
-    body: "{\n  \"authorizationToken\": \"3_20211015222257_0ec1dc0b2edecc668da1113b_f45cd898bb488ad981a406e1bbb83777ddc6e0f3_002_20211016064257_0006_dnld\",\n  \"bucketId\": \"8d625eb63be2775577c70e1a\",\n  \"fileNamePrefix\": \"files/\"\n}\n"
+      content-type:
+        - application/json;charset=UTF-8
+    body: "{\"authorizationToken\":\"hidden-authorization-token\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"fileNamePrefix\":\"files/\"}"
 ---
 - Request:
     method: POST
-    url: "http://localhost:8765/b2api/v2/b2_get_download_authorization"
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_get_download_authorization"
     headers:
-      authorization:
-        - 4_002d2e6b27577ea0000000002_019f9ac2_4af224_acct_BzTNBWOKUVQvIMyHK3tXHG7YqDQ=
       content-type:
         - application/json
+      authorization:
+        - hidden-authorization-token
     body: "{\"b2CacheControl\":null,\"b2ContentDisposition\":null,\"b2ContentEncoding\":null,\"b2ContentLanguage\":null,\"b2ContentType\":null,\"b2Expires\":null,\"bucketId\":\"8d625eb63be2775577c70e1a\",\"fileNamePrefix\":\"files/\",\"validDurationInSeconds\":30000}"
 - Response:
     status: 200
     version: ~
     headers:
+      date:
+        - "Sun, 07 Nov 2021 16:51:21 GMT"
       content-length:
         - "214"
-      content-type:
-        - application/json;charset=UTF-8
-      date:
-        - "Fri, 15 Oct 2021 21:08:23 GMT"
       cache-control:
         - "max-age=0, no-cache, no-store"
-    body: "{\n  \"authorizationToken\": \"3_20211015210824_f86016424582a846be762480_45319fc2d173cae06c73a8918af86fba5feaa07f_002_20211016052824_0006_dnld\",\n  \"bucketId\": \"8d625eb63be2775577c70e1a\",\n  \"fileNamePrefix\": \"files/\"\n}\n"
+      content-type:
+        - application/json;charset=UTF-8
+    body: "{\"authorizationToken\":\"hidden-authorization-token\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"fileNamePrefix\":\"files/\"}"
 ---
 - Request:
     method: POST
-    url: "http://localhost:8765/b2api/v2/b2_list_keys"
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_list_keys"
     headers:
+      authorization:
+        - hidden-authorization-token
       content-type:
         - application/json
-      authorization:
-        - 4_002d2e6b27577ea0000000002_019f9ac2_4af224_acct_BzTNBWOKUVQvIMyHK3tXHG7YqDQ=
-    body: "{\"accountId\":\"abcdefg\",\"maxKeyCount\":100,\"startApplicationKeyId\":null}"
+    body: "{\"accountId\":\"hidden-account-id\",\"maxKeyCount\":100,\"startApplicationKeyId\":null}"
 - Response:
     status: 200
     version: ~
     headers:
-      date:
-        - "Mon, 18 Oct 2021 18:18:00 GMT"
+      content-length:
+        - "1049"
       cache-control:
         - "max-age=0, no-cache, no-store"
+      date:
+        - "Sun, 07 Nov 2021 17:06:19 GMT"
       content-type:
         - application/json;charset=UTF-8
-      content-length:
-        - "1020"
-    body: "{\n  \"keys\": [\n    {\n      \"accountId\": \"abcdefg\",\n      \"applicationKeyId\": \"opqrstu\",\n      \"bucketId\": \"hijklmn\",\n      \"capabilities\": [\n        \"listBuckets\",\n        \"listFiles\",\n        \"readFiles\",\n        \"shareFiles\",\n        \"writeFiles\",\n        \"deleteFiles\"\n      ],\n      \"expirationTimestamp\": null,\n      \"keyName\": \"my-key-name\",\n      \"namePrefix\": null,\n      \"options\": []\n    },\n    {\n      \"accountId\": \"abcdefg\",\n      \"applicationKeyId\": \"vwxyza\",\n      \"bucketId\": \"bcdefgh\",\n      \"capabilities\": [\n        \"listBuckets\",\n        \"readBuckets\",\n        \"listFiles\",\n        \"readFiles\",\n        \"shareFiles\",\n        \"writeFiles\",\n        \"deleteFiles\",\n        \"readBucketEncryption\",\n        \"writeBucketEncryption\"\n      ],\n      \"expirationTimestamp\": null,\n      \"keyName\": \"other-key-name\",\n      \"namePrefix\": null,\n      \"options\": [\n        \"s3\"\n      ]\n    }\n  ],\n  \"nextApplicationKeyId\": null\n}\n"
+    body: "{\"keys\":[{\"accountId\":\"hidden-account-id\",\"applicationKeyId\":\"hidden-app-key-id\",\"bucketId\":\"abcdefghijklmnop\",\"capabilities\":[\"listFiles\",\"readFiles\"],\"expirationTimestamp\":null,\"keyName\":\"dev-b2-client-tester\",\"namePrefix\":null,\"nextApplicationId\":null,\"options\":[\"s3\"]}],\"nextApplicationKeyId\":null}"

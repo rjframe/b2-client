@@ -1,95 +1,96 @@
+---
 - Request:
     method: POST
-    url: "http://localhost:8765/b2api/v2/b2_create_bucket"
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_create_bucket"
     headers:
-      authorization:
-        - 4_002d2e6b27577ea0000000002_019f9ac2_4af224_acct_BzTNBWOKUVQvIMyHK3tXHG7YqDQ=
       content-type:
         - application/json
-    body: "{\"accountId\":\"abcdefg\",\"bucketInfo\":null,\"bucketName\":\"testing-b2-client\",\"bucketType\":\"allPrivate\",\"corsRules\":null,\"defaultServerSideEncryption\":null,\"fileLockEnabled\":false,\"lifecycleRules\":[{\"daysFromHidingToDeleting\":5,\"daysFromUploadingToHiding\":null,\"fileNamePrefix\":\"my-files/\"}]}"
+      authorization:
+        - hidden-authorization-token
+    body: "{\"accountId\":\"hidden-account-id\",\"bucketInfo\":null,\"bucketName\":\"testing-new-b2-client\",\"bucketType\":\"allPrivate\",\"corsRules\":null,\"defaultServerSideEncryption\":null,\"fileLockEnabled\":false,\"lifecycleRules\":[{\"daysFromHidingToDeleting\":5,\"daysFromUploadingToHiding\":null,\"fileNamePrefix\":\"my-files/\"}]}"
+- Response:
+    status: 200
+    version: ~
+    headers:
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      date:
+        - "Mon, 08 Nov 2021 13:04:58 GMT"
+      content-length:
+        - "736"
+      content-type:
+        - application/json;charset=UTF-8
+    body: "{\"accountId\":\"hidden-account-id\",\"bucketId\":\"1df2dee6ab62f7f577c70e1a\",\"bucketInfo\":{},\"bucketName\":\"testing-new-b2-client\",\"bucketType\":\"allPrivate\",\"corsRules\":[],\"defaultServerSideEncryption\":{\"isClientAuthorizedToRead\":true,\"value\":{\"algorithm\":null,\"mode\":null}},\"fileLockConfiguration\":{\"isClientAuthorizedToRead\":true,\"value\":{\"defaultRetention\":{\"mode\":null,\"period\":null},\"isFileLockEnabled\":false}},\"lifecycleRules\":[{\"daysFromHidingToDeleting\":5,\"daysFromUploadingToHiding\":null,\"fileNamePrefix\":\"my-files/\"}],\"options\":[\"s3\"],\"revision\":2}"
+---
+- Request:
+    method: POST
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_create_bucket"
+    headers:
+      authorization:
+        - hidden-authorization-token
+      content-type:
+        - application/json
+    body: "{\"accountId\":\"hidden-account-id\",\"bucketInfo\":null,\"bucketName\":\"testing-b2-client\",\"bucketType\":\"allPrivate\",\"corsRules\":null,\"defaultServerSideEncryption\":null,\"fileLockEnabled\":false,\"lifecycleRules\":[{\"daysFromHidingToDeleting\":5,\"daysFromUploadingToHiding\":null,\"fileNamePrefix\":\"my-files/\"}]}"
 - Response:
     status: 400
     version: ~
     headers:
       content-type:
         - application/json;charset=utf-8
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      connection:
+        - close
       content-length:
         - "101"
       date:
-        - "Mon, 25 Oct 2021 13:19:58 GMT"
-      cache-control:
-        - "max-age=0, no-cache, no-store"
-      connection:
-        - close
-    body: "{\n  \"code\": \"duplicate_bucket_name\",\n  \"message\": \"Bucket name is already in use.\",\n  \"status\": 400\n}"
+        - "Mon, 08 Nov 2021 13:08:47 GMT"
+    body: "{\"code\":\"duplicate_bucket_name\",\"message\":\"Bucket name is already in use.\",\"status\":400}"
 ---
 - Request:
     method: POST
-    url: "http://localhost:8765/b2api/v2/b2_create_bucket"
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_delete_bucket"
     headers:
       authorization:
-        - 4_002d2e6b27577ea0000000002_019f9ac2_4af224_acct_BzTNBWOKUVQvIMyHK3tXHG7YqDQ=
+        - hidden-authorization-token
       content-type:
         - application/json
-    body: "{\"accountId\":\"abcdefg\",\"bucketInfo\":null,\"bucketName\":\"testing-new-b2-client\",\"bucketType\":\"allPrivate\",\"corsRules\":null,\"defaultServerSideEncryption\":null,\"fileLockEnabled\":false,\"lifecycleRules\":[{\"daysFromHidingToDeleting\":5,\"daysFromUploadingToHiding\":null,\"fileNamePrefix\":\"my-files/\"}]}"
+    body: "{\"accountId\":\"hidden-account-id\",\"bucketId\":\"1df2dee6ab62f7f577c70e1a\"}"
 - Response:
     status: 200
     version: ~
     headers:
-      content-type:
-        - application/json;charset=UTF-8
-      date:
-        - "Mon, 25 Oct 2021 14:37:18 GMT"
-      cache-control:
-        - "max-age=0, no-cache, no-store"
       content-length:
         - "736"
-    body: "{\n  \"accountId\": \"abcdefg\",\n  \"bucketId\": \"6dd25ed6eb22b77577c70e1a\",\n  \"bucketInfo\": {},\n  \"bucketName\": \"testing-new-b2-client\",\n  \"bucketType\": \"allPrivate\",\n  \"corsRules\": [],\n  \"defaultServerSideEncryption\": {\n    \"isClientAuthorizedToRead\": true,\n    \"value\": {\n      \"algorithm\": null,\n      \"mode\": null\n    }\n  },\n  \"fileLockConfiguration\": {\n    \"isClientAuthorizedToRead\": true,\n    \"value\": {\n      \"defaultRetention\": {\n        \"mode\": null,\n        \"period\": null\n      },\n      \"isFileLockEnabled\": false\n    }\n  },\n  \"lifecycleRules\": [\n    {\n      \"daysFromHidingToDeleting\": 5,\n      \"daysFromUploadingToHiding\": null,\n      \"fileNamePrefix\": \"my-files/\"\n    }\n  ],\n  \"options\": [\n    \"s3\"\n  ],\n  \"revision\": 2\n}\n"
----
-- Request:
-    method: POST
-    url: "http://localhost:8765/b2api/v2/b2_delete_bucket"
-    headers:
-      content-type:
-        - application/json
-      authorization:
-        - 4_002d2e6b27577ea0000000002_019f9ac2_4af224_acct_BzTNBWOKUVQvIMyHK3tXHG7YqDQ=
-    body: "{\"accountId\":\"abcdefg\",\"bucketId\":\"6dd25ed6eb22b77577c70e1a\"}"
-- Response:
-    status: 200
-    version: ~
-    headers:
-      date:
-        - "Mon, 01 Nov 2021 14:44:28 GMT"
       content-type:
         - application/json;charset=UTF-8
-      content-length:
-        - "607"
+      date:
+        - "Mon, 08 Nov 2021 13:17:59 GMT"
       cache-control:
         - "max-age=0, no-cache, no-store"
-    body: "{\n  \"accountId\": \"abcdefg\",\n  \"bucketId\": \"6dd25ed6eb22b77577c70e1a\",\n  \"bucketInfo\": {},\n  \"bucketName\": \"testing-new-b2-client\",\n  \"bucketType\": \"allPrivate\",\n  \"corsRules\": [],\n  \"defaultServerSideEncryption\": {\n    \"isClientAuthorizedToRead\": true,\n    \"value\": {\n      \"algorithm\": null,\n      \"mode\": null\n    }\n  },\n  \"fileLockConfiguration\": {\n    \"isClientAuthorizedToRead\": true,\n    \"value\": {\n      \"defaultRetention\": {\n        \"mode\": null,\n        \"period\": null\n      },\n      \"isFileLockEnabled\": false\n    }\n  },\n  \"lifecycleRules\": [],\n  \"options\": [\n    \"s3\"\n  ],\n  \"revision\": 3\n}\n"
+    body: "{\"accountId\":\"hidden-account-id\",\"bucketId\":\"1df2dee6ab62f7f577c70e1a\",\"bucketInfo\":{},\"bucketName\":\"testing-new-b2-client\",\"bucketType\":\"allPrivate\",\"corsRules\":[],\"defaultServerSideEncryption\":{\"isClientAuthorizedToRead\":true,\"value\":{\"algorithm\":null,\"mode\":null}},\"fileLockConfiguration\":{\"isClientAuthorizedToRead\":true,\"value\":{\"defaultRetention\":{\"mode\":null,\"period\":null},\"isFileLockEnabled\":false}},\"lifecycleRules\":[{\"daysFromHidingToDeleting\":5,\"daysFromUploadingToHiding\":null,\"fileNamePrefix\":\"my-files/\"}],\"options\":[\"s3\"],\"revision\":3}"
 ---
 - Request:
     method: POST
-    url: "http://localhost:8765/b2api/v2/b2_delete_bucket"
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_delete_bucket"
     headers:
       authorization:
-        - 4_002d2e6b27577ea0000000002_019f9ac2_4af224_acct_BzTNBWOKUVQvIMyHK3tXHG7YqDQ=
+        - hidden-authorization-token
       content-type:
         - application/json
-    body: "{\"accountId\":\"abcdefg\",\"bucketId\":\"1234567\"}"
+    body: "{\"accountId\":\"hidden-account-id\",\"bucketId\":\"1234567\"}"
 - Response:
     status: 400
     version: ~
     headers:
-      cache-control:
-        - "max-age=0, no-cache, no-store"
+      date:
+        - "Mon, 08 Nov 2021 13:14:45 GMT"
       connection:
         - close
-      date:
-        - "Mon, 01 Nov 2021 14:39:35 GMT"
-      content-length:
-        - "109"
       content-type:
         - application/json;charset=utf-8
-    body: "{\n  \"code\": \"bad_bucket_id\",\n  \"message\": \"Bucket 1234567 does not exist\",\n  \"status\": 400\n}"
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      content-length:
+        - "109"
+    body: "{\"code\":\"bad_bucket_id\",\"message\":\"Bucket 1234567 does not exist\",\"status\":400}"

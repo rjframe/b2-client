@@ -84,14 +84,20 @@ the `--no-default-features` flag.
 
 ### Testing
 
-Tests currently only work with surf:
+Run `cargo test` to run all tests; the `surf` backend is used to test fake
+(pre-recorded) responses against the B2 API, so by default no tests are making
+real API calls.
 
-```
-cargo test --features=with_surf
-```
+To run a test against the live B2 API, set the environment variables
+`B2_CLIENT_TEST_KEY` and `B2_CLIENT_TEST_KEY_ID` to a key/id pair capable of
+performing the task you wish to test, and change the test's `VcrMode` to
+`Record`. Although there will be no major-destructive tests (like deleting all
+buckets), don't run a test against the API unless you know what it's doing,
+especially if you have production keys or buckets on your account.
 
-Because `with_surf` is a default feature, it does not need to be specified
-explicitly.
+A few tests will need minor modifications or setup to run against the B2 API
+(e.g., deleting a bucket), and a few tests will not pass their pre-recorded
+sessions with the environment variables set.
 
 
 ### Known Issues
