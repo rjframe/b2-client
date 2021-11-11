@@ -170,7 +170,7 @@ impl CorsRuleBuilder {
     ///
     /// # Notes
     ///
-    /// If adding multiple origins, [with_allowed_origins] will validate the
+    /// If adding multiple origins, [Self::allowed_origins] will validate the
     /// provided origins more efficiently.
     pub fn add_allowed_origin(mut self, origin: impl Into<String>)
     -> Result<Self, ValidationError> {
@@ -448,7 +448,7 @@ impl LifecycleRuleBuilder {
     ///
     /// The B2 service automatically hides files when a file with the same is
     /// uploaded (e.g., when a file changes). Files can also be explicitly
-    /// hidden via [hide_file].
+    /// hidden via [hide_file](crate::file::hide_file).
     pub fn delete_after_hide(mut self, days: chrono::Duration)
     -> Result<Self, ValidationError> {
         let days = days.num_days();
@@ -549,9 +549,9 @@ impl Default for ServerSideEncryption {
 /// [create_bucket].
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CreateBucket {
+pub struct CreateBucket<'a> {
     // account_id is provided by an Authorization.
-    account_id: Option<String>,
+    account_id: Option<&'a str>,
     bucket_name: String,
     bucket_type: BucketType,
     bucket_info: Option<serde_json::Value>,
@@ -561,7 +561,7 @@ pub struct CreateBucket {
     default_server_side_encryption: Option<ServerSideEncryption>,
 }
 
-impl CreateBucket {
+impl<'a> CreateBucket<'a> {
     pub fn builder() -> CreateBucketBuilder {
         CreateBucketBuilder::default()
     }
@@ -740,7 +740,7 @@ impl CreateBucketBuilder {
     }
 
     /// Create a [CreateBucket].
-    pub fn build(self) -> Result<CreateBucket, ValidationError> {
+    pub fn build<'a>(self) -> Result<CreateBucket<'a>, ValidationError> {
         let bucket_name = self.bucket_name.ok_or_else(||
             ValidationError::MissingData(
                 "The bucket must have a name".into()
@@ -849,15 +849,15 @@ pub struct Bucket {
 }
 
 /// Create a new [Bucket].
-pub async fn create_bucket<C, E>(
+pub async fn create_bucket<'a, C, E>(
     auth: &mut Authorization<C>,
-    new_bucket_info: CreateBucket
+    new_bucket_info: CreateBucket<'a>
 ) -> Result<Bucket, Error<E>>
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     let mut new_bucket_info = new_bucket_info;
-    new_bucket_info.account_id = Some(auth.account_id.to_owned());
+    new_bucket_info.account_id = Some(&auth.account_id);
 
     let res = auth.client.post(auth.api_url("b2_create_bucket"))
         .expect("Invalid URL")
@@ -889,7 +889,7 @@ pub async fn delete_bucket<C, E>(
         .expect("Invalid URL")
         .with_header("Authorization", &auth.authorization_token)
         .with_body(&serde_json::json!({
-            "accountId": auth.account_id,
+            "accountId": &auth.account_id,
             "bucketId": bucket_id.as_ref(),
         }))
         .send().await?;

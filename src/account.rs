@@ -279,9 +279,9 @@ pub async fn authorize_account<C, E>(mut client: C, key_id: &str, key: &str)
 /// [create_key] to create a new application [Key] from the request.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CreateKey {
+pub struct CreateKey<'a> {
     // account_id is provided by the Authorization object.
-    account_id: Option<String>,
+    account_id: Option<&'a str>,
     capabilities: Vec<Capability>,
     key_name: String,
     valid_duration_in_seconds: Option<Duration>,
@@ -289,7 +289,7 @@ pub struct CreateKey {
     name_prefix: Option<String>,
 }
 
-impl CreateKey {
+impl<'a> CreateKey<'a> {
     pub fn builder() -> CreateKeyBuilder {
         CreateKeyBuilder::default()
     }
@@ -400,7 +400,7 @@ impl CreateKeyBuilder {
     }
 
     /// Create a new [CreateKey].
-    pub fn build(self) -> Result<CreateKey, ValidationError> {
+    pub fn build<'a>(self) -> Result<CreateKey<'a>, ValidationError> {
         let name = self.name.ok_or_else(||
             ValidationError::MissingData(
                 "A name for the key must be provided".into()
@@ -561,15 +561,15 @@ impl NewlyCreatedKey {
 /// let (secret, new_key) = create_key(&mut auth, create_key_request).await?;
 /// # Ok(()) }
 /// ```
-pub async fn create_key<C, E>(
+pub async fn create_key<'a, C, E>(
     auth: &mut Authorization<C>,
-    new_key_info: CreateKey
+    new_key_info: CreateKey<'a>
 ) -> Result<(String, Key), Error<E>>
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     let mut new_key_info = new_key_info;
-    new_key_info.account_id = Some(auth.account_id.to_owned());
+    new_key_info.account_id = Some(&auth.account_id);
 
     let res = auth.client.post(auth.api_url("b2_create_key"))
         .expect("Invalid URL")
@@ -914,20 +914,20 @@ pub async fn get_download_authorization<C, E>(
 /// [list_keys] to obtain the list of keys.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct KeyListRequest {
+pub struct KeyListRequest<'a> {
     // account_id is provided by an Authorization.
-    account_id: Option<String>,
+    account_id: Option<&'a str>,
     max_key_count: u16,
     start_application_key_id: Option<String>,
 }
 
-impl KeyListRequest {
+impl<'a> KeyListRequest<'a> {
     pub fn builder() -> KeyListRequestBuilder {
         KeyListRequestBuilder::default()
     }
 }
 
-impl Default for KeyListRequest {
+impl<'a> Default for KeyListRequest<'a> {
     fn default() -> Self {
         KeyListRequestBuilder::default().build()
     }
@@ -980,7 +980,7 @@ impl KeyListRequestBuilder {
     }
 
     /// Create a [KeyListRequest].
-    pub fn build(self) -> KeyListRequest {
+    pub fn build<'a>(self) -> KeyListRequest<'a> {
         KeyListRequest {
             account_id: None,
             max_key_count: self.max_keys,
@@ -1038,15 +1038,15 @@ struct KeyList {
 /// ```
 // TODO: Borrow the KeyListRequest to make it easy to quickly call this again?
 // TODO: Create a list_all_keys function?
-pub async fn list_keys<C, E>(
+pub async fn list_keys<'a, C, E>(
     auth: &mut Authorization<C>,
-    list_req: KeyListRequest
+    list_req: KeyListRequest<'a>
 ) -> Result<(Vec<Key>, Option<String>), Error<E>>
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     let mut list_req = list_req;
-    list_req.account_id = Some(auth.account_id.to_owned());
+    list_req.account_id = Some(&auth.account_id);
 
     let res = auth.client.post(auth.api_url("b2_list_keys"))
         .expect("Invalid URL")
