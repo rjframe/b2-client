@@ -101,6 +101,20 @@ pub(crate) mod test_utils {
                 let mut body: serde_json::Value = serde_json::from_str(body)
                     .unwrap();
 
+                // TODO: It would be better/safer to walk through all
+                // dictionaries/arrays and check their keys for these instead of
+                // adding them as I find them.
+                if let Some(buckets) = body.get_mut("buckets") {
+                    if let Some(buckets) = buckets.as_array_mut() {
+                        for bucket in buckets.iter_mut() {
+                            bucket.get_mut("accountId")
+                                .map(|v|
+                                    *v = serde_json::json!("hidden-account-id")
+                                );
+                        }
+                    }
+                }
+
                 body.get_mut("accountId")
                     .map(|v| *v = serde_json::json!("hidden-account-id"));
 

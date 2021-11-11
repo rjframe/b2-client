@@ -24,7 +24,7 @@ use serde::{Serialize, Deserialize};
 
 
 /// A bucket classification for B2 buckets.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum BucketType {
     /// A bucket where downloads are publicly-accessible.
@@ -38,6 +38,16 @@ pub enum BucketType {
     /// Snapshot buckets can only be created from the Backblaze web portal.
     #[serde(rename = "snapshot")]
     Snapshot,
+}
+
+impl fmt::Display for BucketType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Public => write!(f, "allPublic"),
+            Self::Private => write!(f, "allPrivate"),
+            Self::Snapshot => write!(f, "snapshot"),
+        }
+    }
 }
 
 /// A valid CORS operation for B2 buckets.
@@ -891,6 +901,140 @@ pub async fn delete_bucket<C, E>(
     }
 }
 
+// The B2 API intention is that only an ID or name is supplied when listing
+// buckets.
+#[derive(Debug, Clone, Serialize)]
+#[serde(untagged)]
+enum BucketRef {
+    Id(String),
+    Name(String),
+}
+
+#[derive(Debug, Clone, Copy)]
+enum BucketFilter {
+    Type(BucketType),
+    All,
+}
+
+impl From<&BucketType> for BucketFilter {
+    fn from(t: &BucketType) -> Self {
+        Self::Type(*t)
+    }
+}
+
+impl fmt::Display for BucketFilter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Type(t) => t.fmt(f),
+            Self::All => write!(f, "all"),
+        }
+    }
+}
+
+/// A request to list one or all buckets.
+///
+/// Pass the `ListBuckets` object to [list_buckets] to obtain the desired bucket
+/// information.
+#[derive(Debug, Clone, Serialize)]
+#[serde(into = "serialization::InnerListBuckets")]
+pub struct ListBuckets<'a> {
+    account_id: Option<&'a str>,
+    bucket: Option<BucketRef>,
+    bucket_types: Option<Vec<BucketFilter>>,
+}
+
+impl<'a> ListBuckets<'a> {
+    pub fn builder() -> ListBucketsBuilder {
+        ListBucketsBuilder::default()
+    }
+}
+
+#[derive(Default)]
+pub struct ListBucketsBuilder {
+    bucket: Option<BucketRef>,
+    bucket_types: Option<Vec<BucketFilter>>,
+}
+
+impl ListBucketsBuilder {
+    /// If provided, only list the bucket with the specified ID.
+    ///
+    /// This is mutually exclusive with [Self::bucket_name].
+    pub fn bucket_id(mut self, id: impl Into<String>) -> Self {
+        self.bucket = Some(BucketRef::Id(id.into()));
+        self
+    }
+
+    /// If provided, only list the bucket with the specified name.
+    ///
+    /// This is mutually exclusive with [Self::bucket_id].
+    pub fn bucket_name(mut self, name: impl Into<String>)
+    -> Result<Self, ValidationError> {
+        let name = validated_bucket_name(name)?;
+
+        self.bucket = Some(BucketRef::Name(name.into()));
+        Ok(self)
+    }
+
+    /// If provided, only list buckets of the specified [BucketType]s.
+    ///
+    /// By default, all buckets are listed.
+    pub fn bucket_types(mut self, types: &[BucketType]) -> Self {
+        let types = types.iter().map(BucketFilter::from).collect();
+
+        self.bucket_types = Some(types);
+        self
+    }
+
+    /// List all bucket types.
+    pub fn with_all_bucket_types(mut self) -> Self {
+        self.bucket_types = Some(vec![BucketFilter::All]);
+        self
+    }
+
+    /// Create a [ListBuckets].
+    pub fn build<'a>(self) -> ListBuckets<'a> {
+        ListBuckets {
+            account_id: None,
+            bucket: self.bucket,
+            bucket_types: self.bucket_types,
+        }
+    }
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct BucketList {
+    buckets: Vec<Bucket>,
+}
+
+/// List buckets accessible by the [Authorization] according to the filter
+/// provided by a [ListBuckets] object.
+///
+/// If your `Authorization` only has access to one bucket, then attempting to
+/// list all buckets will result in an error with
+/// [ErrorCode::Unauthorized](crate::error::ErrorCode::Unauthorized).
+pub async fn list_buckets<'a, C, E>(
+    auth: &mut Authorization<C>,
+    list_info: ListBuckets<'a>
+) -> Result<Vec<Bucket>, Error<E>>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    let mut list_info = list_info;
+    list_info.account_id = Some(&auth.account_id);
+
+    let res = auth.client.post(auth.api_url("b2_list_buckets"))
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .with_body(&serde_json::to_value(list_info)?)
+        .send().await?;
+
+    let buckets: B2Result<BucketList> = serde_json::from_value(res)?;
+    match buckets {
+        B2Result::Ok(b) => Ok(b.buckets),
+        B2Result::Err(e) => Err(Error::B2(e)),
+    }
+}
+
 mod serialization {
     //! Our public encryption configuration type is sufficiently different from
     //! the JSON that we cannot simply deserialize it. We use the types here as
@@ -1015,6 +1159,45 @@ mod serialization {
             }
         }
     }
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub(crate) struct InnerListBuckets<'a> {
+        account_id: Option<&'a str>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        bucket_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        bucket_name: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        bucket_types: Option<Vec<String>>,
+    }
+
+    impl<'a> From<super::ListBuckets<'a>> for InnerListBuckets<'a> {
+        fn from(other: super::ListBuckets<'a>) -> Self {
+            use super::BucketRef;
+
+            let (bucket_id, bucket_name) = if let Some(bucket) = other.bucket {
+                match bucket {
+                    BucketRef::Id(s) => (Some(s), None),
+                    BucketRef::Name(s) => (None, Some(s)),
+                }
+            } else {
+                (None, None)
+            };
+
+            let bucket_types = other.bucket_types
+                .map(|t| t.into_iter()
+                    .map(|t| t.to_string()).collect()
+                );
+
+            Self {
+                account_id: other.account_id,
+                bucket_id,
+                bucket_name,
+                bucket_types,
+            }
+        }
+    }
 }
 
 #[cfg(feature = "with_surf")]
@@ -1131,6 +1314,28 @@ mod tests_mocked {
                 assert_eq!(e.code(), ErrorCode::BadBucketId),
             e => panic!("Unexpected error: {:?}", e),
         }
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_list_buckets() -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/buckets.yaml"
+        ).await?;
+
+        let mut auth = create_test_auth(client, vec![Capability::WriteBuckets])
+            .await;
+
+        let buckets_req = ListBuckets::builder()
+            .bucket_name("testing-b2-client")?
+            .build();
+
+        let buckets: Vec<Bucket> = list_buckets(&mut auth, buckets_req).await?;
+
+        assert_eq!(buckets.len(), 1);
+        assert_eq!(buckets[0].bucket_name, "testing-b2-client");
 
         Ok(())
     }

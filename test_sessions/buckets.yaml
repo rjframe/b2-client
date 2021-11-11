@@ -94,3 +94,26 @@
       content-length:
         - "109"
     body: "{\"code\":\"bad_bucket_id\",\"message\":\"Bucket 1234567 does not exist\",\"status\":400}"
+---
+- Request:
+    method: POST
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_list_buckets"
+    headers:
+      content-type:
+        - application/json
+      authorization:
+        - hidden-authorization-token
+    body: "{\"accountId\":\"hidden-account-id\",\"bucketName\":\"testing-b2-client\"}"
+- Response:
+    status: 200
+    version: ~
+    headers:
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      content-type:
+        - application/json;charset=UTF-8
+      content-length:
+        - "746"
+      date:
+        - "Thu, 11 Nov 2021 13:41:46 GMT"
+    body: "{\"buckets\":[{\"accountId\":\"hidden-account-id\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"bucketInfo\":{},\"bucketName\":\"testing-b2-client\",\"bucketType\":\"allPrivate\",\"corsRules\":[],\"defaultServerSideEncryption\":{\"isClientAuthorizedToRead\":true,\"value\":{\"algorithm\":null,\"mode\":null}},\"fileLockConfiguration\":{\"isClientAuthorizedToRead\":true,\"value\":{\"defaultRetention\":{\"mode\":null,\"period\":null},\"isFileLockEnabled\":false}},\"lifecycleRules\":[],\"options\":[\"s3\"],\"revision\":2}]}"

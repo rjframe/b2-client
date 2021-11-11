@@ -7,6 +7,7 @@ Project:
     ☐ Check derived traits on objects - ensure consistency.
     ✓ Probably add builder() associated function to types that have one. Ensure consistent APIS. @done(2021-10-28 11:34) @project(Project)
     ☐ Wrap surf's Error so our Error<E> can require E: Error.
+    ☐ serde: skip serializing optional fields when None on pretty much everything.
 
 API:
     ✓ Implement account endpoints @done(2021-10-18 17:20) @project(API)
@@ -16,7 +17,7 @@ API:
     Buckets:
         ✓ create_bucket @done(2021-11-01 09:48) @project(API \ Buckets)
         ✓ delete_bucket @done(2021-11-01 10:58) @project(API \ Buckets)
-        ☐ list_buckets
+        ✓ list_buckets @done(2021-11-11 08:31) @project(API \ Buckets)
         ☐ update_bucket
 
     Files:
