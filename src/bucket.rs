@@ -776,16 +776,16 @@ pub struct FileLockConfiguration {
     retention: FileRetentionPolicy,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum FileRetentionMode {
     Governance,
     Compliance,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 enum PeriodUnit { Days, Years }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 struct Period { duration: u32, unit: PeriodUnit }
 
 impl From<Period> for chrono::Duration {
@@ -797,7 +797,7 @@ impl From<Period> for chrono::Duration {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FileRetentionPolicy {
     mode: Option<FileRetentionMode>,
     period: Option<Period>,
@@ -812,7 +812,7 @@ impl FileRetentionPolicy {
 }
 
 /// Response from B2 with the configured bucket encryption settings.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BucketEncryptionInfo {
     is_client_authorized_to_read: bool,
@@ -1031,6 +1031,185 @@ pub async fn list_buckets<'a, C, E>(
     let buckets: B2Result<BucketList> = serde_json::from_value(res)?;
     match buckets {
         B2Result::Ok(b) => Ok(b.buckets),
+        B2Result::Err(e) => Err(Error::B2(e)),
+    }
+}
+
+/// A request to update one or more settings on a [Bucket].
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateBucket<'a> {
+    account_id: Option<&'a str>,
+    bucket_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bucket_type: Option<BucketType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bucket_info: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cors_rules: Option<Vec<CorsRule>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    default_retention: Option<FileRetentionPolicy>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    default_server_side_encryption: Option<ServerSideEncryption>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lifecycle_rules: Option<Vec<LifecycleRule>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    if_revision_is: Option<u16>,
+}
+
+impl<'a> UpdateBucket<'a> {
+    pub fn builder() -> UpdateBucketBuilder {
+        UpdateBucketBuilder::default()
+    }
+}
+
+#[derive(Default)]
+pub struct UpdateBucketBuilder {
+    bucket_id: Option<String>,
+    bucket_type: Option<BucketType>,
+    bucket_info: Option<serde_json::Value>,
+    cors_rules: Option<Vec<CorsRule>>,
+    default_retention: Option<FileRetentionPolicy>,
+    default_server_side_encryption: Option<ServerSideEncryption>,
+    lifecycle_rules: Option<Vec<LifecycleRule>>,
+    if_revision_is: Option<u16>,
+}
+
+impl UpdateBucketBuilder {
+    /// The ID of the bucket to update.
+    ///
+    /// This is required.
+    pub fn bucket_id(mut self, bucket_id: impl Into<String>) -> Self {
+        self.bucket_id = Some(bucket_id.into());
+        self
+    }
+
+    /// Change the bucket's [type](BucketType) to the one provided.
+    pub fn bucket_type(mut self, typ: BucketType)
+    -> Result<Self, ValidationError> {
+        if matches!(typ, BucketType::Snapshot) {
+            return Err(ValidationError::OutOfBounds(
+                "Bucket type must be either Public or Private".into()
+            ));
+        }
+
+        self.bucket_type = Some(typ);
+        Ok(self)
+    }
+
+    /// Replace the current bucket information with the specified information.
+    ///
+    /// This can contain arbitrary metadata for your own use. You can also set
+    /// cache-control settings from here (but see [Self::cache_control]).
+    pub fn bucket_info(mut self, info: serde_json::Value)
+    -> Self {
+        self.bucket_info = Some(info);
+        self
+    }
+
+    // TODO: pub fn cache_control()
+
+    /// Replace the bucket's current provided CORS rules with the provided
+    /// rules.
+    ///
+    /// See <https://www.backblaze.com/b2/docs/cors_rules.html> for further
+    /// information.
+    pub fn cors_rules(mut self, rules: impl Into<Vec<CorsRule>>)
+    -> Result<Self, ValidationError> {
+        let rules = rules.into();
+
+        if rules.len() > 100 {
+            return Err(ValidationError::OutOfBounds(
+                "A bucket can have no more than 100 CORS rules".into()
+            ));
+        } else if ! rules.is_empty() {
+            self.cors_rules = Some(rules);
+        }
+
+        Ok(self)
+    }
+
+    /// Replace the bucket's default retention policy.
+    ///
+    /// The [Authorization] must have
+    /// [Capability::WriteBucketRetentions](crate::account::Capability::WriteBucketRetentions).
+    pub fn retention_policy(mut self, policy: FileRetentionPolicy) -> Self {
+        self.default_retention = Some(policy);
+        self
+    }
+
+    /// Replace the bucket's server-side encryption settings.
+    ///
+    /// The [Authorization] must have
+    /// [Capability::WriteBucketEncryption](crate::account::Capability::WriteBucketRetentions).
+    pub fn encryption_settings(mut self, settings: ServerSideEncryption) -> Self
+    {
+        self.default_server_side_encryption = Some(settings);
+        self
+    }
+
+    /// Replace the bucket's lifecycle rules with the provided list.
+    ///
+    /// See the documentation for [CreateBucketBuilder::lifecycle_rules] for
+    /// the lifecycle requirements and examples.
+    pub fn lifecycle_rules(mut self, rules: impl Into<Vec<LifecycleRule>>)
+    -> Result<Self, ValidationError> {
+        let rules = validated_lifecycle_rules(rules)?;
+        self.lifecycle_rules = Some(rules);
+        Ok(self)
+    }
+
+    /// Only perform the update if the bucket's current revision is the provided
+    /// version.
+    pub fn if_revision_is(mut self, revision: u16) -> Self {
+        self.if_revision_is = Some(revision);
+        self
+    }
+
+    pub fn build<'a>(self) -> Result<UpdateBucket<'a>, ValidationError> {
+        let bucket_id = self.bucket_id.ok_or_else(||
+            ValidationError::MissingData(
+                "The bucket ID to update must be specified".into()
+            )
+        )?;
+
+        Ok(UpdateBucket {
+            account_id: None,
+            bucket_id,
+            bucket_type: self.bucket_type,
+            bucket_info: self.bucket_info,
+            cors_rules: self.cors_rules,
+            default_retention: self.default_retention,
+            default_server_side_encryption: self.default_server_side_encryption,
+            lifecycle_rules: self.lifecycle_rules,
+            if_revision_is: self.if_revision_is,
+        })
+    }
+}
+
+/// Update one or more properties of a [Bucket].
+///
+/// See <https://www.backblaze.com/b2/docs/b2_update_bucket.html> for further
+/// information.
+pub async fn update_bucket<C, E>(
+    auth: &mut Authorization<C>,
+    bucket_info: UpdateBucket<'_>
+) -> Result<Bucket, Error<E>>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    let mut bucket_info = bucket_info;
+    bucket_info.account_id = Some(&auth.account_id);
+
+    let res = auth.client.post(auth.api_url("b2_update_bucket"))
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .with_body(&serde_json::to_value(bucket_info)?)
+        .send().await?;
+
+    let bucket: B2Result<Bucket> = serde_json::from_value(res)?;
+    match bucket {
+        B2Result::Ok(b) => Ok(b),
         B2Result::Err(e) => Err(Error::B2(e)),
     }
 }
@@ -1336,6 +1515,62 @@ mod tests_mocked {
 
         assert_eq!(buckets.len(), 1);
         assert_eq!(buckets[0].bucket_name, "testing-b2-client");
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn update_bucket_success() -> anyhow::Result<()> {
+        // To run this against the B2 API the bucket_id below needs to be
+        // changed to a valid ID.
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/buckets.yaml"
+        ).await?;
+
+        let mut auth = create_test_auth(client, vec![Capability::WriteBuckets])
+            .await;
+
+        let req = UpdateBucket::builder()
+            .bucket_id("8d625eb63be2775577c70e1a")
+            .bucket_type(BucketType::Private)?
+            .lifecycle_rules(vec![
+                LifecycleRule::builder()
+                    .filename_prefix("my-files/")
+                    .delete_after_hide(chrono::Duration::days(5))?
+                    .build()?
+            ])?
+            .build()?;
+
+        let bucket: Bucket = update_bucket(&mut auth, req).await?;
+        assert_eq!(bucket.bucket_name, "testing-b2-client");
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn update_bucket_conflict() -> anyhow::Result<()> {
+        // To run this against the B2 API the bucket_id below needs to be
+        // changed to a valid ID.
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/buckets.yaml"
+        ).await?;
+
+        let mut auth = create_test_auth(client, vec![Capability::WriteBuckets])
+            .await;
+
+        let req = UpdateBucket::builder()
+            .bucket_id("8d625eb63be2775577c70e1a")
+            .bucket_type(BucketType::Private)?
+            .if_revision_is(10)
+            .build()?;
+
+        match update_bucket(&mut auth, req).await.unwrap_err() {
+            Error::B2(e) =>
+                assert_eq!(e.code(), ErrorCode::Conflict),
+            e => panic!("Unexpected error: {:?}", e),
+        }
 
         Ok(())
     }

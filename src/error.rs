@@ -161,6 +161,9 @@ pub enum ErrorCode {
     // 403
     TransactionCapExceeded,
 
+    // 409
+    Conflict,
+
     // 500
     InternalError,
 
@@ -185,6 +188,8 @@ impl ErrorCode {
 
             "transaction_cap_exceeded" => Ok(Self::TransactionCapExceeded),
 
+            "conflict" => Ok(Self::Conflict),
+
             "internal_error" => Ok(Self::InternalError),
 
             "service_unavailable" => Ok(Self::ServiceUnavailable),
@@ -205,6 +210,7 @@ impl ErrorCode {
             Self::Unauthorized => 401,
             Self::Unsupported => 401,
             Self::TransactionCapExceeded => 403,
+            Self::Conflict => 409,
             Self::InternalError => 500,
             Self::ServiceUnavailable => 503,
         }
