@@ -616,8 +616,8 @@ impl CreateBucketBuilder {
     /// Use the provided information with the bucket.
     ///
     /// This can contain arbitrary metadata for your own use. You can also set
-    /// cache-control settings from here (but see
-    /// [CreateBucketBuilder::with_cache_control]).
+    /// cache-control settings from here (but see [Self::cache_control]).
+    // TODO: Validate CORS rules if provided.
     pub fn bucket_info(mut self, info: serde_json::Value)
     -> Result<Self, ValidationError> {
         self.bucket_info = Some(info);
@@ -849,9 +849,9 @@ pub struct Bucket {
 }
 
 /// Create a new [Bucket].
-pub async fn create_bucket<'a, C, E>(
+pub async fn create_bucket<C, E>(
     auth: &mut Authorization<C>,
-    new_bucket_info: CreateBucket<'a>
+    new_bucket_info: CreateBucket<'_>
 ) -> Result<Bucket, Error<E>>
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
@@ -971,7 +971,7 @@ impl ListBucketsBuilder {
     -> Result<Self, ValidationError> {
         let name = validated_bucket_name(name)?;
 
-        self.bucket = Some(BucketRef::Name(name.into()));
+        self.bucket = Some(BucketRef::Name(name));
         Ok(self)
     }
 
@@ -1012,9 +1012,9 @@ struct BucketList {
 /// If your `Authorization` only has access to one bucket, then attempting to
 /// list all buckets will result in an error with
 /// [ErrorCode::Unauthorized](crate::error::ErrorCode::Unauthorized).
-pub async fn list_buckets<'a, C, E>(
+pub async fn list_buckets<C, E>(
     auth: &mut Authorization<C>,
-    list_info: ListBuckets<'a>
+    list_info: ListBuckets<'_>
 ) -> Result<Vec<Bucket>, Error<E>>
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,

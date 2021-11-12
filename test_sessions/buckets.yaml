@@ -149,7 +149,7 @@
         - application/json
       authorization:
         - hidden-authorization-token
-    body: "{\"accountId\":\"hidden-account-id\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"bucketType\":\"allPrivate\",\"ifRevisionIs\":10,\"lifecycleRules\":[{\"daysFromHidingToDeleting\":5,\"daysFromUploadingToHiding\":null,\"fileNamePrefix\":\"my-files/\"}]}"
+    body: "{\"accountId\":\"hidden-account-id\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"bucketType\":\"allPrivate\",\"ifRevisionIs\":10}"
 - Response:
     status: 409
     version: ~

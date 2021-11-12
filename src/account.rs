@@ -561,9 +561,9 @@ impl NewlyCreatedKey {
 /// let (secret, new_key) = create_key(&mut auth, create_key_request).await?;
 /// # Ok(()) }
 /// ```
-pub async fn create_key<'a, C, E>(
+pub async fn create_key<C, E>(
     auth: &mut Authorization<C>,
-    new_key_info: CreateKey<'a>
+    new_key_info: CreateKey<'_>
 ) -> Result<(String, Key), Error<E>>
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
@@ -1038,9 +1038,9 @@ struct KeyList {
 /// ```
 // TODO: Borrow the KeyListRequest to make it easy to quickly call this again?
 // TODO: Create a list_all_keys function?
-pub async fn list_keys<'a, C, E>(
+pub async fn list_keys<C, E>(
     auth: &mut Authorization<C>,
-    list_req: KeyListRequest<'a>
+    list_req: KeyListRequest<'_>
 ) -> Result<(Vec<Key>, Option<String>), Error<E>>
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
