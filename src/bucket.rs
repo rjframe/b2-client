@@ -1413,7 +1413,7 @@ mod tests_mocked {
             ])?
             .build()?;
 
-        let bucket: Bucket = create_bucket(&mut auth, req).await?;
+        let bucket = create_bucket(&mut auth, req).await?;
         assert_eq!(bucket.bucket_name, "testing-new-b2-client");
 
         Ok(())
@@ -1467,10 +1467,8 @@ mod tests_mocked {
         let mut auth = create_test_auth(client, vec![Capability::WriteBuckets])
             .await;
 
-        let bucket: Bucket = delete_bucket(
-            &mut auth,
-            "1df2dee6ab62f7f577c70e1a"
-        ).await?;
+        let bucket = delete_bucket(&mut auth, "1df2dee6ab62f7f577c70e1a")
+            .await?;
 
         assert_eq!(bucket.bucket_name, "testing-new-b2-client");
 
@@ -1511,7 +1509,7 @@ mod tests_mocked {
             .bucket_name("testing-b2-client")?
             .build();
 
-        let buckets: Vec<Bucket> = list_buckets(&mut auth, buckets_req).await?;
+        let buckets = list_buckets(&mut auth, buckets_req).await?;
 
         assert_eq!(buckets.len(), 1);
         assert_eq!(buckets[0].bucket_name, "testing-b2-client");
@@ -1542,7 +1540,7 @@ mod tests_mocked {
             ])?
             .build()?;
 
-        let bucket: Bucket = update_bucket(&mut auth, req).await?;
+        let bucket = update_bucket(&mut auth, req).await?;
         assert_eq!(bucket.bucket_name, "testing-b2-client");
 
         Ok(())
