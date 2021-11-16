@@ -1,7 +1,7 @@
 //! Collection of internal, general-purpose types used throughout the crate.
 
 use std::fmt;
-
+use super::error::{B2Error, Error};
 use serde::{Serialize, Deserialize};
 
 
@@ -11,7 +11,29 @@ use serde::{Serialize, Deserialize};
 #[serde(untagged)]
 pub(crate) enum B2Result<T> {
     Ok(T),
-    Err(super::error::B2Error),
+    Err(B2Error),
+}
+
+impl<T, E> From<B2Result<T>> for std::result::Result<T, Error<E>>
+    where E: fmt::Debug + fmt::Display,
+{
+    fn from(r: B2Result<T>) -> std::result::Result<T, Error<E>> {
+        match r {
+            B2Result::Ok(v) => Ok(v),
+            B2Result::Err(e) => Err(crate::error::Error::B2(e)),
+        }
+    }
+}
+
+impl<T> B2Result<T> {
+    pub fn map<U, F>(self, op: F) -> B2Result<U>
+        where F: FnOnce(T) -> U,
+    {
+        match self {
+            B2Result::Ok(v) => B2Result::Ok(op(v)),
+            B2Result::Err(e) => B2Result::Err(e),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

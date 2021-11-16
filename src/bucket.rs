@@ -866,10 +866,7 @@ pub async fn create_bucket<C, E>(
         .send().await?;
 
     let new_bucket: B2Result<Bucket> = serde_json::from_value(res)?;
-    match new_bucket {
-        B2Result::Ok(b) => Ok(b),
-        B2Result::Err(e) => Err(Error::B2(e)),
-    }
+    new_bucket.into()
 }
 
 /// Delete the bucket with the given ID.
@@ -895,10 +892,7 @@ pub async fn delete_bucket<C, E>(
         .send().await?;
 
     let new_bucket: B2Result<Bucket> = serde_json::from_value(res)?;
-    match new_bucket {
-        B2Result::Ok(b) => Ok(b),
-        B2Result::Err(e) => Err(Error::B2(e)),
-    }
+    new_bucket.into()
 }
 
 // The B2 API intention is that only an ID or name is supplied when listing
@@ -1029,10 +1023,7 @@ pub async fn list_buckets<C, E>(
         .send().await?;
 
     let buckets: B2Result<BucketList> = serde_json::from_value(res)?;
-    match buckets {
-        B2Result::Ok(b) => Ok(b.buckets),
-        B2Result::Err(e) => Err(Error::B2(e)),
-    }
+    buckets.map(|b| b.buckets).into()
 }
 
 /// A request to update one or more settings on a [Bucket].
@@ -1208,10 +1199,7 @@ pub async fn update_bucket<C, E>(
         .send().await?;
 
     let bucket: B2Result<Bucket> = serde_json::from_value(res)?;
-    match bucket {
-        B2Result::Ok(b) => Ok(b),
-        B2Result::Err(e) => Err(Error::B2(e)),
-    }
+    bucket.into()
 }
 
 mod serialization {

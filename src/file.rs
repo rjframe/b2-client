@@ -185,10 +185,7 @@ pub async fn cancel_large_file_by_id<C, E>(
         .send().await?;
 
     let info: B2Result<CancelledFileUpload> = serde_json::from_value(res)?;
-    match info {
-        B2Result::Ok(f) => Ok(f),
-        B2Result::Err(e) => Err(Error::B2(e)),
-    }
+    info.into()
 }
 
 #[derive(Debug, Serialize)]
@@ -375,10 +372,7 @@ pub async fn start_large_file<C, E>(
         .send().await?;
 
     let file: B2Result<File> = serde_json::from_value(res)?;
-    match file {
-        B2Result::Ok(f) => Ok(f),
-        B2Result::Err(e) => Err(Error::B2(e)),
-    }
+    file.into()
 }
 
 #[cfg(all(test, feature = "with_surf"))]
