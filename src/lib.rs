@@ -8,8 +8,11 @@
 
 pub mod account;
 pub mod bucket;
+pub mod file;
+
 pub mod client;
 pub mod error;
+
 mod types;
 mod validate;
 
@@ -28,6 +31,8 @@ pub mod prelude {
 
 pub use account::*;
 pub use bucket::*;
+pub use file::*;
+
 pub use client::HttpClient;
 pub use error::Error;
 

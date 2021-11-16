@@ -1,0 +1,70 @@
+- Request:
+    method: POST
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_start_large_file"
+    headers:
+      authorization:
+        - hidden-authorization-token
+      content-type:
+        - application/json
+    body: "{\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentType\":\"b2/x-auto\",\"fileInfo\":null,\"fileName\":\"test-large-file\",\"fileRetention\":null,\"legalHold\":null,\"serverSideEncryption\":null}"
+- Response:
+    status: 200
+    version: ~
+    headers:
+      content-type:
+        - application/json;charset=UTF-8
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      content-length:
+        - "688"
+      date:
+        - "Fri, 12 Nov 2021 21:11:09 GMT"
+    body: "{\"accountId\":\"hidden-account-id\",\"action\":\"start\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentLength\":0,\"contentMd5\":null,\"contentSha1\":\"none\",\"contentType\":\"application/octet-stream\",\"fileId\":\"4_z8d625eb63be2775577c70e1a_f204261ca2ea2c4e1_d20211112_m211109_c002_v0001114_t0054\",\"fileInfo\":{},\"fileName\":\"test-large-file\",\"fileRetention\":{\"isClientAuthorizedToRead\":true,\"value\":{\"mode\":null,\"retainUntilTimestamp\":null}},\"legalHold\":{\"isClientAuthorizedToRead\":true,\"value\":null},\"serverSideEncryption\":{\"algorithm\":null,\"mode\":null},\"uploadTimestamp\":1636751469000}"
+---
+- Request:
+    method: POST
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_cancel_large_file"
+    headers:
+      content-type:
+        - application/json
+      authorization:
+        - hidden-authorization-token
+    body: "{\"fileId\":\"4_z8d625eb63be2775577c70e1a_f204261ca2ea2c4e1_d20211112_m211109_c002_v0001114_t0054\"}"
+- Response:
+    status: 200
+    version: ~
+    headers:
+      date:
+        - "Fri, 12 Nov 2021 21:15:19 GMT"
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      content-length:
+        - "208"
+      content-type:
+        - application/json;charset=UTF-8
+    body: "{\"accountId\":\"hidden-account-id\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"fileId\":\"4_z8d625eb63be2775577c70e1a_f204261ca2ea2c4e1_d20211112_m211109_c002_v0001114_t0054\",\"fileName\":\"test-large-file\"}"
+---
+- Request:
+    method: POST
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_cancel_large_file"
+    headers:
+      authorization:
+        - hidden-authorization-token
+      content-type:
+        - application/json
+    body: "{\"fileId\":\"bad-id\"}"
+- Response:
+    status: 400
+    version: ~
+    headers:
+      content-length:
+        - "83"
+      connection:
+        - close
+      date:
+        - "Tue, 16 Nov 2021 19:14:03 GMT"
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      content-type:
+        - application/json;charset=utf-8
+    body: "{\"code\":\"bad_request\",\"message\":\"Invalid fileId: bad-id\",\"status\":400}"

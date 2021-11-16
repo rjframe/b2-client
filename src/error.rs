@@ -90,6 +90,11 @@ pub enum Error<E>
     B2(B2Error),
     /// An error deserializing the HTTP client's response.
     Format(serde_json::Error),
+    /// The [Authorization] lacks a required capability to perform a task.
+    ///
+    /// This error is typically used when the B2 API returns `null` rather than
+    /// returning an error.
+    Unauthorized(crate::account::Capability),
     /// Attempted to send a non-existent request.
     NoRequest,
 }
@@ -108,6 +113,7 @@ impl<E> fmt::Display for Error<E>
             Self::Client(e) => Display::fmt(&e, f),
             Self::B2(e) => Display::fmt(&e, f),
             Self::Format(e) => e.fmt(f),
+            Self::Unauthorized(c) => write!(f, "Missing capability: {:?}", c),
             Self::NoRequest => write!(f, "No request was created"),
         }
     }

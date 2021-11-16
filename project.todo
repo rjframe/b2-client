@@ -22,7 +22,7 @@ API:
         ✓ update_bucket @done(2021-11-11 19:57) @project(API \ Buckets)
 
     Files:
-        ☐ cancel_large_file
+        ✓ cancel_large_file @done(2021-11-16 14:25) @project(API \ Files)
         ☐ copy_file
         ☐ copy_part
         ☐ delete_file_version
@@ -37,7 +37,7 @@ API:
         ☐ list_file_versions
         ☐ list_parts
         ☐ list_unfinished_large_files
-        ☐ start_large_file
+        ✓ start_large_file @done(2021-11-16 14:25) @project(API \ Files)
         ☐ update_file_legal_hold
         ☐ update_file_retention
         ☐ upload_file
