@@ -21,7 +21,7 @@ API:
 
     Files:
         ✓ cancel_large_file @done(2021-11-16 14:25) @project(API \ Files)
-        ☐ copy_file
+        ✓ copy_file @done(2021-11-18 11:54) @project(API \ Files)
         ☐ copy_part
         ☐ delete_file_version
         ☐ download_file_by_id

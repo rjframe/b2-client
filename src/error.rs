@@ -90,10 +90,12 @@ pub enum Error<E>
     B2(B2Error),
     /// An error deserializing the HTTP client's response.
     Format(serde_json::Error),
-    /// The [Authorization] lacks a required capability to perform a task.
+    /// The [Authorization](crate::account::Authorization) lacks a required
+    /// capability to perform a task. The provided capability is required.
     ///
     /// This error is typically used when the B2 API returns `null` rather than
-    /// returning an error.
+    /// returning an error or to return what we know will be an authorization
+    /// error prior to sending a request to the API.
     Unauthorized(crate::account::Capability),
     /// Attempted to send a non-existent request.
     NoRequest,
@@ -165,10 +167,24 @@ pub enum ErrorCode {
     Unsupported,
 
     // 403
+    AccessDenied,
+    CapExceeded,
     TransactionCapExceeded,
+
+    // 404
+    NotFound,
+
+    // 405
+    MethodNotAllowed,
+
+    // 408
+    RequestTimeout,
 
     // 409
     Conflict,
+
+    // 416
+    RangeNotSatisfiable,
 
     // 500
     InternalError,
@@ -192,7 +208,17 @@ impl ErrorCode {
             "unauthorized" => Ok(Self::Unauthorized),
             "unsupported" => Ok(Self::Unsupported),
 
+            "access_denied" => Ok(Self::AccessDenied),
+            "cap_exceeded" => Ok(Self::CapExceeded),
             "transaction_cap_exceeded" => Ok(Self::TransactionCapExceeded),
+
+            "not_found" => Ok(Self::NotFound),
+
+            "method_not_allowed" => Ok(Self::MethodNotAllowed),
+
+            "request_timeout" => Ok(Self::RequestTimeout),
+
+            "range_not_satisfiable" => Ok(Self::RangeNotSatisfiable),
 
             "conflict" => Ok(Self::Conflict),
 
@@ -215,8 +241,14 @@ impl ErrorCode {
             Self::ExpiredAuthToken => 401,
             Self::Unauthorized => 401,
             Self::Unsupported => 401,
+            Self::AccessDenied => 403,
+            Self::CapExceeded => 403,
             Self::TransactionCapExceeded => 403,
+            Self::NotFound => 404,
+            Self::MethodNotAllowed => 405,
+            Self::RequestTimeout => 408,
             Self::Conflict => 409,
+            Self::RangeNotSatisfiable => 416,
             Self::InternalError => 500,
             Self::ServiceUnavailable => 503,
         }

@@ -95,6 +95,10 @@ impl<C> Authorization<C>
     /// the final part.
     pub fn minimum_part_size(&self) -> u64 { self.absolute_minimum_part_size }
 
+    pub fn has_capability(&self, cap: Capability) -> bool {
+        self.allowed.has_capability(cap)
+    }
+
     /// Return the API url to the specified service endpoint.
     ///
     /// This URL is used for all API calls except downloading files.

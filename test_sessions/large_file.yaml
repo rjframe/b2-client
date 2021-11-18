@@ -68,3 +68,26 @@
       content-type:
         - application/json;charset=utf-8
     body: "{\"code\":\"bad_request\",\"message\":\"Invalid fileId: bad-id\",\"status\":400}"
+---
+- Request:
+    method: POST
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_copy_file"
+    headers:
+      content-type:
+        - application/json
+      authorization:
+        - hidden-authorization-token
+    body: "{\"contentType\":null,\"destinationBucketId\":null,\"destinationServerSideEncryption\":null,\"fileInfo\":null,\"fileName\":\"new-file.txt\",\"fileRetention\":null,\"legalHold\":null,\"metadataDirective\":\"COPY\",\"range\":null,\"sourceFileId\":\"4_z8d625eb63be2775577c70e1a_f111954e3108ff3f6_d20211118_m151810_c002_v0001168_t0010\",\"sourceServerSideEncryption\":null}"
+- Response:
+    status: 200
+    version: ~
+    headers:
+      content-length:
+        - "788"
+      content-type:
+        - application/json;charset=UTF-8
+      date:
+        - "Thu, 18 Nov 2021 15:37:03 GMT"
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+    body: "{\"accountId\":\"hidden-account-id\",\"action\":\"copy\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentLength\":10,\"contentMd5\":\"3c825ca59d58209eae5924221497780c\",\"contentSha1\":\"5a08924b0ef1cccfb5de1d94e3d75c38dc0d3c79\",\"contentType\":\"text/plain\",\"fileId\":\"4_z8d625eb63be2775577c70e1a_f1052a33c70ab4806_d20211118_m153703_c002_v0001160_t0027\",\"fileInfo\":{\"src_last_modified_millis\":\"1637248673875\"},\"fileName\":\"new-file.txt\",\"fileRetention\":{\"isClientAuthorizedToRead\":true,\"value\":{\"mode\":null,\"retainUntilTimestamp\":null}},\"legalHold\":{\"isClientAuthorizedToRead\":true,\"value\":null},\"serverSideEncryption\":{\"algorithm\":null,\"mode\":null},\"uploadTimestamp\":1637249823000}"
