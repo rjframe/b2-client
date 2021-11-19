@@ -29,6 +29,7 @@ enum LegalHoldValue {
     Off,
 }
 
+/// Determines whether there is a legal hold on a file.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FileLegalHold {
     #[serde(rename = "isClientAuthorizedToRead")]
@@ -61,6 +62,7 @@ struct FileRetentionSetting {
 }
 
 // This is different than but very similar to bucket::FileLockConfiguration.
+/// The retention settings for a file.
 #[derive(Debug, Deserialize)]
 pub struct FileRetention {
     #[serde(rename = "isClientAuthorizedToRead")]
@@ -127,7 +129,7 @@ impl File {
     }
 
     /// When [action](Self::action) is [FileAction::Upload],
-    /// [FileAction::Start], or [File::Copy], the file's MIME type.
+    /// [FileAction::Start], or [FileAction::Copy], the file's MIME type.
     pub fn content_type(&self) -> Option<&String> {
         self.content_type.as_ref()
     }
@@ -187,12 +189,17 @@ impl File {
     }
 }
 
+/// A large file that was cancelled prior to upload completion.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CancelledFileUpload {
+    /// The ID of the cancelled file.
     pub file_id: String,
-    account_id: String, // TODO: Make pub? Remove?
+    /// The account that owns the file.
+    pub account_id: String,
+    /// The bucket the file was being uploaded to.
     pub bucket_id: String,
+    /// The file's name.
     pub file_name: String,
 }
 
@@ -502,6 +509,7 @@ pub async fn copy_file<C, E>(auth: &mut Authorization<C>, file: CopyFile)
     file.into()
 }
 
+/// A request to prepare to upload a large file.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StartLargeFile {
@@ -520,6 +528,7 @@ impl StartLargeFile {
     }
 }
 
+/// A builder for a [StartLargeFile] request.
 #[derive(Debug, Default)]
 pub struct StartLargeFileBuilder {
     bucket_id: Option<String>,
@@ -534,16 +543,21 @@ pub struct StartLargeFileBuilder {
 // TODO: Many questions and TODOs also apply to other file creation objects
 // (e.g., CopyFileBuilder).
 impl StartLargeFileBuilder {
+    /// Specify the bucket in which to store the new file.
     pub fn bucket_id(mut self, id: impl Into<String>) -> Self {
         self.bucket_id = Some(id.into());
         self
     }
 
+    /// Set the file's name.
     pub fn file_name(mut self, name: impl Into<String>) -> Self {
         self.file_name = Some(name.into());
         self
     }
 
+    /// Set the file's MIME type.
+    ///
+    /// If not specified, B2 will attempt to determine the file's type.
     pub fn content_type(mut self, mime: impl Into<String>) -> Self {
         // TODO: B2 has a map of auto-detected MIME types:
         // https://www.backblaze.com/b2/docs/content-types.html
@@ -554,26 +568,31 @@ impl StartLargeFileBuilder {
 
     // TODO: document data sharing - B2 uses more than just content-disposition
     // here
+    /// Set file metadata.
     pub fn file_info(mut self, info: serde_json::Value) -> Self {
         self.file_info = Some(info);
         self
     }
 
+    /// Set the retention policy for the file.
     pub fn file_retention(mut self, policy: FileRetentionPolicy) -> Self {
         self.file_retention = Some(policy);
         self
     }
 
+    /// Enable a legal hold on the file.
     pub fn with_legal_hold(mut self) -> Self {
         self.legal_hold = Some(LegalHoldValue::On);
         self
     }
 
+    /// Disable a legal hold on the file.
     pub fn without_legal_hold(mut self) -> Self {
         self.legal_hold = Some(LegalHoldValue::Off);
         self
     }
 
+    /// Set the server-side encryption configuration for the file.
     pub fn encryption_settings(mut self, settings: ServerSideEncryption) -> Self
     {
         self.server_side_encryption = Some(settings);

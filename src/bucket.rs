@@ -495,12 +495,16 @@ impl LifecycleRuleBuilder {
     }
 }
 
+/// Valid encryption algorithms for server-side encryption.
+///
+/// AES256 is the only supported algorithm.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub enum EncryptionAlgorithm {
     #[serde(rename = "AES256")]
     Aes256,
 }
 
+/// Configuration for client-managed server-side encryption.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(try_from = "serialization::InnerSelfEncryption")]
 #[serde(into = "serialization::InnerSelfEncryption")]
@@ -528,12 +532,16 @@ impl SelfManagedEncryption {
     }
 }
 
+/// Configuration for server-side encryption.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(try_from = "serialization::InnerEncryptionConfig")]
 #[serde(into = "serialization::InnerEncryptionConfig")]
 pub enum ServerSideEncryption {
+    /// Let the B2 service manage encryption settings.
     B2Managed(EncryptionAlgorithm),
+    /// Provide the encryption configuration for the B2 service to use.
     SelfManaged(SelfManagedEncryption),
+    /// Do not encrypt the bucket or file.
     NoEncryption,
 }
 
@@ -766,6 +774,7 @@ impl CreateBucketBuilder {
     }
 }
 
+/// Information from B2 concerning a file's retention settings.
 #[derive(Debug, Deserialize)]
 pub struct FileLockConfiguration {
     #[serde(rename = "isClientAuthorizedToRead")]
@@ -776,6 +785,7 @@ pub struct FileLockConfiguration {
     retention: FileRetentionPolicy,
 }
 
+/// The B2 mode of a file's retention policy.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum FileRetentionMode {
     Governance,
@@ -797,6 +807,7 @@ impl From<Period> for chrono::Duration {
     }
 }
 
+/// A file's B2 retention policy.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FileRetentionPolicy {
     mode: Option<FileRetentionMode>,
@@ -832,6 +843,7 @@ impl BucketEncryptionInfo {
     }
 }
 
+/// A B2 bucket
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Bucket {
@@ -943,6 +955,7 @@ impl<'a> ListBuckets<'a> {
     }
 }
 
+/// A builder for a [ListBuckets] request.
 #[derive(Default)]
 pub struct ListBucketsBuilder {
     bucket: Option<BucketRef>,
@@ -1054,6 +1067,7 @@ impl<'a> UpdateBucket<'a> {
     }
 }
 
+/// A builder to create an [UpdateBucket] request.
 #[derive(Default)]
 pub struct UpdateBucketBuilder {
     bucket_id: Option<String>,

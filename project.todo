@@ -7,6 +7,7 @@ Project:
     ☐ Wrap surf's Error so our Error<E> can require E: Error.
     ☐ serde: skip serializing optional fields when None on pretty much everything.
     ☐ Can I reorder the documentation sections? Place functions first
+    ☐ Bucket's fields need to be publicly accessible
 
 API:
     ✓ Implement account endpoints @done(2021-10-18 17:20) @project(API)
