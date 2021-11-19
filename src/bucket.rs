@@ -18,6 +18,7 @@ use crate::{
     client::HttpClient,
     error::{ValidationError, Error},
     validate::*,
+    require_capability,
 };
 
 use serde::{Serialize, Deserialize};
@@ -868,6 +869,14 @@ pub async fn create_bucket<C, E>(
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
+    require_capability!(auth, Capability::WriteBuckets);
+    if new_bucket_info.file_lock_enabled {
+        require_capability!(auth, Capability::WriteBucketRetentions);
+    }
+    if new_bucket_info.default_server_side_encryption.is_some() {
+        require_capability!(auth, Capability::WriteBucketEncryption);
+    }
+
     let mut new_bucket_info = new_bucket_info;
     new_bucket_info.account_id = Some(&auth.account_id);
 
@@ -894,6 +903,8 @@ pub async fn delete_bucket<C, E>(
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
+    require_capability!(auth, Capability::DeleteBuckets);
+
     let res = auth.client.post(auth.api_url("b2_delete_bucket"))
         .expect("Invalid URL")
         .with_header("Authorization", &auth.authorization_token)
@@ -1026,6 +1037,8 @@ pub async fn list_buckets<C, E>(
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
+    require_capability!(auth, Capability::ListBuckets);
+
     let mut list_info = list_info;
     list_info.account_id = Some(&auth.account_id);
 
@@ -1203,6 +1216,14 @@ pub async fn update_bucket<C, E>(
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
+    require_capability!(auth, Capability::WriteBuckets);
+    if bucket_info.default_retention.is_some() {
+        require_capability!(auth, Capability::WriteBucketRetentions);
+    }
+    if bucket_info.default_server_side_encryption.is_some() {
+        require_capability!(auth, Capability::WriteBucketEncryption);
+    }
+
     let mut bucket_info = bucket_info;
     bucket_info.account_id = Some(&auth.account_id);
 
@@ -1466,7 +1487,7 @@ mod tests_mocked {
             "test_sessions/buckets.yaml"
         ).await?;
 
-        let mut auth = create_test_auth(client, vec![Capability::WriteBuckets])
+        let mut auth = create_test_auth(client, vec![Capability::DeleteBuckets])
             .await;
 
         let bucket = delete_bucket(&mut auth, "1df2dee6ab62f7f577c70e1a")
@@ -1484,7 +1505,7 @@ mod tests_mocked {
             "test_sessions/buckets.yaml"
         ).await?;
 
-        let mut auth = create_test_auth(client, vec![Capability::WriteBuckets])
+        let mut auth = create_test_auth(client, vec![Capability::DeleteBuckets])
             .await;
 
         // B2 documentation says ErrorCode::BadRequest but this is what we get.
@@ -1504,7 +1525,7 @@ mod tests_mocked {
             "test_sessions/buckets.yaml"
         ).await?;
 
-        let mut auth = create_test_auth(client, vec![Capability::WriteBuckets])
+        let mut auth = create_test_auth(client, vec![Capability::ListBuckets])
             .await;
 
         let buckets_req = ListBuckets::builder()

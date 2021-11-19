@@ -17,6 +17,7 @@ use crate::{
     },
     client::HttpClient,
     error::{ValidationError, Error},
+    require_capability,
 };
 
 use serde::{Serialize, Deserialize};
@@ -220,6 +221,8 @@ pub async fn cancel_large_file_by_id<C, E>(
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
+    require_capability!(auth, Capability::WriteFiles);
+
     let res = auth.client.post(auth.api_url("b2_cancel_large_file"))
         .expect("Invalid URL")
         .with_header("Authorization", &auth.authorization_token)
@@ -495,8 +498,15 @@ pub async fn copy_file<C, E>(auth: &mut Authorization<C>, file: CopyFile)
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
-    if ! auth.has_capability(Capability::WriteFiles) {
-        return Err(Error::Unauthorized(Capability::WriteFiles));
+    require_capability!(auth, Capability::WriteFiles);
+    if file.file_retention.is_some() {
+        require_capability!(auth, Capability::WriteFileRetentions);
+    }
+    if file.legal_hold.is_some() {
+        require_capability!(auth, Capability::WriteFileLegalHolds);
+    }
+    if file.dest_encryption.is_some() {
+        require_capability!(auth, Capability::WriteBucketEncryption);
     }
 
     let res = auth.client.post(auth.api_url("b2_copy_file"))
@@ -700,6 +710,17 @@ pub async fn start_large_file<C, E>(
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
+    require_capability!(auth, Capability::WriteFiles);
+    if file.file_retention.is_some() {
+        require_capability!(auth, Capability::WriteFileRetentions);
+    }
+    if file.legal_hold.is_some() {
+        require_capability!(auth, Capability::WriteFileLegalHolds);
+    }
+    if file.server_side_encryption.is_some() {
+        require_capability!(auth, Capability::WriteBucketEncryption);
+    }
+
     let res = auth.client.post(auth.api_url("b2_start_large_file"))
         .expect("Invalid URL")
         .with_header("Authorization", &auth.authorization_token)
@@ -728,7 +749,7 @@ mod tests_mocked {
             "test_sessions/large_file.yaml"
         ).await?;
 
-        let mut auth = create_test_auth(client, vec![Capability::WriteBuckets])
+        let mut auth = create_test_auth(client, vec![Capability::WriteFiles])
             .await;
 
         let req = StartLargeFile::builder()
@@ -750,7 +771,7 @@ mod tests_mocked {
             "test_sessions/large_file.yaml"
         ).await?;
 
-        let mut auth = create_test_auth(client, vec![Capability::WriteBuckets])
+        let mut auth = create_test_auth(client, vec![Capability::WriteFiles])
             .await;
 
         let file_info = cancel_large_file_by_id(
@@ -773,7 +794,7 @@ mod tests_mocked {
             "test_sessions/large_file.yaml"
         ).await?;
 
-        let mut auth = create_test_auth(client, vec![Capability::WriteBuckets])
+        let mut auth = create_test_auth(client, vec![Capability::WriteFiles])
             .await;
 
         match cancel_large_file_by_id(&mut auth, "bad-id").await.unwrap_err() {

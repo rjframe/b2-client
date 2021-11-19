@@ -20,13 +20,22 @@ pub mod prelude {
     #![allow(unused_imports)]
 
     pub use super::{
-        account::Authorization,
+        account::{Authorization, Capability},
     };
 
     pub(crate) use super::types::{
         B2Result,
         Duration,
     };
+}
+
+#[macro_export]
+macro_rules! require_capability {
+    ($auth:ident, $cap:expr) => {
+        if ! $auth.has_capability($cap) {
+            return Err(Error::Unauthorized($cap));
+        }
+    }
 }
 
 pub use account::*;

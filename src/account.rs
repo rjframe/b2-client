@@ -22,6 +22,7 @@ use crate::{
     client::HttpClient,
     error::{ValidationError, Error},
     types::Duration,
+    require_capability,
 };
 
 use chrono::{DateTime, Local};
@@ -569,6 +570,8 @@ pub async fn create_key<C, E>(
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
+    require_capability!(auth, Capability::WriteKeys);
+
     let mut new_key_info = new_key_info;
     new_key_info.account_id = Some(&auth.account_id);
 
@@ -650,6 +653,8 @@ pub async fn delete_key_by_id<C, E, S: AsRef<str>>(
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
+    require_capability!(auth, Capability::DeleteKeys);
+
     let res = auth.client.post(auth.api_url("b2_delete_key"))
         .expect("Invalid URL")
         .with_header("Authorization", &auth.authorization_token)
@@ -888,6 +893,8 @@ pub async fn get_download_authorization<C, E>(
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
+    require_capability!(auth, Capability::ShareFiles);
+
     let res = auth.client.post(auth.api_url("b2_get_download_authorization"))
         .expect("Invalid URL")
         .with_header("Authorization", &auth.authorization_token)
@@ -1035,6 +1042,8 @@ pub async fn list_keys<C, E>(
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
+    require_capability!(auth, Capability::ListKeys);
+
     let mut list_req = list_req;
     list_req.account_id = Some(&auth.account_id);
 
@@ -1165,7 +1174,7 @@ mod tests {
             "test_sessions/auth_account.yaml"
         ).await?;
 
-        let mut auth = create_test_auth(client, vec![Capability::WriteKeys])
+        let mut auth = create_test_auth(client, vec![Capability::DeleteKeys])
             .await;
 
         let removed_key = delete_key_by_id(
