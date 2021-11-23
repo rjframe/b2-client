@@ -22,6 +22,7 @@ use crate::{
     client::HttpClient,
     error::{ValidationError, Error},
     types::Duration,
+    validate::validated_file_name,
     require_capability,
 };
 
@@ -733,10 +734,10 @@ impl DownloadAuthorizationRequestBuilder {
 
     /// Use the given file name prefix to determine what files the
     /// [DownloadAuthorization] will allow access to.
-    pub fn file_name_prefix<S: Into<String>>(mut self, name: S) -> Self {
-        // TODO: Validate prefix.
-        self.file_name_prefix = Some(name.into());
-        self
+    pub fn file_name_prefix<S: Into<String>>(mut self, name: S)
+    -> Result<Self, ValidationError> {
+        self.file_name_prefix = Some(validated_file_name(name)?);
+        Ok(self)
     }
 
     /// Specify the amount of time for which the [DownloadAuthorization] will be
@@ -877,7 +878,7 @@ impl DownloadAuthorization {
 ///
 /// let download_req = DownloadAuthorizationRequest::builder()
 ///     .bucket_id("MY BUCKET ID")
-///     .file_name_prefix("my/files/")
+///     .file_name_prefix("my/files/")?
 ///     .duration(chrono::Duration::seconds(60))?
 ///     .build()?;
 ///
@@ -1198,7 +1199,7 @@ mod tests {
 
         let req = DownloadAuthorizationRequest::builder()
             .bucket_id("8d625eb63be2775577c70e1a")
-            .file_name_prefix("files/")
+            .file_name_prefix("files/")?
             .duration(chrono::Duration::seconds(30))?
             .content_disposition(
                 ContentDisposition("Attachment; filename=example.html".into())
@@ -1227,7 +1228,7 @@ mod tests {
 
         let req = DownloadAuthorizationRequest::builder()
             .bucket_id("8d625eb63be2775577c70e1a")
-            .file_name_prefix("files/")
+            .file_name_prefix("files/")?
             .duration(chrono::Duration::seconds(30))?
             .build()?;
 

@@ -409,9 +409,10 @@ impl LifecycleRuleBuilder {
     ///
     /// A prefix of `""` will apply to all files, allowing the creation of rules
     /// that could delete **all** files.
-    pub fn filename_prefix(mut self, prefix: impl Into<String>) -> Self {
-        self.prefix = Some(prefix.into());
-        self
+    pub fn filename_prefix(mut self, prefix: impl Into<String>)
+    -> Result<Self, ValidationError> {
+        self.prefix = Some(validated_file_name(prefix)?);
+        Ok(self)
     }
 
     /// The number of days to hide a file after it was uploaded.
@@ -1430,7 +1431,7 @@ mod tests_mocked {
             .bucket_type(BucketType::Private)?
             .lifecycle_rules(vec![
                 LifecycleRule::builder()
-                    .filename_prefix("my-files/")
+                    .filename_prefix("my-files/")?
                     .delete_after_hide(chrono::Duration::days(5))?
                     .build()?
             ])?
@@ -1463,7 +1464,7 @@ mod tests_mocked {
             .bucket_type(BucketType::Private)?
             .lifecycle_rules(vec![
                 LifecycleRule::builder()
-                    .filename_prefix("my-files/")
+                    .filename_prefix("my-files/")?
                     .delete_after_hide(chrono::Duration::days(5))?
                     .build()?
             ])?
@@ -1557,7 +1558,7 @@ mod tests_mocked {
             .bucket_type(BucketType::Private)?
             .lifecycle_rules(vec![
                 LifecycleRule::builder()
-                    .filename_prefix("my-files/")
+                    .filename_prefix("my-files/")?
                     .delete_after_hide(chrono::Duration::days(5))?
                     .build()?
             ])?

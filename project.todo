@@ -9,6 +9,7 @@ Project:
     ☐ Can I reorder the documentation sections? Place functions first
     ☐ Bucket's fields need to be publicly accessible
     ☐ If we store Bucket instead of bucket_id in relevant objects, we can better validate access to private buckets without making a request to B2. It potentially requires an extra API call to obtain though.
+    ☐ We should likely use a type for FileInfo rather than deal with JSON in the public API
 
 API:
     ✓ Implement account endpoints @done(2021-10-18 17:20) @project(API)

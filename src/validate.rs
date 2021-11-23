@@ -7,6 +7,11 @@ use crate::{
     error::ValidationError,
 };
 
+use http_types::{
+    cache::{CacheControl, Expires},
+    Trailers,
+};
+
 
 /// Returns the provided HTTP header if it's valid; otherwise ValidationError.
 ///
@@ -60,10 +65,248 @@ pub(crate) fn validated_bucket_name(name: impl Into<String>)
     }
 }
 
+/// Ensure a filename is valid.
+///
+/// Note that B2 disallows ASCII control characters, but other control
+/// characters defined by Unicode are allowed.
+pub(crate) fn validated_file_name(name: impl Into<String>)
+-> Result<String, ValidationError> {
+    let name = name.into();
+
+    for ch in name.chars() {
+        if ch.is_ascii_control() {
+            return Err(ValidationError::BadFormat(format!(
+                "The filename \"{}\" cannot include the character '{}'",
+                name,
+                ch,
+            )));
+        }
+    }
+
+    if name.len() > 1024 {
+        return Err(ValidationError::BadFormat(format!(
+            "The filename cannot be above 1024 bytes, but is {}", name.len()
+        )));
+    }
+
+    Ok(name)
+}
+
 pub(crate) fn validated_cors_rule_name(name: impl Into<String>)
 -> Result<String, ValidationError> {
     // The rules are the same as for bucket names.
     validated_bucket_name(name)
+}
+
+/// Ensure the keys and values of file metadata is correct.
+///
+/// We do not check the byte length limit since the limit applies to both the
+/// file info and the name.
+// TODO: Check limit anyway? If we exceed the limit here we can fail faster.
+pub(crate) fn validated_file_info(info: serde_json::Value)
+-> Result<serde_json::Value, ValidationError> {
+    let obj = info.as_object()
+        .ok_or_else(||
+            ValidationError::BadFormat("file_info is not an object".into())
+        )?;
+
+    if obj.len() > 10 {
+        return Err(ValidationError::BadFormat(
+            "file_info cannot contain more than 10 items".into()
+        ));
+    }
+
+    for (key, val) in obj {
+        validate_info_key_val(key, val)?;
+    }
+
+    Ok(info)
+}
+
+fn validate_info_key_val(key: &str, val: &serde_json::Value)
+-> Result<(), ValidationError> {
+    if key.len() > 50 {
+        return Err(ValidationError::BadFormat(format!(
+            "Key cannot exceed 50 bytes, but is {}", key.len()
+        )));
+    }
+
+    if key.starts_with("b2-") {
+        validate_info_val(key, val)?
+    }
+
+    let is_valid = |c: char| c.is_alphanumeric()
+        || ['-', '_', '.', '`', '~', '!', '#', '$', '%', '^', '&', '*', '\'',
+            '|', '+'].contains(&c);
+
+    for ch in key.chars() {
+        if ! is_valid(ch) {
+            return Err(ValidationError::BadFormat(format!(
+                "Invalid character in key: '{}'", ch
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+/// Validate the file_info for B2-specific metadata.
+fn validate_info_val(key: &str, val: &serde_json::Value)
+-> Result<(), ValidationError> {
+    let val = val.as_str().ok_or_else(||
+        ValidationError::BadFormat(format!("{} value must be a string", key))
+    )?;
+
+    // TODO: We can likely validate the stuff I'm using http_types to validate
+    // more efficiently by doing it manually.
+    match key {
+        "b2-content-disposition" => {
+            validate_content_disposition(val, false)
+        },
+        "b2-content-language" => {
+            for ch in val.chars() {
+                if ! (ch.is_ascii_alphabetic() || ch == '-') {
+                    return Err(ValidationError::BadFormat(format!(
+                        "Invalid character in Content-Language: {}", ch
+                    )));
+                }
+            }
+            Ok(())
+        },
+        "b2-expires" => {
+            let mut hdr = Trailers::new();
+            hdr.insert("Expires", val);
+
+            Expires::from_headers(hdr.as_ref())
+                .map_err(|_| ValidationError::BadFormat(format!(
+                    "Invalid Expires value: {}", val
+                )))?;
+
+            Ok(())
+        },
+        "b2-cache-control" => {
+            // TODO: CacheControl type doesn't seem to validate cache-extension
+            // properly. See
+            // https://datatracker.ietf.org/doc/html/rfc2616#section-14.9
+            let mut hdr = Trailers::new();
+            hdr.insert("CacheControl", val);
+
+            CacheControl::from_headers(hdr.as_ref())
+                .map_err(|_| ValidationError::BadFormat(format!(
+                    "Invalid CacheControl value: {}", val
+                )))?;
+
+            Ok(())
+        },
+        "b2-content-encoding" => {
+            // B2 documentation says this must conform to RFC 2616, which seems
+            // to be more restrictive than RFC 7231, which supercedes it. We're
+            // going to validate that the value is a valid token, but not worry
+            // about the value itself.
+            if is_valid_token(val) {
+                Ok(())
+            } else {
+                Err(ValidationError::BadFormat(format!(
+                    "Invalid ContentEncoding: {}", val
+                )))
+            }
+        },
+        _ => Err(ValidationError::BadFormat(format!(
+            "Invalid key name: {}", key
+        ))),
+    }
+}
+
+fn validate_content_disposition(text: &str, allow_star: bool)
+-> Result<(), ValidationError> {
+    let sep_idx = text.find(';');
+
+    if sep_idx.is_none() {
+        // Lack of a ';' means the value is a simple token.
+        return if is_valid_token(text) {
+            Ok(())
+        } else {
+            Err(ValidationError::BadFormat(format!(
+                "Illegal Content-Disposition type: {}", text
+            )))
+        };
+    } else if text.ends_with(';') {
+        return Err(ValidationError::BadFormat(
+            "Content-Disposition cannot end with a semicolon".into()
+        ));
+    }
+    let sep_idx = sep_idx.unwrap();
+
+    for param in text[sep_idx+1..].split(';') {
+        if let Some((field, value)) = param.split_once('=') {
+            let field = field.trim();
+
+            if ! is_valid_token(field) {
+                return Err(ValidationError::BadFormat(format!(
+                    "Illegal character in field name: {}", field
+                )));
+            }
+
+            if ! allow_star && field == "*" {
+                return Err(ValidationError::BadFormat(
+                    "Asterisk ('*') is not allowed in a field name".into()
+                ));
+            }
+
+            let value = value.trim();
+
+            // TODO: We need to also verify that if the value is an ext-value as
+            // defined at
+            // https://datatracker.ietf.org/doc/html/rfc5987#section-3.2 that it
+            // is valid. We currently assume it's valid. Also see restrictions
+            // listed at https://www.backblaze.com/b2/docs/files.html
+            if ! (is_valid_token(value) || is_valid_quoted_string(value)) {
+                return Err(ValidationError::BadFormat(
+                    "Invalid field value".into()
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn is_valid_token(s: &str) -> bool {
+    let separators = [
+        '(', ')', '<', '>', '@', ',', ';', ':', '\\', '"', '/', '[', ']', '?',
+        '=', '{', '}', ' ', '\t',
+    ];
+
+    if s.is_empty() { return false; }
+
+    for ch in s.chars() {
+        if ! ch.is_ascii_alphanumeric() || ch.is_control()
+            || separators.contains(&ch)
+        {
+            return false;
+        }
+    }
+
+    true
+}
+
+fn is_valid_quoted_string(s: &str) -> bool {
+    if ! (s.starts_with('"') && s.ends_with('"'))
+    {
+        return false;
+    }
+
+    let s = s.as_bytes();
+
+    for i in 1..s.len() - 1 {
+        if ! s[i].is_ascii() || s[i].is_ascii_control()
+            || (s[i] == b'"' && s[i-1] != b'\\')
+        {
+            return false;
+        }
+    }
+
+    true
 }
 
 /// Return the provided list of [LifecycleRule]s or a map of errors.
@@ -194,10 +437,12 @@ pub(crate) fn validated_origins(origins: impl Into<Vec<String>>)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+
 
     fn make_rule(prefix: &str) -> LifecycleRule {
         LifecycleRule::builder()
-            .filename_prefix(prefix)
+            .filename_prefix(prefix).unwrap()
             .delete_after_hide(chrono::Duration::days(3)).unwrap()
             .build().unwrap()
     }
@@ -346,5 +591,82 @@ mod tests {
             },
             e => panic!("Unexpected error: {}", e),
         }
+    }
+
+    #[test]
+    fn validate_quoted_string() {
+        assert!(is_valid_quoted_string("\"\""));
+        assert!(is_valid_quoted_string("\"a\""));
+        assert!(is_valid_quoted_string("\"abcde\""));
+        assert!(is_valid_quoted_string("\"ab\\\"cde\""));
+
+        assert!(! is_valid_quoted_string("\"ab\"cd\""));
+    }
+
+    #[test]
+    fn validate_info_key_val_filters_disallowed_chars() {
+        validate_info_key_val("good-sep", &json!("asdf")).unwrap();
+        validate_info_key_val("good#sep", &json!("asdf")).unwrap();
+        validate_info_key_val("$goodsep", &json!("asdf")).unwrap();
+        validate_info_key_val("good-sep%", &json!("asdf")).unwrap();
+
+        validate_info_key_val("bad@sep", &json!("asdf")).unwrap_err();
+        validate_info_key_val("bad(sep", &json!("asdf")).unwrap_err();
+        validate_info_key_val("{badsep", &json!("asdf")).unwrap_err();
+        validate_info_key_val("badsep]", &json!("asdf")).unwrap_err();
+    }
+
+    #[test]
+    fn validate_content_disposition() {
+        validate_info_val("b2-content-disposition", &json!("inline")).unwrap();
+        validate_info_val(
+            "b2-content-disposition",
+            &json!("attachment; filename=\"myfile.txt\"")
+        ).unwrap();
+        validate_info_val(
+            "b2-content-disposition",
+            &json!("attachment; something=value")
+        ).unwrap();
+        validate_info_val(
+            "b2-content-disposition",
+            &json!("attachment; filename=\"myfile.txt\"; something=value")
+        ).unwrap();
+
+        // RFC 6266 says that the semicolon without at least one field is
+        // illegal. It wouldn't surprise me if many clients allow it, but we're
+        // going to enforce the standard.
+        validate_info_val("b2-content-disposition", &json!("inline;"))
+            .unwrap_err();
+        validate_info_val("b2-content-disposition", &json!("inline; f="))
+            .unwrap_err();
+    }
+
+    #[test]
+    fn validate_content_language() {
+        validate_info_val("b2-content-language", &json!("en")).unwrap();
+        validate_info_val("b2-content-language", &json!("lang-dialect"))
+            .unwrap();
+
+        validate_info_val("b2-content-language", &json!("bad-lang/text"))
+            .unwrap_err();
+        validate_info_val("b2-content-language", &json!("bad+lang"))
+            .unwrap_err();
+    }
+
+    #[test]
+    fn validate_expires() {
+        validate_info_val("b2-expires", &json!("Thu, 01 Dec 1994 16:00:00 GMT"))
+            .unwrap();
+
+        validate_info_val("b2-expires", &json!("2021-1-1")).unwrap_err();
+    }
+
+    #[test]
+    fn validate_cache_control() {
+        validate_info_val("b2-cache-control", &json!("no-store")).unwrap();
+
+        // TODO: Implement cache-extension validation to test:
+        //validate_info_val("b2-cache-control", &json!("(not-valid-token)"))
+        //    .unwrap_err();
     }
 }

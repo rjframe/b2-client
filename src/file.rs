@@ -17,6 +17,7 @@ use crate::{
     },
     client::HttpClient,
     error::{ValidationError, Error},
+    validate::{validated_file_info, validated_file_name},
     require_capability,
 };
 
@@ -344,9 +345,10 @@ impl CopyFileBuilder {
     }
 
     /// Set the filename to use for the new file.
-    pub fn destination_file_name(mut self, name: impl Into<String>) -> Self {
-        self.file_name = Some(name.into());
-        self
+    pub fn destination_file_name(mut self, name: impl Into<String>)
+    -> Result<Self, ValidationError> {
+        self.file_name = Some(validated_file_name(name)?);
+        Ok(self)
     }
 
     /// If provided, only copy the specified byte range of the source file.
@@ -383,9 +385,10 @@ impl CopyFileBuilder {
     /// The file information can only be set if
     /// [metadata_directive](Self::metadata_directive) is
     /// [MetadataDirective::Replace].
-    pub fn file_info(mut self, info: serde_json::Value) -> Self {
-        self.file_info = Some(info);
-        self
+    pub fn file_info(mut self, info: serde_json::Value)
+    -> Result<Self, ValidationError> {
+        self.file_info = Some(validated_file_info(info)?);
+        Ok(self)
     }
 
     /// Set the file-retention settings for the new file.
@@ -560,9 +563,10 @@ impl StartLargeFileBuilder {
     }
 
     /// Set the file's name.
-    pub fn file_name(mut self, name: impl Into<String>) -> Self {
-        self.file_name = Some(name.into());
-        self
+    pub fn file_name(mut self, name: impl Into<String>)
+    -> Result<Self, ValidationError> {
+        self.file_name = Some(validated_file_name(name)?);
+        Ok(self)
     }
 
     /// Set the file's MIME type.
@@ -579,9 +583,10 @@ impl StartLargeFileBuilder {
     // TODO: document data sharing - B2 uses more than just content-disposition
     // here
     /// Set file metadata.
-    pub fn file_info(mut self, info: serde_json::Value) -> Self {
-        self.file_info = Some(info);
-        self
+    pub fn file_info(mut self, info: serde_json::Value)
+    -> Result<Self, ValidationError> {
+        self.file_info = Some(validated_file_info(info)?);
+        Ok(self)
     }
 
     /// Set the retention policy for the file.
@@ -754,7 +759,7 @@ mod tests_mocked {
 
         let req = StartLargeFile::builder()
             .bucket_id("8d625eb63be2775577c70e1a")
-            .file_name("test-large-file")
+            .file_name("test-large-file")?
             .build()?;
 
         let file = start_large_file(&mut auth, req).await?;
@@ -822,7 +827,7 @@ mod tests_mocked {
                 "4_z8d625eb63be2775577c70e1a_f111954e3108ff3f6_d20211118_",
                 "m151810_c002_v0001168_t0010"
             ))
-            .destination_file_name("new-file.txt")
+            .destination_file_name("new-file.txt")?
             .build()?;
 
         let new_file = copy_file(&mut auth, file).await?;
@@ -847,7 +852,7 @@ mod tests {
                 "4_z8d625eb63be2775577c70e1a_f111954e3108ff3f6_d20211118_",
                 "m151810_c002_v0001168_t0010"
             ))
-            .destination_file_name("new-file.txt")
+            .destination_file_name("new-file.txt")?
             .content_type("text/plain");
 
         match file.build().unwrap_err() {
