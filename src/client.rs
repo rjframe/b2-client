@@ -12,8 +12,9 @@
 //! To use a custom HTTP client backend, implement [HttpClient] over an object
 //! that wraps your client.
 
-use crate::error::{ValidationError, Error};
+use std::path::PathBuf;
 
+use crate::error::{ValidationError, Error};
 
 #[cfg(feature = "with_surf")]
 pub use surf_client::SurfClient;
@@ -62,8 +63,8 @@ pub trait HttpClient
     /// Add a header to the request.
     fn with_header<S: AsRef<str>>(&mut self, name: S, value: S) -> &mut Self;
     /// Use the given [serde_json::Value] as the request's body.
-    // TODO: Take ownership of body?
-    fn with_body(&mut self, body: &serde_json::Value) -> &mut Self;
+    fn with_body(&mut self, body: serde_json::Value) -> &mut Self;
+    fn read_body_from_file(&mut self, path: impl Into<PathBuf>) -> &mut Self;
 
     /// Send the previously-constructed request and return a response.
     async fn send(&mut self) -> Result<Self::Response, Self::Error>;
@@ -71,6 +72,7 @@ pub trait HttpClient
 
 #[cfg(feature = "with_surf")]
 mod surf_client {
+    use std::path::PathBuf;
     use super::{HttpClient, ValidationError, Error};
     use surf::{
         http::Method,
@@ -82,7 +84,13 @@ mod surf_client {
     pub struct SurfClient {
         client: surf::Client,
         req: Option<Request>,
-        body: Option<serde_json::Value>,
+        body: Option<Body>,
+    }
+
+    #[derive(Debug)]
+    enum Body {
+        Json(serde_json::Value),
+        File(PathBuf),
     }
 
     impl SurfClient {
@@ -144,10 +152,16 @@ mod surf_client {
         /// Use the given [serde_json::Value] as the request's body.
         ///
         /// If an HTTP method has not been set, this method does nothing.
-        fn with_body(&mut self, body: &serde_json::Value) -> &mut Self {
+        fn with_body(&mut self, body: serde_json::Value) -> &mut Self {
             // Nothing I've tried will actually save the body in the req.
             // We store it and set it in send().
-            self.body = Some(body.to_owned());
+            self.body = Some(Body::Json(body));
+            self
+        }
+
+        fn read_body_from_file(&mut self, path: impl Into<PathBuf>)
+        -> &mut Self {
+            self.body = Some(Body::File(path.into()));
             self
         }
 
@@ -160,7 +174,11 @@ mod surf_client {
         async fn send(&mut self) -> Result<Self::Response, Self::Error> {
             if let Some(mut req) = self.req.to_owned() {
                 if let Some(body) = &self.body {
-                    req.body_json(body)?;
+                    match body {
+                        Body::Json(val) => req.body_json(val)?,
+                        Body::File(path) =>
+                            req.set_body(surf::Body::from_file(path).await?),
+                    }
                 }
 
                 let res = self.client.send(req).await?
@@ -178,11 +196,11 @@ mod surf_client {
 
 #[cfg(feature = "with_hyper")]
 mod hyper_client {
+    use std::path::PathBuf;
     use super::{HttpClient, ValidationError, Error};
     use hyper::{
         client::connect::HttpConnector,
         header::{HeaderName, HeaderValue},
-        Body,
         Method
     };
     use hyper_tls::HttpsConnector;
@@ -195,7 +213,13 @@ mod hyper_client {
         method: Option<Method>,
         url: String,
         headers: Vec<(HeaderName, HeaderValue)>,
-        body: serde_json::Value,
+        body: Option<Body>,
+    }
+
+    #[derive(Debug)]
+    enum Body {
+        Json(serde_json::Value),
+        File(PathBuf),
     }
 
     macro_rules! gen_method_func {
@@ -231,14 +255,14 @@ mod hyper_client {
         fn new() -> Self {
             let https = HttpsConnector::new();
             let client = hyper::Client::builder()
-                .build::<_, Body>(https);
+                .build::<_, hyper::Body>(https);
 
             Self {
                 client,
                 method: None,
                 url: String::default(),
                 headers: vec![],
-                body: serde_json::Value::Null,
+                body: None,
             }
         }
 
@@ -267,8 +291,14 @@ mod hyper_client {
 
         /// Use the given [serde_json::Value] as the request's body.
         // TODO: Take ownership of body?
-        fn with_body(&mut self, body: &serde_json::Value) -> &mut Self {
-            self.body = body.to_owned();
+        fn with_body(&mut self, body: serde_json::Value) -> &mut Self {
+            self.body = Some(Body::Json(body));
+            self
+        }
+
+        fn read_body_from_file(&mut self, path: impl Into<PathBuf>)
+        -> &mut Self {
+            self.body = Some(Body::File(path.into()));
             self
         }
 
@@ -291,7 +321,27 @@ mod hyper_client {
                 req = req.header(name, value);
             }
 
-            let body = Body::from(self.body.to_string());
+            let body = match &self.body {
+                Some(body) => match body {
+                    Body::Json(val) => hyper::Body::from(val.to_string()),
+                    Body::File(path) => {
+                        use tokio::{
+                            fs::File,
+                            io::AsyncReadExt as _,
+                        };
+
+                        // TODO: We might do better to create a stream over the
+                        // file and pass it to the hyper::Body.
+                        let mut file = File::open(path).await?;
+                        let mut buf = vec![];
+                        file.read_to_end(&mut buf).await?;
+
+                        hyper::Body::from(buf)
+                    },
+                },
+                None => hyper::Body::empty(),
+            };
+
             let req = req.body(body).expect(concat!(
                 "Invalid request. Please file an issue on b2-client for ",
                 "improper validation"
@@ -304,7 +354,7 @@ mod hyper_client {
             self.method = None;
             self.url = String::default();
             self.headers.clear();
-            self.body = serde_json::Value::Null;
+            self.body = None;
 
             Ok(serde_json::from_slice(&res)?)
         }

@@ -86,6 +86,8 @@ pub enum Error<E>
 {
     /// An error from the underlying HTTP client.
     Client(E),
+    /// An I/O error from the local filesystem.
+    IO(std::io::Error),
     /// An error from the Backblaze B2 API.
     B2(B2Error),
     /// An error deserializing the HTTP client's response.
@@ -113,6 +115,7 @@ impl<E> fmt::Display for Error<E>
 
         match self {
             Self::Client(e) => Display::fmt(&e, f),
+            Self::IO(e) => e.fmt(f),
             Self::B2(e) => Display::fmt(&e, f),
             Self::Format(e) => e.fmt(f),
             Self::Unauthorized(c) => write!(f, "Missing capability: {:?}", c),
@@ -126,6 +129,14 @@ impl<E> From<B2Error> for Error<E>
 {
     fn from(e: B2Error) -> Self {
         Self::B2(e)
+    }
+}
+
+impl<E> From<std::io::Error> for Error<E>
+    where E: fmt::Debug + fmt::Display,
+{
+    fn from(e: std::io::Error) -> Self {
+        Self::IO(e)
     }
 }
 

@@ -227,7 +227,7 @@ pub async fn cancel_large_file_by_id<C, E>(
     let res = auth.client.post(auth.api_url("b2_cancel_large_file"))
         .expect("Invalid URL")
         .with_header("Authorization", &auth.authorization_token)
-        .with_body(&serde_json::json!({ "fileId": id.as_ref() }))
+        .with_body(serde_json::json!({ "fileId": id.as_ref() }))
         .send().await?;
 
     let info: B2Result<CancelledFileUpload> = serde_json::from_value(res)?;
@@ -515,7 +515,7 @@ pub async fn copy_file<C, E>(auth: &mut Authorization<C>, file: CopyFile)
     let res = auth.client.post(auth.api_url("b2_copy_file"))
         .expect("Invalid URL")
         .with_header("Authorization", &auth.authorization_token)
-        .with_body(&serde_json::to_value(file)?)
+        .with_body(serde_json::to_value(file)?)
         .send().await?;
 
     let file: B2Result<File> = serde_json::from_value(res)?;
@@ -729,7 +729,7 @@ pub async fn start_large_file<C, E>(
     let res = auth.client.post(auth.api_url("b2_start_large_file"))
         .expect("Invalid URL")
         .with_header("Authorization", &auth.authorization_token)
-        .with_body(&serde_json::to_value(file)?)
+        .with_body(serde_json::to_value(file)?)
         .send().await?;
 
     let file: B2Result<File> = serde_json::from_value(res)?;

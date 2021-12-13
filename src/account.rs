@@ -579,7 +579,7 @@ pub async fn create_key<C, E>(
     let res = auth.client.post(auth.api_url("b2_create_key"))
         .expect("Invalid URL")
         .with_header("Authorization", &auth.authorization_token)
-        .with_body(&serde_json::to_value(new_key_info)?)
+        .with_body(serde_json::to_value(new_key_info)?)
         .send().await?;
 
     let new_key: B2Result<NewlyCreatedKey> = serde_json::from_value(res)?;
@@ -659,7 +659,7 @@ pub async fn delete_key_by_id<C, E, S: AsRef<str>>(
     let res = auth.client.post(auth.api_url("b2_delete_key"))
         .expect("Invalid URL")
         .with_header("Authorization", &auth.authorization_token)
-        .with_body(&serde_json::json!({"applicationKeyId": key_id.as_ref()}))
+        .with_body(serde_json::json!({"applicationKeyId": key_id.as_ref()}))
         .send().await?;
 
     let key: B2Result<Key> = serde_json::from_value(res)?;
@@ -899,7 +899,7 @@ pub async fn get_download_authorization<C, E>(
     let res = auth.client.post(auth.api_url("b2_get_download_authorization"))
         .expect("Invalid URL")
         .with_header("Authorization", &auth.authorization_token)
-        .with_body(&serde_json::to_value(download_req)?)
+        .with_body(serde_json::to_value(download_req)?)
         .send().await?;
 
     let auth: B2Result<DownloadAuthorization> = serde_json::from_value(res)?;
@@ -1051,7 +1051,7 @@ pub async fn list_keys<C, E>(
     let res = auth.client.post(auth.api_url("b2_list_keys"))
         .expect("Invalid URL")
         .with_header("Authorization", &auth.authorization_token)
-        .with_body(&serde_json::to_value(list_req)?)
+        .with_body(serde_json::to_value(list_req)?)
         .send().await?;
 
     let keys: B2Result<KeyList> = serde_json::from_value(res)?;

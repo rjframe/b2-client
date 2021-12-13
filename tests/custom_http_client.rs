@@ -52,7 +52,12 @@ impl HttpClient for FakeClient {
         self
     }
 
-    fn with_body(&mut self, _body: &serde_json::Value) -> &mut Self { self }
+    fn with_body(&mut self, _body: serde_json::Value) -> &mut Self { self }
+
+    fn read_body_from_file(&mut self, _path: impl Into<std::path::PathBuf>)
+    -> &mut Self {
+        self
+    }
 
     async fn send(&mut self) -> Result<Self::Response, Self::Error> {
         Err(Error::Client(FakeError))
