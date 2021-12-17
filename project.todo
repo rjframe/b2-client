@@ -10,6 +10,9 @@ Project:
     ☐ Bucket's fields need to be publicly accessible
     ☐ If we store Bucket instead of bucket_id in relevant objects, we can better validate access to private buckets without making a request to B2. It potentially requires an extra API call to obtain though.
     ☐ We should likely use a type for FileInfo rather than deal with JSON in the public API
+    ☐ Efficient byte management in HttpClients.
+    ☐ Support uploading multiple file parts concurrently; likely via making the upload authorization cloneable.
+    ☐ Document API differences from upstream and reasons for doing so.
 
 API:
     ✓ Implement account endpoints @done(2021-10-18 17:20) @project(API)
@@ -29,9 +32,9 @@ API:
         ☐ delete_file_version
         ☐ download_file_by_id
         ☐ download_file_by_name
-        ☐ finish_large_file
+        ✓ finish_large_file @done(2021-12-17 10:21) @project(API \ Files)
         ☐ get_file_info
-        ☐ get_upload_part_url
+        ✓ get_upload_part_url @done(2021-12-17 10:21) @project(API \ Files)
         ☐ get_upload_url
         ☐ hide_file
         ☐ list_file_names
@@ -42,7 +45,7 @@ API:
         ☐ update_file_legal_hold
         ☐ update_file_retention
         ☐ upload_file
-        ☐ upload_part
+        ✓ upload_part @done(2021-12-17 10:21) @project(API \ Files)
 
 ＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿
 Archive:

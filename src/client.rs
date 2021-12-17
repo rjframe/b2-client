@@ -62,8 +62,11 @@ pub trait HttpClient
 
     /// Add a header to the request.
     fn with_header<S: AsRef<str>>(&mut self, name: S, value: S) -> &mut Self;
+    /// Use the provided bytes as the request body.
+    fn with_body(&mut self, data: impl Into<Vec<u8>>) -> &mut Self;
     /// Use the given [serde_json::Value] as the request's body.
-    fn with_body(&mut self, body: serde_json::Value) -> &mut Self;
+    fn with_body_json(&mut self, body: serde_json::Value) -> &mut Self;
+    /// Read the provided path as the request's body.
     fn read_body_from_file(&mut self, path: impl Into<PathBuf>) -> &mut Self;
 
     /// Send the previously-constructed request and return a response.
@@ -90,6 +93,12 @@ mod surf_client {
     #[derive(Debug)]
     enum Body {
         Json(serde_json::Value),
+        // TODO: I'd rather store a reference, but doing so spams lifetimes all
+        // over everything (if we can avoid adding an explicit lifetime to
+        // HttpClient we should be OK).
+        //
+        // The best solution is likely going to be to refcount it.
+        Bytes(Vec<u8>),
         File(PathBuf),
     }
 
@@ -138,9 +147,6 @@ mod surf_client {
         gen_method_func!(put, Put);
         gen_method_func!(trace, Trace);
 
-        /// Add a header to the request.
-        ///
-        /// If an HTTP method has not been set, this method does nothing.
         fn with_header<S: AsRef<str>>(&mut self, name: S, value: S)
         -> &mut Self {
             if let Some(req) = &mut self.req {
@@ -149,10 +155,13 @@ mod surf_client {
             self
         }
 
-        /// Use the given [serde_json::Value] as the request's body.
-        ///
-        /// If an HTTP method has not been set, this method does nothing.
-        fn with_body(&mut self, body: serde_json::Value) -> &mut Self {
+        fn with_body(&mut self, data: impl Into<Vec<u8>>) -> &mut Self
+        {
+            self.body = Some(Body::Bytes(data.into()));
+            self
+        }
+
+        fn with_body_json(&mut self, body: serde_json::Value) -> &mut Self {
             // Nothing I've tried will actually save the body in the req.
             // We store it and set it in send().
             self.body = Some(Body::Json(body));
@@ -176,6 +185,7 @@ mod surf_client {
                 if let Some(body) = &self.body {
                     match body {
                         Body::Json(val) => req.body_json(val)?,
+                        Body::Bytes(data) => req.body_bytes(data),
                         Body::File(path) =>
                             req.set_body(surf::Body::from_file(path).await?),
                     }
@@ -219,6 +229,7 @@ mod hyper_client {
     #[derive(Debug)]
     enum Body {
         Json(serde_json::Value),
+        Bytes(hyper::body::Bytes),
         File(PathBuf),
     }
 
@@ -241,6 +252,17 @@ mod hyper_client {
             client: hyper::Client<HttpsConnector<HttpConnector>>
         ) -> Self {
             self.client = client;
+            self
+        }
+
+        /// Use the provided [Bytes](hyper::body::Bytes) as the request's body.
+        ///
+        /// The `Bytes` type is cheaply cloneable, so this method should be
+        /// preferred over [with_bytes] when you wish to retain ownership of the
+        /// byte buffer (e.g., to reuse it when uploading multiple file parts).
+        pub fn with_body_bytes(&mut self, bytes: hyper::body::Bytes)
+        -> &mut Self {
+            self.body = Some(Body::Bytes(bytes));
             self
         }
     }
@@ -289,9 +311,15 @@ mod hyper_client {
             self
         }
 
-        /// Use the given [serde_json::Value] as the request's body.
-        // TODO: Take ownership of body?
-        fn with_body(&mut self, body: serde_json::Value) -> &mut Self {
+        fn with_body<'a>(&mut self, data: impl Into<Vec<u8>>) -> &mut Self {
+            self.body = Some(
+                Body::Bytes(hyper::body::Bytes::from(data.into()))
+            );
+
+            self
+        }
+
+        fn with_body_json(&mut self, body: serde_json::Value) -> &mut Self {
             self.body = Some(Body::Json(body));
             self
         }
@@ -324,6 +352,7 @@ mod hyper_client {
             let body = match &self.body {
                 Some(body) => match body {
                     Body::Json(val) => hyper::Body::from(val.to_string()),
+                    Body::Bytes(data) => hyper::Body::from(data.clone()),
                     Body::File(path) => {
                         use tokio::{
                             fs::File,

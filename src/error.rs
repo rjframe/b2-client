@@ -99,6 +99,8 @@ pub enum Error<E>
     /// returning an error or to return what we know will be an authorization
     /// error prior to sending a request to the API.
     Unauthorized(crate::account::Capability),
+    /// An error validating data prior to making a Backblaze B2 API call.
+    Validation(ValidationError),
     /// Attempted to send a non-existent request.
     NoRequest,
 }
@@ -119,6 +121,7 @@ impl<E> fmt::Display for Error<E>
             Self::B2(e) => Display::fmt(&e, f),
             Self::Format(e) => e.fmt(f),
             Self::Unauthorized(c) => write!(f, "Missing capability: {:?}", c),
+            Self::Validation(e) => e.fmt(f),
             Self::NoRequest => write!(f, "No request was created"),
         }
     }
@@ -162,6 +165,14 @@ impl From<hyper::Error> for Error<hyper::Error> {
     }
 }
 
+impl<E> From<ValidationError> for Error<E>
+    where E: fmt::Debug + fmt::Display,
+{
+    fn from(e: ValidationError) -> Self {
+        Self::Validation(e)
+    }
+}
+
 /// An error code from the B2 API.
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ErrorCode {
@@ -180,6 +191,7 @@ pub enum ErrorCode {
     // 403
     AccessDenied,
     CapExceeded,
+    StorageCapExceeded,
     TransactionCapExceeded,
 
     // 404
@@ -221,6 +233,7 @@ impl ErrorCode {
 
             "access_denied" => Ok(Self::AccessDenied),
             "cap_exceeded" => Ok(Self::CapExceeded),
+            "storage_cap_exceeded" => Ok(Self::StorageCapExceeded),
             "transaction_cap_exceeded" => Ok(Self::TransactionCapExceeded),
 
             "not_found" => Ok(Self::NotFound),
@@ -254,6 +267,7 @@ impl ErrorCode {
             Self::Unsupported => 401,
             Self::AccessDenied => 403,
             Self::CapExceeded => 403,
+            Self::StorageCapExceeded => 403,
             Self::TransactionCapExceeded => 403,
             Self::NotFound => 404,
             Self::MethodNotAllowed => 405,

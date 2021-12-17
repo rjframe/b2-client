@@ -5,7 +5,10 @@
 
 //! B2 API calls for working with files.
 
-use std::fmt;
+use std::{
+    path::Path,
+    fmt,
+};
 
 use crate::{
     prelude::*,
@@ -191,6 +194,18 @@ impl File {
     }
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FilePart {
+    file_id: String,
+    part_number: u16,
+    content_length: u64,
+    content_sha1: String,
+    content_md5: Option<String>,
+    server_side_encryption: Option<ServerSideEncryption>,
+    upload_timestamp: i64,
+}
+
 /// A large file that was cancelled prior to upload completion.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -227,7 +242,7 @@ pub async fn cancel_large_file_by_id<C, E>(
     let res = auth.client.post(auth.api_url("b2_cancel_large_file"))
         .expect("Invalid URL")
         .with_header("Authorization", &auth.authorization_token)
-        .with_body(serde_json::json!({ "fileId": id.as_ref() }))
+        .with_body_json(serde_json::json!({ "fileId": id.as_ref() }))
         .send().await?;
 
     let info: B2Result<CancelledFileUpload> = serde_json::from_value(res)?;
@@ -515,11 +530,113 @@ pub async fn copy_file<C, E>(auth: &mut Authorization<C>, file: CopyFile)
     let res = auth.client.post(auth.api_url("b2_copy_file"))
         .expect("Invalid URL")
         .with_header("Authorization", &auth.authorization_token)
-        .with_body(serde_json::to_value(file)?)
+        .with_body_json(serde_json::to_value(file)?)
         .send().await?;
 
     let file: B2Result<File> = serde_json::from_value(res)?;
     file.into()
+}
+
+pub async fn finish_large_file_upload<C, E>(
+    auth: &mut Authorization<C>,
+    file: &File,
+    sha1_checksums: &[String],
+) -> Result<File, Error<E>>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    finish_large_file_upload_by_id(auth, &file.file_id, sha1_checksums).await
+}
+
+pub async fn finish_large_file_upload_by_id<C, E>(
+    auth: &mut Authorization<C>,
+    file_id: impl AsRef<str>,
+    sha1_checksums: &[String],
+) -> Result<File, Error<E>>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    use serde_json::json;
+
+    require_capability!(auth, Capability::WriteFiles);
+
+    let res = auth.client.post(auth.api_url("b2_finish_large_file"))
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .with_body_json(json!( {
+            "fileId": file_id.as_ref(),
+            "partSha1Array": &sha1_checksums,
+        }))
+        .send().await?;
+
+    let file: B2Result<File> = serde_json::from_value(res)?;
+    file.into()
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UploadPartAuthorization<'a, 'b, C, E>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    #[serde(skip_deserializing)]
+    #[serde(default = "make_none")]
+    auth: Option<&'a mut Authorization<C>>,
+    #[serde(skip_deserializing)]
+    #[serde(default = "make_none")]
+    encryption: Option<&'b ServerSideEncryption>,
+    file_id: String,
+    upload_url: String,
+    authorization_token: String,
+}
+
+fn make_none<T>() -> Option<T> { None }
+
+pub async fn get_upload_part_authorization<'a, 'b, C, E>(
+    auth: &'a mut Authorization<C>,
+    file: &'b File,
+) -> Result<UploadPartAuthorization<'a, 'b, C, E>, Error<E>>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    get_upload_part_authorization_by_id(
+        auth,
+        &file.file_id,
+        file.server_side_encryption.as_ref()
+    ).await
+}
+
+pub async fn get_upload_part_authorization_by_id<'a, 'b, C, E>(
+    auth: &'a mut Authorization<C>,
+    file_id: impl AsRef<str>,
+    encryption: Option<&'b ServerSideEncryption>,
+) -> Result<UploadPartAuthorization<'a, 'b, C, E>, Error<E>>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    use serde_json::json;
+
+    require_capability!(auth, Capability::WriteFiles);
+
+    let res = auth.client.post(auth.api_url("b2_get_upload_part_url"))
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .with_body_json(json!({ "fileId": file_id.as_ref() }))
+        .send().await?;
+
+    let upload_auth: B2Result<UploadPartAuthorization<'_, '_, _, _>> =
+        serde_json::from_value(res)?;
+
+    let upload_auth = match upload_auth {
+        B2Result::Ok(mut a) => {
+            a.auth = Some(auth);
+            a.encryption = encryption;
+            B2Result::Ok(a)
+        },
+        e => e,
+    };
+
+    upload_auth.into()
 }
 
 /// A request to prepare to upload a large file.
@@ -729,11 +846,52 @@ pub async fn start_large_file<C, E>(
     let res = auth.client.post(auth.api_url("b2_start_large_file"))
         .expect("Invalid URL")
         .with_header("Authorization", &auth.authorization_token)
-        .with_body(serde_json::to_value(file)?)
+        .with_body_json(serde_json::to_value(file)?)
         .send().await?;
 
     let file: B2Result<File> = serde_json::from_value(res)?;
     file.into()
+}
+
+// TODO: Stream-based data upload to avoid requiring all data be in RAM at once.
+pub async fn upload_file_part<C, E>(
+    auth: &mut UploadPartAuthorization<'_, '_, C, E>,
+    part_num: u16,
+    sha1_checksum: impl AsRef<str>,
+    data: &[u8],
+) -> Result<FilePart, Error<E>>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    #[allow(clippy::manual_range_contains)]
+    if part_num < 1 || part_num > 10000 {
+        return Err(ValidationError::OutOfBounds(format!(
+            "part_num must be between 1 and 10,000 inclusive. Was {}", part_num
+        )).into());
+    }
+
+    // TODO: Validate that sha1_checksum is a possible checksum.
+
+    // Unwrap safety: an `UploadPartAuthorization` can only be created from
+    // `get_upload_part_authorization`, which will always embed an
+    // `Authorization` reference before returning.
+    let inner_auth = auth.auth.as_mut().unwrap();
+
+    require_capability!(inner_auth, Capability::WriteFiles);
+
+    let req = inner_auth.client.post(&auth.upload_url)
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .with_header("X-Bz-Part-Number", &part_num.to_string())
+        .with_header("Content-Length", &data.len().to_string())
+        .with_header("X-Bz-Content-Sha1", sha1_checksum.as_ref());
+
+    // TODO: Encryption headers.
+
+    let res = req.with_body(data).send().await?;
+
+    let part: B2Result<FilePart> = serde_json::from_value(res)?;
+    part.into()
 }
 
 #[cfg(all(test, feature = "with_surf"))]
@@ -838,6 +996,58 @@ mod tests_mocked {
     }
 
     // TODO: test copy_file with a byte range.
+
+    #[async_std::test]
+    async fn upload_large_file_full_process() -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/large_file.yaml"
+        ).await?;
+
+        let mut auth = create_test_auth(client, vec![Capability::WriteFiles])
+            .await;
+
+        let file = StartLargeFile::builder()
+            .bucket_id("8d625eb63be2775577c70e1a")
+            .file_name("Test-large-file.txt")?
+            .content_type("text/plain")
+            .build()?;
+
+        let file = start_large_file(&mut auth, file).await?;
+        let mut upload_auth = get_upload_part_authorization(&mut auth, &file)
+            .await?;
+
+        // All but the last part must be at least 5MB.
+        let data1: Vec<u8> = [b'a'].iter().cycle().take(5*1024*1024)
+            .cloned().collect();
+
+        let _part1 = upload_file_part(
+            &mut upload_auth,
+            1,
+            "61b8d6600ac94d912874f569a9341120f680c9f8",
+            &data1
+        ).await?;
+
+        let _part2 = upload_file_part(
+            &mut upload_auth,
+            2,
+            "924f61661a3472da74307a35f2c8d22e07e84a4d",
+            b"bcd"
+        ).await?;
+
+        let file = finish_large_file_upload(
+            &mut auth,
+            &file,
+            &[
+                "61b8d6600ac94d912874f569a9341120f680c9f8".into(),
+                "924f61661a3472da74307a35f2c8d22e07e84a4d".into(),
+            ]
+        ).await?;
+
+        assert_eq!(file.action, FileAction::Upload);
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

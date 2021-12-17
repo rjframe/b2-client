@@ -91,3 +91,130 @@
       cache-control:
         - "max-age=0, no-cache, no-store"
     body: "{\"accountId\":\"hidden-account-id\",\"action\":\"copy\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentLength\":10,\"contentMd5\":\"3c825ca59d58209eae5924221497780c\",\"contentSha1\":\"5a08924b0ef1cccfb5de1d94e3d75c38dc0d3c79\",\"contentType\":\"text/plain\",\"fileId\":\"4_z8d625eb63be2775577c70e1a_f1052a33c70ab4806_d20211118_m153703_c002_v0001160_t0027\",\"fileInfo\":{\"src_last_modified_millis\":\"1637248673875\"},\"fileName\":\"new-file.txt\",\"fileRetention\":{\"isClientAuthorizedToRead\":true,\"value\":{\"mode\":null,\"retainUntilTimestamp\":null}},\"legalHold\":{\"isClientAuthorizedToRead\":true,\"value\":null},\"serverSideEncryption\":{\"algorithm\":null,\"mode\":null},\"uploadTimestamp\":1637249823000}"
+---
+- Request:
+    method: POST
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_start_large_file"
+    headers:
+      authorization:
+        - hidden-authorization-token
+      content-type:
+        - application/json
+    body: "{\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentType\":\"text/plain\",\"fileInfo\":null,\"fileName\":\"Test-large-file.txt\",\"fileRetention\":null,\"legalHold\":null,\"serverSideEncryption\":null}"
+- Response:
+    status: 200
+    version: ~
+    headers:
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      content-type:
+        - application/json;charset=UTF-8
+      date:
+        - "Fri, 17 Dec 2021 15:02:15 GMT"
+      content-length:
+        - "678"
+    body: "{\"accountId\":\"hidden-account-id\",\"action\":\"start\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentLength\":0,\"contentMd5\":null,\"contentSha1\":\"none\",\"contentType\":\"text/plain\",\"fileId\":\"4_z8d625eb63be2775577c70e1a_f222f9c9a66d56ef9_d20211217_m150215_c002_v0001129_t0022\",\"fileInfo\":{},\"fileName\":\"Test-large-file.txt\",\"fileRetention\":{\"isClientAuthorizedToRead\":true,\"value\":{\"mode\":null,\"retainUntilTimestamp\":null}},\"legalHold\":{\"isClientAuthorizedToRead\":true,\"value\":null},\"serverSideEncryption\":{\"algorithm\":null,\"mode\":null},\"uploadTimestamp\":1639753335000}"
+---
+- Request:
+    method: POST
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_get_upload_part_url"
+    headers:
+      authorization:
+        - hidden-authorization-token
+      content-type:
+        - application/json
+    body: "{\"fileId\":\"4_z8d625eb63be2775577c70e1a_f222f9c9a66d56ef9_d20211217_m150215_c002_v0001129_t0022\"}"
+- Response:
+    status: 200
+    version: ~
+    headers:
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      content-type:
+        - application/json;charset=UTF-8
+      content-length:
+        - "376"
+      date:
+        - "Fri, 17 Dec 2021 15:02:15 GMT"
+    body: "{\"authorizationToken\":\"hidden-authorization-token\",\"fileId\":\"4_z8d625eb63be2775577c70e1a_f222f9c9a66d56ef9_d20211217_m150215_c002_v0001129_t0022\",\"uploadUrl\":\"https://pod-000-1129-18.backblaze.com/b2api/v2/b2_upload_part/4_z8d625eb63be2775577c70e1a_f222f9c9a66d56ef9_d20211217_m150215_c002_v0001129_t0022/0018\"}"
+---
+- Request:
+    method: POST
+    url: "https://pod-000-1129-18.backblaze.com/b2api/v2/b2_upload_part/4_z8d625eb63be2775577c70e1a_f222f9c9a66d56ef9_d20211217_m150215_c002_v0001129_t0022/0018"
+    headers:
+      content-type:
+        - application/octet-stream
+      x-bz-content-sha1:
+        - 61b8d6600ac94d912874f569a9341120f680c9f8
+      x-bz-part-number:
+        - "1"
+      authorization:
+        - hidden-authorization-token
+      content-length:
+        - "5242880"
+    body: "aaaaa for 5 MB of data"
+- Response:
+    status: 200
+    version: ~
+    headers:
+      content-length:
+        - "371"
+      date:
+        - "Fri, 17 Dec 2021 15:02:36 GMT"
+      content-type:
+        - application/json;charset=UTF-8
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+    body: "{\"contentLength\":5242880,\"contentMd5\":\"79b281060d337b9b2b84ccf390adcf74\",\"contentSha1\":\"61b8d6600ac94d912874f569a9341120f680c9f8\",\"fileId\":\"4_z8d625eb63be2775577c70e1a_f222f9c9a66d56ef9_d20211217_m150215_c002_v0001129_t0022\",\"partNumber\":1,\"serverSideEncryption\":{\"algorithm\":null,\"mode\":null},\"uploadTimestamp\":1639753356820}"
+---
+- Request:
+    method: POST
+    url: "https://pod-000-1129-18.backblaze.com/b2api/v2/b2_upload_part/4_z8d625eb63be2775577c70e1a_f222f9c9a66d56ef9_d20211217_m150215_c002_v0001129_t0022/0018"
+    headers:
+      content-type:
+        - application/octet-stream
+      content-length:
+        - "3"
+      x-bz-part-number:
+        - "2"
+      authorization:
+        - hidden-authorization-token
+      x-bz-content-sha1:
+        - 924f61661a3472da74307a35f2c8d22e07e84a4d
+    body: bcd
+- Response:
+    status: 200
+    version: ~
+    headers:
+      content-type:
+        - application/json;charset=UTF-8
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      content-length:
+        - "365"
+      date:
+        - "Fri, 17 Dec 2021 15:02:36 GMT"
+    body: "{\"contentLength\":3,\"contentMd5\":\"d4b7c284882ca9e208bb65e8abd5f4c8\",\"contentSha1\":\"924f61661a3472da74307a35f2c8d22e07e84a4d\",\"fileId\":\"4_z8d625eb63be2775577c70e1a_f222f9c9a66d56ef9_d20211217_m150215_c002_v0001129_t0022\",\"partNumber\":2,\"serverSideEncryption\":{\"algorithm\":null,\"mode\":null},\"uploadTimestamp\":1639753357221}"
+---
+- Request:
+    method: POST
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_finish_large_file"
+    headers:
+      content-type:
+        - application/json
+      authorization:
+        - hidden-authorization-token
+    body: "{\"fileId\":\"4_z8d625eb63be2775577c70e1a_f222f9c9a66d56ef9_d20211217_m150215_c002_v0001129_t0022\",\"partSha1Array\":[\"61b8d6600ac94d912874f569a9341120f680c9f8\",\"924f61661a3472da74307a35f2c8d22e07e84a4d\"]}"
+- Response:
+    status: 200
+    version: ~
+    headers:
+      date:
+        - "Fri, 17 Dec 2021 15:02:37 GMT"
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      content-type:
+        - application/json;charset=UTF-8
+      content-length:
+        - "685"
+    body: "{\"accountId\":\"hidden-account-id\",\"action\":\"upload\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentLength\":5242883,\"contentMd5\":null,\"contentSha1\":\"none\",\"contentType\":\"text/plain\",\"fileId\":\"4_z8d625eb63be2775577c70e1a_f222f9c9a66d56ef9_d20211217_m150215_c002_v0001129_t0022\",\"fileInfo\":{},\"fileName\":\"Test-large-file.txt\",\"fileRetention\":{\"isClientAuthorizedToRead\":true,\"value\":{\"mode\":null,\"retainUntilTimestamp\":null}},\"legalHold\":{\"isClientAuthorizedToRead\":true,\"value\":null},\"serverSideEncryption\":{\"algorithm\":null,\"mode\":null},\"uploadTimestamp\":1639753335000}"

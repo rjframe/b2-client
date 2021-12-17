@@ -31,7 +31,7 @@ pub mod prelude {
 
 #[macro_export]
 macro_rules! require_capability {
-    ($auth:ident, $cap:expr) => {
+    ($auth:expr, $cap:expr) => {
         if ! $auth.has_capability($cap) {
             return Err(Error::Unauthorized($cap));
         }
@@ -96,14 +96,18 @@ pub(crate) mod test_utils {
                     _ => panic!("Response body was in bytes"),
                 };
 
-                let body: Result<serde_json::Value, _> =
+                let body_json: Result<serde_json::Value, _> =
                     serde_json::from_str(body);
 
-                if let Ok(mut body) = body {
+                if let Ok(mut body) = body_json {
                     body.get_mut("accountId")
                         .map(|v| *v = serde_json::json!("hidden-account-id"));
 
                     req.body = Body::Str(body.to_string());
+                } else if body.starts_with("aaaaa") {
+                    // Our large-file upload test has 5 MB of 'a'. There's
+                    // no need to store it though.
+                    req.body = Body::Str("aaaaa for 5 MB of data".into());
                 }
             })
             .with_modify_response(|res| {

@@ -52,7 +52,8 @@ impl HttpClient for FakeClient {
         self
     }
 
-    fn with_body(&mut self, _body: serde_json::Value) -> &mut Self { self }
+    fn with_body(&mut self, _body: impl Into<Vec<u8>>) -> &mut Self { self }
+    fn with_body_json(&mut self, _body: serde_json::Value) -> &mut Self { self }
 
     fn read_body_from_file(&mut self, _path: impl Into<std::path::PathBuf>)
     -> &mut Self {
