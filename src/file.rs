@@ -3,7 +3,94 @@
    file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-//! B2 API calls for working with files.
+//! Backblaze B2 API calls for working with files.
+//!
+//! See [the B2 documentation on uploading
+//! files](https://www.backblaze.com/b2/docs/uploading.html) for an overview of
+//! the process.
+//!
+//! # Uploading Large Files
+//!
+//! To upload a large file:
+//!
+//! 1. Create a [StartLargeFile] object with the destination bucket and new
+//!    file's information, then pass it to [start_large_file]. You will receive
+//!    a [File] object.
+//! 2. Pass the [File] to [get_upload_part_authorization] to receive an
+//!    [UploadPartAuthorization] to upload the file in multiple parts.
+//!     * You can upload parts in separate threads for better performance; each
+//!       thread must call [get_upload_part_authorization] and use its
+//!       respective authorization when uploading data.
+//! 3. Use the [UploadPartAuthorization] to (repeatedly) call [upload_file_part]
+//!    with the file data to upload.
+//! 4. Call [finish_large_file_upload] to merge the file parts into a single
+//!    [File]. After finishing the file, it can be treated like any other
+//!    uploaded file.
+//!
+//! # Examples
+//!
+//! ```no_run
+//! # fn calculate_sha1(data: &[u8]) -> String { String::default() }
+//! use std::env;
+//! use anyhow;
+//! use b2_client::{
+//!     self as b2,
+//!     HttpClient as _,
+//! };
+//!
+//! async fn upload_large_file(
+//!     name: &str,
+//!     data_part1: &[u8],
+//!     data_part2: &[u8],
+//! ) -> anyhow::Result<b2::File> {
+//!     let key = env::var("B2_KEY").ok().unwrap();
+//!     let key_id = env::var("B2_KEY_ID").ok().unwrap();
+//!
+//!     let client = b2::client::SurfClient::new();
+//!     let mut auth = b2::authorize_account(client, &key, &key_id).await?;
+//!
+//!     let file = b2::StartLargeFile::builder()
+//!         .bucket_id("some-bucket-id")
+//!         .file_name(name)?
+//!         .content_type("text/plain")
+//!         .build()?;
+//!
+//!     let file = b2::start_large_file(&mut auth, file).await?;
+//!
+//!     let mut upload_auth = b2::get_upload_part_authorization(
+//!         &mut auth,
+//!         &file
+//!     ).await?;
+//!
+//!     // Assuming a `calculate_sha1` function is defined:
+//!     let sha1 = calculate_sha1(&data_part1);
+//!     let sha2 = calculate_sha1(&data_part2);
+//!
+//!     let _part1 = b2::upload_file_part(
+//!         &mut upload_auth,
+//!         1,
+//!         Some(&sha1),
+//!         &data_part1,
+//!     ).await?;
+//!
+//!     let _part2 = b2::upload_file_part(
+//!         &mut upload_auth,
+//!         2,
+//!         Some(&sha2),
+//!         &data_part2,
+//!     ).await?;
+//!
+//!     Ok(b2::finish_large_file_upload(
+//!         &mut auth,
+//!         &file,
+//!         &[sha1, sha2],
+//!     ).await?)
+//! }
+//! ```
+//!
+//! # Differences from B2 Service API
+//!
+//! * The B2 `b2_get_upload_part_url` is [get_upload_part_authorization].
 
 use std::{
     path::Path,
@@ -194,6 +281,7 @@ impl File {
     }
 }
 
+/// A part of a large file currently being uploaded.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FilePart {
@@ -230,6 +318,8 @@ pub async fn cancel_large_file<C, E>(auth: &mut Authorization<C>, file: File)
 }
 
 /// Cancel the uploading of a large file and delete any parts already uploaded.
+///
+/// See [cancel_large_file] for documentation on use.
 pub async fn cancel_large_file_by_id<C, E>(
     auth: &mut Authorization<C>,
     id: impl AsRef<str>
@@ -537,6 +627,15 @@ pub async fn copy_file<C, E>(auth: &mut Authorization<C>, file: CopyFile)
     file.into()
 }
 
+/// Complete the upload of a large file, merging all parts into a single [File].
+///
+/// This is the final step to uploading a large file. If the request times out,
+/// it is recommended to call [get_file_info] to see if the file succeeded and
+/// only repeat the call to `finish_large_file_upload` if the file is missing.
+///
+/// The `sha1_checksums` must be sorted ascending by part number.
+///
+/// The [Authorization] must have [Capability::WriteFiles].
 pub async fn finish_large_file_upload<C, E>(
     auth: &mut Authorization<C>,
     file: &File,
@@ -548,6 +647,9 @@ pub async fn finish_large_file_upload<C, E>(
     finish_large_file_upload_by_id(auth, &file.file_id, sha1_checksums).await
 }
 
+/// Complete the upload of a large file, merging all parts into a single [File].
+///
+/// See [finish_large_file_upload] for documentation on use.
 pub async fn finish_large_file_upload_by_id<C, E>(
     auth: &mut Authorization<C>,
     file_id: impl AsRef<str>,
@@ -573,6 +675,7 @@ pub async fn finish_large_file_upload_by_id<C, E>(
     file.into()
 }
 
+/// An authorization to upload file contents to a B2 file.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UploadPartAuthorization<'a, 'b, C, E>
@@ -592,6 +695,22 @@ pub struct UploadPartAuthorization<'a, 'b, C, E>
 
 fn make_none<T>() -> Option<T> { None }
 
+/// Get an [UploadPartAuthorization] to upload data to a new B2 file.
+///
+/// Use the returned `UploadPartAuthorization` when calling [upload_file_part].
+///
+/// The `UploadPartAuthorization` is valid for 24 hours or until an endpoint
+/// rejects an upload.
+///
+/// If uploading multiple parts concurrently, each thread or task needs its own
+/// authorization.
+///
+/// The [Authorization] must have [Capability::WriteFiles].
+///
+/// # B2 API Difference
+///
+/// The equivalent B2 function is called
+/// [`b2_get_upload_url`](https://www.backblaze.com/b2/docs/b2_get_upload_part_url.html).
 pub async fn get_upload_part_authorization<'a, 'b, C, E>(
     auth: &'a mut Authorization<C>,
     file: &'b File,
@@ -606,6 +725,10 @@ pub async fn get_upload_part_authorization<'a, 'b, C, E>(
     ).await
 }
 
+/// Get an [UploadPartAuthorization] to upload data to a new B2 file.
+///
+/// See [get_upload_part_authorization] for information on retrieving the
+/// authorization.
 pub async fn get_upload_part_authorization_by_id<'a, 'b, C, E>(
     auth: &'a mut Authorization<C>,
     file_id: impl AsRef<str>,
@@ -808,8 +931,8 @@ impl StartLargeFileBuilder {
 /// Prepare to upload a large file in multiple parts.
 ///
 /// After calling `start_large_file`, each thread uploading a file part should
-/// call [get_upload_part_url] to obtain the upload URL for that part. Then call
-/// [upload_part] to upload the relevant file part.
+/// call [get_upload_part_authorization] to obtain an upload authorization.
+/// Then call [upload_file_part] to upload the relevant file part.
 ///
 /// File parts can be copied from a bucket via [copy_part].
 ///
@@ -853,6 +976,41 @@ pub async fn start_large_file<C, E>(
     file.into()
 }
 
+/// Upload a part of a large file to B2.
+///
+/// Once all parts are uploaded, call [finish_large_file_upload] to merge the
+/// parts into a single file.
+///
+/// If you make two uploads with the same part number, the second upload to
+/// complete will overwrite the first.
+///
+/// The [Authorization] used to create the given [UploadPartAuthorization] must
+/// have [Capability::WriteFiles].
+///
+/// A large file must have at least two parts, and all parts except the last
+/// must be at least 5 MB in size. See
+/// <https://www.backblaze.com/b2/docs/uploading.html> for further information
+/// on uploading files.
+///
+/// Some errors will requiring obtaining a new [UploadPartAuthorization]. See
+/// the B2 documentation for
+/// [b2_upload_part](https://www.backblaze.com/b2/docs/b2_upload_part.html) or
+/// [uploading files](https://www.backblaze.com/b2/docs/uploading.html) for
+/// information on these errors.
+///
+/// # Parameters
+///
+/// * `auth`: An upload authorization obtained via
+///   [get_upload_part_authorization].
+/// * `part_num`: The part number of this part; it must be between 1 and 10,000
+///   inclusive and increment by one for each part.
+/// * `sha1_checksum`: The SHA1 checksum of this part of the file. You may pass
+///   `None` to defer verification until finishing the file.
+/// * `data`: The data part of the file.
+///
+/// Uploading a file part without a checksum is not recommended as it prevents
+/// B2 from determining if the file part is corrupt, allowing you to immediately
+/// retry.
 // TODO: Stream-based data upload to avoid requiring all data be in RAM at once.
 pub async fn upload_file_part<C, E>(
     auth: &mut UploadPartAuthorization<'_, '_, C, E>,

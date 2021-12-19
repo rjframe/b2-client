@@ -11,7 +11,6 @@ Project:
     ☐ If we store Bucket instead of bucket_id in relevant objects, we can better validate access to private buckets without making a request to B2. It potentially requires an extra API call to obtain though.
     ☐ We should likely use a type for FileInfo rather than deal with JSON in the public API
     ☐ Efficient byte management in HttpClients.
-    ☐ Support uploading multiple file parts concurrently; likely via making the upload authorization cloneable.
     ☐ Document API differences from upstream and reasons for doing so.
 
 API:
