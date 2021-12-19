@@ -653,7 +653,7 @@ pub struct StartLargeFile {
 }
 
 impl StartLargeFile {
-    fn builder() -> StartLargeFileBuilder {
+    pub fn builder() -> StartLargeFileBuilder {
         StartLargeFileBuilder::default()
     }
 }
