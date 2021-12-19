@@ -857,7 +857,7 @@ pub async fn start_large_file<C, E>(
 pub async fn upload_file_part<C, E>(
     auth: &mut UploadPartAuthorization<'_, '_, C, E>,
     part_num: u16,
-    sha1_checksum: impl AsRef<str>,
+    sha1_checksum: Option<impl AsRef<str>>,
     data: &[u8],
 ) -> Result<FilePart, Error<E>>
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
@@ -870,7 +870,11 @@ pub async fn upload_file_part<C, E>(
         )).into());
     }
 
-    // TODO: Validate that sha1_checksum is a possible checksum.
+    // TODO: Validate that sha1 is a possible checksum.
+    let sha1 = match sha1_checksum {
+        Some(ref sha1) => sha1.as_ref(),
+        None => "do_not_verify",
+    };
 
     // Unwrap safety: an `UploadPartAuthorization` can only be created from
     // `get_upload_part_authorization`, which will always embed an
@@ -884,7 +888,7 @@ pub async fn upload_file_part<C, E>(
         .with_header("Authorization", &auth.authorization_token)
         .with_header("X-Bz-Part-Number", &part_num.to_string())
         .with_header("Content-Length", &data.len().to_string())
-        .with_header("X-Bz-Content-Sha1", sha1_checksum.as_ref());
+        .with_header("X-Bz-Content-Sha1", sha1);
 
     // TODO: Encryption headers.
 
@@ -1024,14 +1028,14 @@ mod tests_mocked {
         let _part1 = upload_file_part(
             &mut upload_auth,
             1,
-            "61b8d6600ac94d912874f569a9341120f680c9f8",
+            Some("61b8d6600ac94d912874f569a9341120f680c9f8"),
             &data1
         ).await?;
 
         let _part2 = upload_file_part(
             &mut upload_auth,
             2,
-            "924f61661a3472da74307a35f2c8d22e07e84a4d",
+            Some("924f61661a3472da74307a35f2c8d22e07e84a4d"),
             b"bcd"
         ).await?;
 
