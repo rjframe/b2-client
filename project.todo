@@ -12,6 +12,7 @@ Project:
     ☐ We should likely use a type for FileInfo rather than deal with JSON in the public API
     ☐ Efficient byte management in HttpClients.
     ☐ Document API differences from upstream and reasons for doing so.
+    ☐ Make tests easily reproducible for others and me in the future - move bucket ID, etc. to environment variables.
 
 API:
     ✓ Implement account endpoints @done(2021-10-18 17:20) @project(API)
@@ -27,7 +28,7 @@ API:
     Files:
         ✓ cancel_large_file @done(2021-11-16 14:25) @project(API \ Files)
         ✓ copy_file @done(2021-11-18 11:54) @project(API \ Files)
-        ☐ copy_part
+        ✓ copy_part @done(2021-12-21 10:36) @project(API \ Files)
         ☐ delete_file_version
         ☐ download_file_by_id
         ☐ download_file_by_name

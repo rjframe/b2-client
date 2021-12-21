@@ -92,10 +92,7 @@
 //!
 //! * The B2 `b2_get_upload_part_url` is [get_upload_part_authorization].
 
-use std::{
-    path::Path,
-    fmt,
-};
+use std::fmt;
 
 use crate::{
     prelude::*,
@@ -627,6 +624,166 @@ pub async fn copy_file<C, E>(auth: &mut Authorization<C>, file: CopyFile)
     file.into()
 }
 
+/// A request to copy from an existing file to a part of a large file.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CopyFilePart<'a> {
+    source_file_id: &'a str,
+    large_file_id: &'a str,
+    part_number: u16,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    range: Option<ByteRange>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source_server_side_encryption: Option<&'a ServerSideEncryption>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    destination_server_side_encryption: Option<&'a ServerSideEncryption>,
+}
+
+impl<'a> CopyFilePart<'a> {
+    pub fn builder() -> CopyFilePartBuilder<'a> {
+        CopyFilePartBuilder::default()
+    }
+}
+
+/// A builder to create a [CopyFilePart] request.
+#[derive(Default)]
+pub struct CopyFilePartBuilder<'a> {
+    source_file: Option<&'a str>,
+    large_file: Option<&'a str>,
+    part_number: Option<u16>,
+    range: Option<ByteRange>,
+    source_encryption: Option<&'a ServerSideEncryption>,
+    dest_encryption: Option<&'a ServerSideEncryption>,
+}
+
+impl<'a> CopyFilePartBuilder<'a> {
+    /// Set the source file to copy from and its encryption settings.
+    pub fn source_file(mut self, file: &'a File) -> Self {
+        self.source_file = Some(&file.file_id);
+        self.source_encryption = file.server_side_encryption.as_ref();
+        self
+    }
+
+    /// Set the source file to copy from.
+    pub fn source_file_id(mut self, file: &'a str) -> Self {
+        self.source_file = Some(file);
+        self
+    }
+
+    /// Set the large file to copy data to and its encryption settings.
+    pub fn destination_large_file(mut self, file: &'a File) -> Self {
+        self.large_file = Some(&file.file_id);
+
+        if let Some(enc) = self.dest_encryption {
+            if ! matches!(enc, ServerSideEncryption::NoEncryption) {
+                self.dest_encryption = Some(enc);
+            }
+        }
+
+        self
+    }
+
+    /// Set  the large file to copy data to.
+    pub fn destination_large_file_id(mut self, file: &'a str) -> Self {
+        self.large_file = Some(file);
+        self
+    }
+
+    /// Set the number of this part.
+    ///
+    /// Part numbers increment from 1 to 10,000 inclusive.
+    pub fn part_number(mut self, part_num: u16) -> Result<Self, ValidationError>
+    {
+        #[allow(clippy::manual_range_contains)]
+        if part_num < 1 || part_num > 10000 {
+            return Err(ValidationError::OutOfBounds(format!(
+                "part_num must be between 1 and 10,000 inclusive. Was {}",
+                part_num
+            )));
+        }
+
+        self.part_number = Some(part_num);
+        Ok(self)
+    }
+
+    /// Set the range of bytes from the source file to copy.
+    ///
+    /// If no range is specified, the entire file is copied.
+    pub fn range(mut self, range: ByteRange) -> Self {
+        self.range = Some(range);
+        self
+    }
+
+    /// Set the encryption settings of the source file.
+    ///
+    /// This must match the settings with which the file was encrypted.
+    pub fn source_encryption_settings(mut self, enc: &'a ServerSideEncryption)
+    -> Self {
+        self.source_encryption = Some(enc);
+        self
+    }
+
+    /// Set the encryption settings of the destination file.
+    ///
+    /// This must match the settings passed to [start_large_file].
+    pub fn destination_encryption_settings(
+        mut self,
+        enc: &'a ServerSideEncryption
+    ) -> Self {
+        self.dest_encryption = Some(enc);
+        self
+    }
+
+    /// Create a [CopyFilePart] request object.
+    pub fn build(self) -> Result<CopyFilePart<'a>, ValidationError> {
+        let source_file_id = self.source_file.ok_or_else(||
+            ValidationError::MissingData("source_file is required".into())
+        )?;
+
+        let large_file_id = self.large_file.ok_or_else(||
+            ValidationError::MissingData(
+                "destination_large_file is required".into()
+            )
+        )?;
+
+        let part_number = self.part_number.ok_or_else(||
+            ValidationError::MissingData("part_number is required".into())
+        )?;
+
+        Ok(CopyFilePart {
+            source_file_id,
+            large_file_id,
+            part_number,
+            range: self.range,
+            source_server_side_encryption: self.source_encryption,
+            destination_server_side_encryption: self.dest_encryption,
+        })
+    }
+}
+
+/// Copy from an existing file to a new large file.
+///
+/// The [Authorization] must have [Capability::WriteFiles], and if the bucket is
+/// private, [Capability::ReadFiles].
+pub async fn copy_file_part<C, E>(
+    auth: &mut Authorization<C>,
+    file_part: CopyFilePart<'_>
+) -> Result<FilePart, Error<E>>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    require_capability!(auth, Capability::WriteFiles);
+
+    let res = auth.client.post(auth.api_url("b2_copy_part"))
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .with_body_json(serde_json::to_value(file_part)?)
+        .send().await?;
+
+    let part: B2Result<FilePart> = serde_json::from_value(res)?;
+    part.into()
+}
+
 /// Complete the upload of a large file, merging all parts into a single [File].
 ///
 /// This is the final step to uploading a large file. If the request times out,
@@ -948,6 +1105,9 @@ impl StartLargeFileBuilder {
 /// documentation on starting large file uploads.
 ///
 /// The [Authorization] must have [Capability::WriteFiles].
+// TODO: Return a LargeFile or FileInProgress type? It would only matter for
+// something like `copy_file_part` where it provides type-safety when passing
+// both a source file and the large (destination) file IDs together.
 pub async fn start_large_file<C, E>(
     auth: &mut Authorization<C>,
     file: StartLargeFile
@@ -1158,6 +1318,55 @@ mod tests_mocked {
     }
 
     // TODO: test copy_file with a byte range.
+
+    #[async_std::test]
+    async fn copy_file_part_success() -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/large_file.yaml"
+        ).await?;
+
+        let mut auth = create_test_auth(
+            client,
+            vec![Capability::WriteFiles, Capability::ReadFiles]
+        ).await;
+
+        let file = StartLargeFile::builder()
+            .bucket_id("8d625eb63be2775577c70e1a")
+            .file_name("Test-large-file2.txt")?
+            .content_type("text/plain")
+            .build()?;
+
+        let file = start_large_file(&mut auth, file).await?;
+
+        let part1 = CopyFilePart::builder()
+            .source_file_id(concat!(
+                "4_z8d625eb63be2775577c70e1a_f111954e3108ff3f6_d20211118_",
+                "m151810_c002_v0001168_t0010"
+            ))
+            .destination_large_file(&file)
+            .part_number(1)?
+            .build()?;
+
+        let part2 = CopyFilePart::builder()
+            .source_file_id(concat!(
+                "4_z8d625eb63be2775577c70e1a_f111954e3108ff3f6_d20211118_",
+                "m151810_c002_v0001168_t0010"
+            ))
+            .destination_large_file(&file)
+            .part_number(2)?
+            .range(ByteRange::new(0, 3)?)
+            .build()?;
+
+        let part1 = copy_file_part(&mut auth, part1).await?;
+        let part2 = copy_file_part(&mut auth, part2).await?;
+
+        assert_eq!(part1.part_number, 1);
+        assert_eq!(part2.part_number, 2);
+
+        let _file = cancel_large_file(&mut auth, file).await?;
+        Ok(())
+    }
 
     #[async_std::test]
     async fn upload_large_file_full_process() -> anyhow::Result<()> {
