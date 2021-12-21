@@ -1,0 +1,44 @@
+---
+- Request:
+    method: GET
+    url: "https://api.backblazeb2.com/b2api/v2/b2_authorize_account"
+    headers:
+      authorization:
+        - Basic hidden-account-id
+    body: ""
+- Response:
+    status: 200
+    version: ~
+    headers:
+      content-type:
+        - application/json;charset=UTF-8
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      date:
+        - "Tue, 21 Dec 2021 16:44:26 GMT"
+      content-length:
+        - "1014"
+    body: "{\"absoluteMinimumPartSize\":5000000,\"accountId\":\"hidden-account-id\",\"allowed\":{\"bucketId\":null,\"bucketName\":null,\"capabilities\":[\"shareFiles\",\"listBuckets\",\"writeFiles\",\"writeFileRetentions\",\"deleteFiles\",\"writeKeys\",\"readFiles\",\"listFiles\",\"writeBucketEncryption\",\"deleteBuckets\",\"readFileLegalHolds\",\"listAllBucketNames\",\"deleteKeys\",\"readBucketEncryption\",\"writeFileLegalHolds\",\"listKeys\",\"bypassGovernance\",\"writeBucketRetentions\",\"readBuckets\",\"readFileRetentions\",\"readBucketRetentions\",\"writeBuckets\"],\"namePrefix\":null},\"apiUrl\":\"https://api002.backblazeb2.com\",\"authorizationToken\":\"hidden-authorization-token\",\"downloadUrl\":\"https://f002.backblazeb2.com\",\"recommendedPartSize\":100000000,\"s3ApiUrl\":\"https://s3.us-west-002.backblazeb2.com\"}"
+---
+- Request:
+    method: POST
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_get_upload_url"
+    headers:
+      content-type:
+        - application/json
+      authorization:
+        - hidden-authorization-token
+    body: "{\"bucketId\":\"8d625eb63be2775577c70e1a\"}"
+- Response:
+    status: 200
+    version: ~
+    headers:
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      content-type:
+        - application/json;charset=UTF-8
+      date:
+        - "Tue, 21 Dec 2021 16:44:26 GMT"
+      content-length:
+        - "275"
+    body: "{\"authorizationToken\":\"hidden-authorization-token\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"uploadUrl\":\"https://pod-000-1129-06.backblaze.com/b2api/v2/b2_upload_file/8d625eb63be2775577c70e1a/c002_v0001129_t0017\"}"
