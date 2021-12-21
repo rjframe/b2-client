@@ -35,7 +35,7 @@ API:
         ✓ finish_large_file @done(2021-12-17 10:21) @project(API \ Files)
         ☐ get_file_info
         ✓ get_upload_part_url @done(2021-12-17 10:21) @project(API \ Files)
-        ☐ get_upload_url
+        ✓ get_upload_url @done(2021-12-21 11:48) @project(API \ Files)
         ☐ hide_file
         ☐ list_file_names
         ☐ list_file_versions

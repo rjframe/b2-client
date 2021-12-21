@@ -850,7 +850,7 @@ impl BucketEncryptionInfo {
 #[serde(rename_all = "camelCase")]
 pub struct Bucket {
     account_id: Option<String>,
-    bucket_id: String,
+    pub(crate) bucket_id: String,
     bucket_name: String,
     bucket_type: BucketType,
     bucket_info: serde_json::Value,

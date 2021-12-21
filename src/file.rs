@@ -88,9 +88,13 @@
 //! }
 //! ```
 //!
-//! # Differences from B2 Service API
+//! # Differences from the B2 Service API
 //!
-//! * The B2 `b2_get_upload_part_url` is [get_upload_part_authorization].
+//! * The B2 endpoint `b2_get_upload_part_url` is
+//!   [get_upload_part_authorization].
+//! * The B2 endpoint `b2_get_upload_url` is [get_upload_authorization].
+//! * The word "file" is often added for clarity; e.g., the B2 endpoint
+//!   `b2_copy_part` is [copy_file_part].
 
 use std::fmt;
 
@@ -98,6 +102,7 @@ use crate::{
     prelude::*,
     account::Capability,
     bucket::{
+        Bucket,
         FileRetentionMode,
         FileRetentionPolicy,
         ServerSideEncryption,
@@ -908,16 +913,79 @@ pub async fn get_upload_part_authorization_by_id<'a, 'b, C, E>(
     let upload_auth: B2Result<UploadPartAuthorization<'_, '_, _, _>> =
         serde_json::from_value(res)?;
 
-    let upload_auth = match upload_auth {
-        B2Result::Ok(mut a) => {
-            a.auth = Some(auth);
-            a.encryption = encryption;
-            B2Result::Ok(a)
-        },
-        e => e,
-    };
+    upload_auth.map(move |mut a| {
+        a.auth = Some(auth);
+        a.encryption = encryption;
+        a
+    }).into()
+}
 
-    upload_auth.into()
+/// An authorization to upload a file to a B2 bucket.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UploadAuthorization<'a, C, E>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    #[serde(skip_deserializing)]
+    #[serde(default = "make_none")]
+    auth: Option<&'a mut Authorization<C>>,
+    bucket_id: String,
+    upload_url: String,
+    authorization_token: String,
+}
+
+/// Obtain an authorization to upload files to a bucket.
+///
+/// Use the returned [UploadAuthorization] when calling [upload_file].
+///
+/// For faster uploading, you can obtain multiple authorizations and upload
+/// files concurrently.
+///
+/// The `UploadAuthorization` is valid for 24 hours or until an upload attempt
+/// is rejected. You can make multiple file uploads with a single authorization.
+///
+/// The [Authorization] must have [Capability::WriteFiles].
+///
+/// # B2 API Difference
+///
+/// The equivalent B2 endpoint is called
+/// [`b2_get_upload_url`](https://www.backblaze.com/b2/docs/b2_get_upload_url.html).
+pub async fn get_upload_authorization<'a, 'b, C, E>(
+    auth: &'a mut Authorization<C>,
+    bucket: &'b Bucket,
+) -> Result<UploadAuthorization<'a, C, E>, Error<E>>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    get_upload_authorization_by_id(auth, &bucket.bucket_id).await
+}
+
+/// Obtain an authorization to upload files to a bucket.
+///
+/// See [get_upload_authorization] for documentation on retrieving the
+/// authorization.
+pub async fn get_upload_authorization_by_id<'a, 'b, C, E>(
+    auth: &'a mut Authorization<C>,
+    bucket_id: impl AsRef<str>,
+) -> Result<UploadAuthorization<'a, C, E>, Error<E>>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    use serde_json::json;
+
+    require_capability!(auth, Capability::WriteFiles);
+
+    let res = auth.client.post(auth.api_url("b2_get_upload_url"))
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .with_body_json(json!({ "bucketId": bucket_id.as_ref() }))
+        .send().await?;
+
+    let upload_auth: B2Result<UploadAuthorization<'_, _, _>> =
+        serde_json::from_value(res)?;
+
+    upload_auth.map(move |mut a| { a.auth = Some(auth); a }).into()
 }
 
 /// A request to prepare to upload a large file.
@@ -1287,6 +1355,51 @@ mod tests_mocked {
             Error::B2(e) => assert_eq!(e.code(), ErrorCode::BadRequest),
             _ => panic!("Unexpected error type"),
         }
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn obtain_part_upload_authorization() -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/large_file.yaml"
+        ).await?;
+
+        let mut auth = create_test_auth(client, vec![Capability::WriteFiles])
+            .await;
+
+        let file = StartLargeFile::builder()
+            .bucket_id("8d625eb63be2775577c70e1a")
+            .file_name("Test-large-file.txt")?
+            .content_type("text/plain")
+            .build()?;
+
+        let file = start_large_file(&mut auth, file).await?;
+        let upload_auth = get_upload_part_authorization(&mut auth, &file)
+            .await?;
+
+        assert_eq!(upload_auth.file_id, file.file_id);
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn obtain_upload_authorization() -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/file.yaml"
+        ).await?;
+
+        let mut auth = create_test_auth(client, vec![Capability::WriteFiles])
+            .await;
+
+        let upload_auth = get_upload_authorization_by_id(
+            &mut auth,
+            "8d625eb63be2775577c70e1a"
+        ).await?;
+
+        assert_eq!(upload_auth.bucket_id, "8d625eb63be2775577c70e1a");
 
         Ok(())
     }
