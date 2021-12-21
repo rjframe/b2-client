@@ -38,6 +38,7 @@
 //!     HttpClient as _,
 //! };
 //!
+//! # #[cfg(feature = "with_surf")]
 //! async fn upload_large_file(
 //!     name: &str,
 //!     data_part1: &[u8],
