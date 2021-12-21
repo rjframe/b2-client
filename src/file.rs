@@ -594,7 +594,8 @@ impl CopyFileBuilder {
 
 /// Copy an existing file to a new file, possibly on a different bucket.
 ///
-/// The new file must be less than 5 GB. Use [copy_part] to copy larger files.
+/// The new file must be less than 5 GB. Use [copy_file_part] to copy larger
+/// files.
 ///
 /// If copying from one bucket to another, both buckets must belong to the same
 /// account.
@@ -866,7 +867,7 @@ fn make_none<T>() -> Option<T> { None }
 ///
 /// # B2 API Difference
 ///
-/// The equivalent B2 function is called
+/// The equivalent B2 endpoint is called
 /// [`b2_get_upload_url`](https://www.backblaze.com/b2/docs/b2_get_upload_part_url.html).
 pub async fn get_upload_part_authorization<'a, 'b, C, E>(
     auth: &'a mut Authorization<C>,
@@ -884,7 +885,7 @@ pub async fn get_upload_part_authorization<'a, 'b, C, E>(
 
 /// Get an [UploadPartAuthorization] to upload data to a new B2 file.
 ///
-/// See [get_upload_part_authorization] for information on retrieving the
+/// See [get_upload_part_authorization] for documentation on retrieving the
 /// authorization.
 pub async fn get_upload_part_authorization_by_id<'a, 'b, C, E>(
     auth: &'a mut Authorization<C>,
@@ -1091,7 +1092,7 @@ impl StartLargeFileBuilder {
 /// call [get_upload_part_authorization] to obtain an upload authorization.
 /// Then call [upload_file_part] to upload the relevant file part.
 ///
-/// File parts can be copied from a bucket via [copy_part].
+/// File parts can be copied from an existing file via [copy_file_part].
 ///
 /// A large file size can be 100 MB to 10 TB (inclusive). See
 /// <https://www.backblaze.com/b2/docs/large_files.html> for more information on
