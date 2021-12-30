@@ -409,9 +409,9 @@ impl LifecycleRuleBuilder {
     ///
     /// A prefix of `""` will apply to all files, allowing the creation of rules
     /// that could delete **all** files.
-    pub fn filename_prefix(mut self, prefix: impl Into<String>)
+    pub fn filename_prefix(mut self, prefix: impl AsRef<str>)
     -> Result<Self, ValidationError> {
-        self.prefix = Some(validated_file_name(prefix)?);
+        self.prefix = Some(validated_file_name(prefix.as_ref())?.to_owned());
         Ok(self)
     }
 

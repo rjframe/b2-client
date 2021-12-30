@@ -387,10 +387,10 @@ impl ByteRange {
 /// Use [CopyFileBuilder] to create a `CopyFile`, then pass it to [copy_file].
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CopyFile {
+pub struct CopyFile<'a> {
     source_file_id: String,
     destination_bucket_id: Option<String>,
-    file_name: String,
+    file_name: &'a str,
     range: Option<ByteRange>,
     metadata_directive: MetadataDirective,
     content_type: Option<String>,
@@ -403,8 +403,8 @@ pub struct CopyFile {
     dest_encryption: Option<ServerSideEncryption>,
 }
 
-impl CopyFile {
-    pub fn builder() -> CopyFileBuilder {
+impl<'a> CopyFile<'a> {
+    pub fn builder() -> CopyFileBuilder<'a> {
         CopyFileBuilder::default()
     }
 }
@@ -414,10 +414,10 @@ impl CopyFile {
 /// See <https://www.backblaze.com/b2/docs/b2_copy_file.html> for further
 /// information.
 #[derive(Default)]
-pub struct CopyFileBuilder {
+pub struct CopyFileBuilder<'a> {
     source_file_id: Option<String>,
     destination_bucket_id: Option<String>,
-    file_name: Option<String>,
+    file_name: Option<&'a str>,
     range: Option<ByteRange>,
     metadata_directive: Option<MetadataDirective>,
     content_type: Option<String>,
@@ -428,7 +428,7 @@ pub struct CopyFileBuilder {
     dest_encryption: Option<ServerSideEncryption>,
 }
 
-impl CopyFileBuilder {
+impl<'a> CopyFileBuilder<'a> {
     /// Obtain the source file ID and encryption settings for the copy
     /// operation.
     pub fn source_file(mut self, file: &File) -> Self {
@@ -453,7 +453,7 @@ impl CopyFileBuilder {
     }
 
     /// Set the filename to use for the new file.
-    pub fn destination_file_name(mut self, name: impl Into<String>)
+    pub fn destination_file_name(mut self, name: &'a str)
     -> Result<Self, ValidationError> {
         self.file_name = Some(validated_file_name(name)?);
         Ok(self)
@@ -552,7 +552,7 @@ impl CopyFileBuilder {
     /// [MetadataDirective::Copy] or was not provided AND
     /// [content_type](Self::content_type) or [file_info](Self::file_info) were
     /// set.
-    pub fn build(self) -> Result<CopyFile, ValidationError> {
+    pub fn build(self) -> Result<CopyFile<'a>, ValidationError> {
         let source_file_id = self.source_file_id.ok_or_else(||
             ValidationError::MissingData(
                 "The source file ID is required".into()
@@ -605,8 +605,10 @@ impl CopyFileBuilder {
 ///
 /// If copying from one bucket to another, both buckets must belong to the same
 /// account.
-pub async fn copy_file<C, E>(auth: &mut Authorization<C>, file: CopyFile)
--> Result<File, Error<E>>
+pub async fn copy_file<'a, C, E>(
+    auth: &mut Authorization<C>,
+    file: CopyFile<'a>
+) -> Result<File, Error<E>>
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
@@ -992,9 +994,9 @@ pub async fn get_upload_authorization_by_id<'a, 'b, C, E>(
 /// A request to prepare to upload a large file.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct StartLargeFile {
+pub struct StartLargeFile<'a> {
     bucket_id: String,
-    file_name: String,
+    file_name: &'a str,
     content_type: String,
     file_info: Option<serde_json::Value>,
     file_retention: Option<FileRetentionPolicy>,
@@ -1002,17 +1004,17 @@ pub struct StartLargeFile {
     server_side_encryption: Option<ServerSideEncryption>,
 }
 
-impl StartLargeFile {
-    pub fn builder() -> StartLargeFileBuilder {
+impl<'a> StartLargeFile<'a> {
+    pub fn builder() -> StartLargeFileBuilder<'a> {
         StartLargeFileBuilder::default()
     }
 }
 
 /// A builder for a [StartLargeFile] request.
 #[derive(Debug, Default)]
-pub struct StartLargeFileBuilder {
+pub struct StartLargeFileBuilder<'a> {
     bucket_id: Option<String>,
-    file_name: Option<String>,
+    file_name: Option<&'a str>,
     content_type: Option<String>,
     file_info: Option<serde_json::Value>,
     file_retention: Option<FileRetentionPolicy>,
@@ -1022,7 +1024,7 @@ pub struct StartLargeFileBuilder {
 
 // TODO: Many questions and TODOs also apply to other file creation objects
 // (e.g., CopyFileBuilder).
-impl StartLargeFileBuilder {
+impl<'a> StartLargeFileBuilder<'a> {
     /// Specify the bucket in which to store the new file.
     pub fn bucket_id(mut self, id: impl Into<String>) -> Self {
         self.bucket_id = Some(id.into());
@@ -1030,9 +1032,9 @@ impl StartLargeFileBuilder {
     }
 
     /// Set the file's name.
-    pub fn file_name(mut self, name: impl Into<String>)
+    pub fn file_name(mut self, name: &'a str)
     -> Result<Self, ValidationError> {
-        self.file_name = Some(validated_file_name(name)?);
+        self.file_name = Some(validated_file_name(name.as_ref())?);
         Ok(self)
     }
 
@@ -1086,7 +1088,7 @@ impl StartLargeFileBuilder {
     // docs)
     // Store separately and merge into file_info in build()?
 
-    pub fn build(self) -> Result<StartLargeFile, ValidationError> {
+    pub fn build(self) -> Result<StartLargeFile<'a>, ValidationError> {
         self.validate_size()?;
 
         let bucket_id = self.bucket_id.ok_or_else(||
@@ -1178,9 +1180,9 @@ impl StartLargeFileBuilder {
 // TODO: Return a LargeFile or FileInProgress type? It would only matter for
 // something like `copy_file_part` where it provides type-safety when passing
 // both a source file and the large (destination) file IDs together.
-pub async fn start_large_file<C, E>(
+pub async fn start_large_file<'a, C, E>(
     auth: &mut Authorization<C>,
-    file: StartLargeFile
+    file: StartLargeFile<'a>
 ) -> Result<File, Error<E>>
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,

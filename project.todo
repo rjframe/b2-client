@@ -13,6 +13,7 @@ Project:
     ☐ Efficient byte management in HttpClients.
     ☐ Document API differences from upstream and reasons for doing so.
     ☐ Make tests easily reproducible for others and me in the future - move bucket ID, etc. to environment variables.
+    ☐ I have DateTime<Local> and DateTime<Utc> objects; check whether they're correct or should be changed
 
 API:
     ✓ Implement account endpoints @done(2021-10-18 17:20) @project(API)

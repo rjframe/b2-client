@@ -680,9 +680,9 @@ pub struct ContentDisposition(String);
 /// to obtain a [DownloadAuthorization].
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DownloadAuthorizationRequest {
-    bucket_id: String,
-    file_name_prefix: String,
+pub struct DownloadAuthorizationRequest<'a> {
+    bucket_id: &'a str,
+    file_name_prefix: &'a str,
     valid_duration_in_seconds: Duration,
     b2_content_disposition: Option<String>,
     b2_content_language: Option<String>,
@@ -694,8 +694,8 @@ pub struct DownloadAuthorizationRequest {
     b2_content_type: Option<String>,
 }
 
-impl DownloadAuthorizationRequest {
-    pub fn builder() -> DownloadAuthorizationRequestBuilder {
+impl<'a> DownloadAuthorizationRequest<'a> {
+    pub fn builder() -> DownloadAuthorizationRequestBuilder<'a> {
         DownloadAuthorizationRequestBuilder::default()
     }
 }
@@ -710,10 +710,10 @@ impl DownloadAuthorizationRequest {
 /// See <https://www.backblaze.com/b2/docs/b2_get_download_authorization.html>
 /// for furter information.
 #[derive(Default)]
-pub struct DownloadAuthorizationRequestBuilder {
+pub struct DownloadAuthorizationRequestBuilder<'a> {
     // Required:
-    bucket_id: Option<String>,
-    file_name_prefix: Option<String>,
+    bucket_id: Option<&'a str>,
+    file_name_prefix: Option<&'a str>,
     valid_duration_in_seconds: Option<Duration>,
     // Optional:
     b2_content_disposition: Option<String>,
@@ -724,19 +724,20 @@ pub struct DownloadAuthorizationRequestBuilder {
     b2_content_type: Option<String>,
 }
 
-impl DownloadAuthorizationRequestBuilder {
+impl<'a> DownloadAuthorizationRequestBuilder<'a> {
     /// Create a download authorization for the specified bucket ID.
-    pub fn bucket_id<S: Into<String>>(mut self, id: S) -> Self {
+    pub fn bucket_id(mut self, id: &'a str) -> Self {
         // TODO: Validate id.
-        self.bucket_id = Some(id.into());
+        self.bucket_id = Some(id.as_ref());
         self
     }
 
     /// Use the given file name prefix to determine what files the
     /// [DownloadAuthorization] will allow access to.
-    pub fn file_name_prefix<S: Into<String>>(mut self, name: S)
+    pub fn file_name_prefix(mut self, name: &'a str)
     -> Result<Self, ValidationError> {
-        self.file_name_prefix = Some(validated_file_name(name)?);
+
+        self.file_name_prefix = Some(validated_file_name(name.as_ref())?);
         Ok(self)
     }
 
@@ -803,8 +804,8 @@ impl DownloadAuthorizationRequestBuilder {
     }
 
     /// Build a [DownloadAuthorizationRequest].
-    pub fn build(self) -> Result<DownloadAuthorizationRequest, ValidationError>
-    {
+    pub fn build(self)
+    -> Result<DownloadAuthorizationRequest<'a>, ValidationError> {
         let bucket_id = self.bucket_id
             .ok_or_else(|| ValidationError::MissingData(
                 "A bucket ID must be provided".into()
@@ -887,9 +888,9 @@ impl DownloadAuthorization {
 /// # Ok(()) }
 /// ```
 // TODO: Once download endpoints are implemented, add one to the example above.
-pub async fn get_download_authorization<C, E>(
+pub async fn get_download_authorization<'a, C, E>(
     auth: &mut Authorization<C>,
-    download_req: DownloadAuthorizationRequest
+    download_req: DownloadAuthorizationRequest<'a>
 ) -> Result<DownloadAuthorization, Error<E>>
     where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
