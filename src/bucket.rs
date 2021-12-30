@@ -506,14 +506,20 @@ pub enum EncryptionAlgorithm {
     Aes256,
 }
 
+impl fmt::Display for EncryptionAlgorithm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "AES256")
+    }
+}
+
 /// Configuration for client-managed server-side encryption.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(try_from = "serialization::InnerSelfEncryption")]
 #[serde(into = "serialization::InnerSelfEncryption")]
 pub struct SelfManagedEncryption {
-    algorithm: EncryptionAlgorithm,
-    key: String,
-    digest: String,
+    pub(crate) algorithm: EncryptionAlgorithm,
+    pub(crate) key: String,
+    pub(crate) digest: String,
 }
 
 impl SelfManagedEncryption {
@@ -792,6 +798,15 @@ pub struct FileLockConfiguration {
 pub enum FileRetentionMode {
     Governance,
     Compliance,
+}
+
+impl fmt::Display for FileRetentionMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Governance => write!(f, "governance"),
+            Self::Compliance => write!(f, "compliance"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

@@ -671,7 +671,7 @@ pub async fn delete_key_by_id<C, E, S: AsRef<str>>(
 /// The grammar is specified in RFC 6266, except parameter names that contain an
 /// '*' are not allowed.
 // TODO: Implement; parse/validate.
-pub struct ContentDisposition(String);
+pub struct ContentDisposition(pub(crate) String);
 
 /// A request to obtain a [DownloadAuthorization].
 ///

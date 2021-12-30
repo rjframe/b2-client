@@ -101,7 +101,7 @@ use std::fmt;
 
 use crate::{
     prelude::*,
-    account::Capability,
+    account::{Capability, ContentDisposition},
     bucket::{
         Bucket,
         FileRetentionMode,
@@ -114,6 +114,12 @@ use crate::{
     require_capability,
 };
 
+pub use http_types::{
+    cache::{CacheDirective, Expires},
+    content::ContentEncoding,
+    mime::Mime,
+};
+
 use serde::{Serialize, Deserialize};
 
 
@@ -122,6 +128,15 @@ use serde::{Serialize, Deserialize};
 enum LegalHoldValue {
     On,
     Off,
+}
+
+impl fmt::Display for LegalHoldValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::On => write!(f, "on"),
+            Self::Off => write!(f, "off"),
+        }
+    }
 }
 
 /// Determines whether there is a legal hold on a file.
@@ -1208,6 +1223,269 @@ pub async fn start_large_file<'a, C, E>(
     file.into()
 }
 
+pub struct UploadFile<'a> {
+    file_name: &'a str,
+    content_type: String,
+    sha1_checksum: &'a str,
+    last_modified: Option<i64>,
+
+    // These go in custom headers (file_info)
+    content_disposition: Option<String>,
+    content_language: Option<String>,
+    expires: Option<String>,
+    cache_control: Option<String>,
+    content_encoding: Option<String>,
+    custom_headers: Option<(String, String)>, // TODO: type
+
+    legal_hold: Option<LegalHoldValue>,
+    file_retention: Option<(FileRetentionMode, i64)>,
+    encryption: Option<ServerSideEncryption>,
+}
+
+impl<'a> UploadFile<'a> {
+    pub fn builder() -> UploadFileBuilder<'a> {
+        UploadFileBuilder::default()
+    }
+}
+
+#[derive(Default)]
+pub struct UploadFileBuilder<'a> {
+    file_name: Option<&'a str>,
+    content_type: Option<String>,
+    sha1_checksum: Option<&'a str>,
+    last_modified: Option<i64>,
+
+    // These go in custom headers (file_info). Merge in builder?
+    content_disposition: Option<String>,
+    content_language: Option<String>,
+    expires: Option<String>,
+    cache_control: Option<String>,
+    content_encoding: Option<String>,
+    custom_headers: Option<(String, String)>, // TODO: type
+
+    legal_hold: Option<LegalHoldValue>,
+    file_retention_mode: Option<FileRetentionMode>,
+    file_retention_time: Option<i64>,
+    encryption: Option<ServerSideEncryption>,
+}
+
+impl<'a> UploadFileBuilder<'a> {
+    pub fn file_name(mut self, name: &'a str) -> Result<Self, ValidationError> {
+        self.file_name = Some(validated_file_name(name)?);
+        Ok(self)
+    }
+
+    pub fn content_type(mut self, content_type: Mime) -> Self {
+        self.content_type = Some(content_type.to_string());
+        self
+    }
+
+    pub fn sha1_checksum(mut self, checksum: &'a str) -> Self {
+        self.sha1_checksum = Some(checksum);
+        self
+    }
+
+    pub fn last_modified(mut self, time: chrono::DateTime<chrono::Utc>) -> Self
+    {
+        self.last_modified = Some(time.timestamp());
+        self
+    }
+
+    pub fn content_disposition(mut self, disposition: ContentDisposition)
+    -> Self {
+        self.content_disposition = Some(disposition.0);
+        self
+    }
+
+    pub fn content_language(mut self, language: impl Into<String>) -> Self {
+        self.content_language = Some(language.into());
+        self
+    }
+
+    pub fn expiration(mut self, expiration: Expires) -> Self {
+        self.expires = Some(expiration.value().to_string());
+        self
+    }
+
+    pub fn cache_control(mut self, directive: CacheDirective) -> Self {
+        use http_types::headers::HeaderValue;
+
+        self.cache_control = Some(HeaderValue::from(directive).to_string());
+        self
+    }
+
+    pub fn content_encoding(mut self, encoding: ContentEncoding) -> Self {
+        self.content_encoding = Some(format!("{}", encoding.encoding()));
+        self
+    }
+
+    // TODO: Custom headers
+
+    pub fn with_legal_hold(mut self) -> Self {
+        self.legal_hold = Some(LegalHoldValue::On);
+        self
+    }
+
+    pub fn without_legal_hold(mut self) -> Self {
+        self.legal_hold = Some(LegalHoldValue::Off);
+        self
+    }
+
+    pub fn file_retention_mode(mut self, mode: FileRetentionMode) -> Self {
+        self.file_retention_mode = Some(mode);
+        self
+    }
+
+    pub fn retain_until(mut self, time: chrono::DateTime<chrono::Utc>)
+    -> Self {
+        self.file_retention_time = Some(time.timestamp());
+        self
+    }
+
+    pub fn encryption_settings(mut self, settings: ServerSideEncryption)
+    -> Self {
+        self.encryption = Some(settings);
+        self
+    }
+
+    pub fn build(self) -> Result<UploadFile<'a>, ValidationError> {
+        let file_name = self.file_name.map(|v| validated_file_name(v))
+            .ok_or_else(||
+                ValidationError::MissingData("Filename is required".into())
+            )??;
+
+        let content_type = self.content_type
+            .unwrap_or_else(|| "b2/x-auto".into());
+
+        let sha1_checksum = self.sha1_checksum.unwrap_or("do_not_verify");
+
+        if self.file_retention_mode.is_some()
+            ^ self.file_retention_time.is_some()
+        {
+            return Err(ValidationError::BadFormat(
+                "File retention policy is not fully configured".into()
+            ));
+        }
+
+        let file_retention = self.file_retention_mode
+            .zip(self.file_retention_time);
+
+        Ok(UploadFile {
+            file_name,
+            content_type,
+            sha1_checksum,
+            last_modified: self.last_modified,
+            content_disposition: self.content_disposition,
+            content_language: self.content_language,
+            expires: self.expires,
+            cache_control: self.cache_control,
+            content_encoding: self.content_encoding,
+            custom_headers: self.custom_headers,
+            legal_hold: self.legal_hold,
+            file_retention,
+            encryption: self.encryption,
+        })
+    }
+}
+
+pub async fn upload_file<C, E>(
+    auth: &mut UploadAuthorization<'_, C, E>,
+    upload: UploadFile<'_>,
+    data: &[u8],
+) -> Result<File, Error<E>>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    // Unwrap safety: an `UploadAuthorization` can only be created from
+    // `get_upload_authorization`, which will always embed an `Authorization`
+    // reference before returning.
+    let inner_auth = auth.auth.as_mut().unwrap();
+
+    require_capability!(inner_auth, Capability::WriteFiles);
+
+    if upload.file_retention.is_some() {
+        // We check this here rather than when we need it below to satisfy the
+        // borrow checker.
+        require_capability!(inner_auth, Capability::WriteFileRetentions);
+    }
+
+    let mut req = inner_auth.client.post(&auth.upload_url)
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .with_header("X-Bz-File-Name", &upload.file_name)
+        .with_header("Content-Type", &upload.content_type)
+        .with_header("Content-Length", &data.len().to_string())
+        .with_header("X-Bz-Content-Sha1", &upload.sha1_checksum);
+
+    if let Some(time) = upload.last_modified {
+        req = req.with_header(
+            "X-Bz-Info-src_last_modified_millis",
+            &time.to_string()
+        );
+    }
+
+    if let Some(disp) = upload.content_disposition {
+        req = req.with_header("X-Bz-Info-b2-content-disposition", &disp);
+    }
+
+    if let Some(lang) = upload.content_language {
+        req = req.with_header("X-Bz-Info-b2-content-language", &lang);
+    }
+
+    if let Some(expiration) = upload.expires {
+        req = req.with_header("X-Bz-Info-b2-expireq", &expiration);
+    }
+
+    if let Some(cache_control) = upload.cache_control {
+        req = req.with_header("X-Bz-Info-b2-cache-control", &cache_control);
+    }
+
+    if let Some(encoding) = upload.content_encoding {
+        req = req.with_header("X-Bz-Info-b2-content-encoding", &encoding);
+    }
+
+    // TODO: custom headers
+
+    if let Some(legal_hold) = upload.legal_hold {
+        req = req.with_header("X-Bz-File-Legal-Hold", &legal_hold.to_string());
+    }
+
+    if let Some((mode, timestamp)) = upload.file_retention {
+        req = req
+            .with_header("X-Bz-File-Retention-Mode", &mode.to_string())
+            .with_header("X-Bz-File-Retention-Retain-Until-Timestamp",
+                &timestamp.to_string());
+    }
+
+    match upload.encryption {
+        Some(ServerSideEncryption::B2Managed(enc)) => {
+            req = req
+                .with_header("X-Bz-Server-Side-Encryption", &enc.to_string());
+        },
+        Some(ServerSideEncryption::SelfManaged(enc)) => {
+            req = req
+                .with_header(
+                    "X-Bz-Server-Side-Encryption-Customer-Algorithm",
+                    &enc.algorithm.to_string()
+                )
+                .with_header(
+                    "X-Bz-Server-Side-Encryption-Customer-Key",
+                    &enc.key
+                )
+                .with_header(
+                    "X-Bz-Server-Side-Encryption-Customer-Key-Md5",
+                    &enc.digest
+                );
+        },
+        _ => {},
+    }
+
+    let res = req.with_body(data).send().await?;
+
+    let file: B2Result<File> = serde_json::from_value(res)?;
+    file.into()
+}
+
 /// Upload a part of a large file to B2.
 ///
 /// Once all parts are uploaded, call [finish_large_file_upload] to merge the
@@ -1403,6 +1681,33 @@ mod tests_mocked {
         ).await?;
 
         assert_eq!(upload_auth.bucket_id, "8d625eb63be2775577c70e1a");
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn upload_file_success() -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/file.yaml"
+        ).await?;
+
+        let mut auth = create_test_auth(client, vec![Capability::WriteFiles])
+            .await;
+
+        let mut upload_auth = get_upload_authorization_by_id(
+            &mut auth,
+            "8d625eb63be2775577c70e1a"
+        ).await?;
+
+        let file = UploadFile::builder()
+            .file_name("test-file-upload.txt")?
+            .sha1_checksum("81fe8bfe87576c3ecb22426f8e57847382917acf")
+            .build()?;
+
+        let file = upload_file(&mut upload_auth, file, b"abcd").await?;
+
+        assert_eq!(file.action, FileAction::Upload);
 
         Ok(())
     }
