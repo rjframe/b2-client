@@ -6,6 +6,10 @@
 //! A Backblaze B2 API library that can send and receive data via arbitrary HTTP
 //! clients.
 
+// Increase the recursion limit for a macro in a test in validate.rs.
+#![cfg_attr(test, recursion_limit = "256")]
+
+
 pub mod account;
 pub mod bucket;
 pub mod file;

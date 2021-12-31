@@ -110,7 +110,11 @@ use crate::{
     },
     client::HttpClient,
     error::{ValidationError, Error},
-    validate::{validated_file_info, validated_file_name},
+    validate::{
+        validate_content_disposition,
+        validated_file_info,
+        validated_file_name,
+    },
     require_capability,
 };
 
@@ -1223,8 +1227,11 @@ pub async fn start_large_file<'a, C, E>(
     file.into()
 }
 
+/// A request to upload a file to B2.
+///
+/// Use [UploadFileBuilder] to create an `UploadFile`.
 pub struct UploadFile<'a> {
-    file_name: &'a str,
+    file_name: String,
     content_type: String,
     sha1_checksum: &'a str,
     last_modified: Option<i64>,
@@ -1250,7 +1257,7 @@ impl<'a> UploadFile<'a> {
 
 #[derive(Default)]
 pub struct UploadFileBuilder<'a> {
-    file_name: Option<&'a str>,
+    file_name: Option<String>,
     content_type: Option<String>,
     sha1_checksum: Option<&'a str>,
     last_modified: Option<i64>,
@@ -1270,8 +1277,20 @@ pub struct UploadFileBuilder<'a> {
 }
 
 impl<'a> UploadFileBuilder<'a> {
-    pub fn file_name(mut self, name: &'a str) -> Result<Self, ValidationError> {
-        self.file_name = Some(validated_file_name(name)?);
+    /// The name of the file.
+    ///
+    /// The provided name will be percent-encoded.
+    pub fn file_name(mut self, name: impl AsRef<str>)
+    -> Result<Self, ValidationError> {
+        use crate::validate::FILENAME_ENCODE_SET;
+        use percent_encoding::utf8_percent_encode;
+
+        let name = validated_file_name(name.as_ref())?;
+
+        self.file_name = Some(
+            utf8_percent_encode(name, &FILENAME_ENCODE_SET).to_string()
+        );
+
         Ok(self)
     }
 
@@ -1292,9 +1311,10 @@ impl<'a> UploadFileBuilder<'a> {
     }
 
     pub fn content_disposition(mut self, disposition: ContentDisposition)
-    -> Self {
+    -> Result<Self, ValidationError> {
+        validate_content_disposition(&disposition.0, false)?;
         self.content_disposition = Some(disposition.0);
-        self
+        Ok(self)
     }
 
     pub fn content_language(mut self, language: impl Into<String>) -> Self {
@@ -1349,10 +1369,9 @@ impl<'a> UploadFileBuilder<'a> {
     }
 
     pub fn build(self) -> Result<UploadFile<'a>, ValidationError> {
-        let file_name = self.file_name.map(|v| validated_file_name(v))
-            .ok_or_else(||
-                ValidationError::MissingData("Filename is required".into())
-            )??;
+        let file_name = self.file_name.ok_or_else(||
+            ValidationError::MissingData("Filename is required".into())
+        )?;
 
         let content_type = self.content_type
             .unwrap_or_else(|| "b2/x-auto".into());
