@@ -1014,8 +1014,8 @@ pub async fn get_upload_authorization_by_id<'a, 'b, C, E>(
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StartLargeFile<'a> {
-    bucket_id: String,
-    file_name: &'a str,
+    bucket_id: &'a str,
+    file_name: String,
     content_type: String,
     file_info: Option<serde_json::Value>,
     file_retention: Option<FileRetentionPolicy>,
@@ -1032,8 +1032,8 @@ impl<'a> StartLargeFile<'a> {
 /// A builder for a [StartLargeFile] request.
 #[derive(Debug, Default)]
 pub struct StartLargeFileBuilder<'a> {
-    bucket_id: Option<String>,
-    file_name: Option<&'a str>,
+    bucket_id: Option<&'a str>,
+    file_name: Option<String>,
     content_type: Option<String>,
     file_info: Option<serde_json::Value>,
     file_retention: Option<FileRetentionPolicy>,
@@ -1045,15 +1045,25 @@ pub struct StartLargeFileBuilder<'a> {
 // (e.g., CopyFileBuilder).
 impl<'a> StartLargeFileBuilder<'a> {
     /// Specify the bucket in which to store the new file.
-    pub fn bucket_id(mut self, id: impl Into<String>) -> Self {
-        self.bucket_id = Some(id.into());
+    pub fn bucket_id(mut self, id: &'a str) -> Self {
+        self.bucket_id = Some(id.as_ref());
         self
     }
 
     /// Set the file's name.
-    pub fn file_name(mut self, name: &'a str)
+    ///
+    /// The provied name will be percent-encoded.
+    pub fn file_name(mut self, name: impl AsRef<str>)
     -> Result<Self, ValidationError> {
-        self.file_name = Some(validated_file_name(name.as_ref())?);
+        use crate::validate::FILENAME_ENCODE_SET;
+        use percent_encoding::utf8_percent_encode;
+
+        let name = validated_file_name(name.as_ref())?;
+
+        self.file_name = Some(
+            utf8_percent_encode(name, &FILENAME_ENCODE_SET).to_string()
+        );
+
         Ok(self)
     }
 
