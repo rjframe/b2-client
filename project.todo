@@ -14,6 +14,7 @@ Project:
     ☐ Document API differences from upstream and reasons for doing so.
     ☐ Make tests easily reproducible for others and me in the future - move bucket ID, etc. to environment variables.
     ☐ I have DateTime<Local> and DateTime<Utc> objects; check whether they're correct or should be changed
+    ☐ Allow uploads via streams/chunked/buffers/local filesystem
 
 API:
     ✓ Implement account endpoints @done(2021-10-18 17:20) @project(API)
@@ -45,7 +46,7 @@ API:
         ✓ start_large_file @done(2021-11-16 14:25) @project(API \ Files)
         ☐ update_file_legal_hold
         ☐ update_file_retention
-        ☐ upload_file
+        ✓ upload_file @done(2021-12-30 12:41) @project(API \ Files)
         ✓ upload_part @done(2021-12-17 10:21) @project(API \ Files)
 
 ＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿

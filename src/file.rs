@@ -9,23 +9,45 @@
 //! files](https://www.backblaze.com/b2/docs/uploading.html) for an overview of
 //! the process.
 //!
+//!
+//! # Uploading Files
+//!
+//! For files larger than 5 GB, see [Uploading Large
+//! Files](#uploading-large-files).
+//!
+//! To upload a file:
+//!
+//! 1. Authenticate with B2 to obtain an [Authorization] object.
+//! 2. Create an [UploadFile] request.
+//! 3. Call [get_upload_authorization] to get an [UploadAuthorization] for a
+//!    bucket.
+//! 4. Call [upload_file] with your `UploadAuthorization`, `UploadFile` request,
+//!    and file data.
+//!
+//! You can upload multiple files with a single `UploadAuthorization`, but only
+//! one at a time. To upload multiple files in parallel, each thread or task
+//! needs to obtain its own `UploadAuthorization`.
+//!
+//!
 //! # Uploading Large Files
 //!
 //! To upload a large file:
 //!
-//! 1. Create a [StartLargeFile] object with the destination bucket and new
+//! 1. Authenticate with B2 to obtain an [Authorization] object.
+//! 2. Create a [StartLargeFile] object with the destination bucket and new
 //!    file's information, then pass it to [start_large_file]. You will receive
 //!    a [File] object.
-//! 2. Pass the [File] to [get_upload_part_authorization] to receive an
-//!    [UploadPartAuthorization] to upload the file in multiple parts.
+//! 3. Pass the [File] to [get_upload_part_authorization] to receive an
+//!    [UploadPartAuthorization].
 //!     * You can upload parts in separate threads for better performance; each
 //!       thread must call [get_upload_part_authorization] and use its
 //!       respective authorization when uploading data.
-//! 3. Use the [UploadPartAuthorization] to (repeatedly) call [upload_file_part]
+//! 4. Use the [UploadPartAuthorization] to (repeatedly) call [upload_file_part]
 //!    with the file data to upload.
-//! 4. Call [finish_large_file_upload] to merge the file parts into a single
+//! 5. Call [finish_large_file_upload] to merge the file parts into a single
 //!    [File]. After finishing the file, it can be treated like any other
 //!    uploaded file.
+//!
 //!
 //! # Examples
 //!
@@ -33,10 +55,36 @@
 //! # fn calculate_sha1(data: &[u8]) -> String { String::default() }
 //! use std::env;
 //! use anyhow;
-//! use b2_client::{
-//!     self as b2,
-//!     HttpClient as _,
-//! };
+//! use b2_client::{self as b2, HttpClient as _};
+//!
+//! # #[cfg(feature = "with_surf")]
+//! async fn upload_file(name: &str, bucket: b2::Bucket, data: &[u8])
+//! -> anyhow::Result<b2::File> {
+//!     let key = env::var("B2_KEY").ok().unwrap();
+//!     let key_id = env::var("B2_KEY_ID").ok().unwrap();
+//!
+//!     let client = b2::client::SurfClient::new();
+//!     let mut auth = b2::authorize_account(client, &key, &key_id).await?;
+//!
+//!     let mut upload_auth = b2::get_upload_authorization(&mut auth, &bucket)
+//!         .await?;
+//!
+//!     let checksum = calculate_sha1(&data);
+//!
+//!     let file = b2::UploadFile::builder()
+//!         .file_name(name)?
+//!         .sha1_checksum(&checksum)
+//!         .build()?;
+//!
+//!     Ok(b2::upload_file(&mut upload_auth, file, &data).await?)
+//! }
+//! ```
+//!
+//! ```no_run
+//! # fn calculate_sha1(data: &[u8]) -> String { String::default() }
+//! use std::env;
+//! use anyhow;
+//! use b2_client::{self as b2, HttpClient as _};
 //!
 //! # #[cfg(feature = "with_surf")]
 //! async fn upload_large_file(
@@ -1265,6 +1313,18 @@ impl<'a> UploadFile<'a> {
     }
 }
 
+/// A builder to create an [UploadFile] request.
+///
+/// The [file_name](Self::file_name), [content_type](Self::content_type), and
+/// [sha1_checksum](Self::sha1_checksum) are required.
+///
+/// The combined length limit of
+/// [content_disposition](Self::content_disposition),
+/// [content_language](Self::content_language), [expiration](Self::expiration),
+/// [cache_control](Self::cache_control),
+/// [content_encoding](Self::content_encoding), and custom headers is 7,000
+/// bytes, unless self-managed encryption and/or file locks are enabled, in
+/// which case the limit is 2,048 bytes.
 #[derive(Default)]
 pub struct UploadFileBuilder<'a> {
     file_name: Option<String>,
@@ -1304,22 +1364,42 @@ impl<'a> UploadFileBuilder<'a> {
         Ok(self)
     }
 
+    /// The MIME type of the file's contents.
+    ///
+    /// This will be returned in the `Content-Type` header when downloading the
+    /// file.
+    ///
+    /// If not specified, B2 will attempt to automatically set the content-type,
+    /// defaulting to `application/octet-stream` if unable to determine its
+    /// type.
+    ///
+    /// B2-recognized content-types can be viewed
+    /// [here](https://www.backblaze.com/b2/docs/content-types.html)
     pub fn content_type(mut self, content_type: Mime) -> Self {
         self.content_type = Some(content_type.to_string());
         self
     }
 
+    /// The SHA1 checksum of the file's contents.
+    ///
+    /// B2 will use this to verify the accuracy of the file upload, and it will
+    /// be returned in the header `X-Bz-Content-Sha1` when downloading the file.
     pub fn sha1_checksum(mut self, checksum: &'a str) -> Self {
         self.sha1_checksum = Some(checksum);
         self
     }
 
+    /// The time of the file's last modification.
     pub fn last_modified(mut self, time: chrono::DateTime<chrono::Utc>) -> Self
     {
         self.last_modified = Some(time.timestamp());
         self
     }
 
+    /// The value to use for the `Content-Disposition` header when downloading
+    /// the file.
+    ///
+    /// Note that the download request can override this value.
     pub fn content_disposition(mut self, disposition: ContentDisposition)
     -> Result<Self, ValidationError> {
         validate_content_disposition(&disposition.0, false)?;
@@ -1327,16 +1407,29 @@ impl<'a> UploadFileBuilder<'a> {
         Ok(self)
     }
 
+    /// The value to use for the `Content-Language` header when downloading the
+    /// file.
+    ///
+    /// Note that the download request can override this value.
     pub fn content_language(mut self, language: impl Into<String>) -> Self {
+        // TODO: validate content_language
         self.content_language = Some(language.into());
         self
     }
 
+    /// The value to use for the `Expires` header when the file is downloaded.
+    ///
+    /// Note that the download request can override this value.
     pub fn expiration(mut self, expiration: Expires) -> Self {
         self.expires = Some(expiration.value().to_string());
         self
     }
 
+    /// The value to use for the `Cache-Control` header when the file is
+    /// downloaded.
+    ///
+    /// This would override the value set at the bucket level, and can be
+    /// overriden by a download request.
     pub fn cache_control(mut self, directive: CacheDirective) -> Self {
         use http_types::headers::HeaderValue;
 
@@ -1344,6 +1437,10 @@ impl<'a> UploadFileBuilder<'a> {
         self
     }
 
+    /// The value to use for the `Content-Encoding` header when the file is
+    /// downloaded.
+    ///
+    /// Note that this can be overriden by a download request.
     pub fn content_encoding(mut self, encoding: ContentEncoding) -> Self {
         self.content_encoding = Some(format!("{}", encoding.encoding()));
         self
@@ -1351,33 +1448,45 @@ impl<'a> UploadFileBuilder<'a> {
 
     // TODO: Custom headers
 
+    /// Set a legal hold on the file.
     pub fn with_legal_hold(mut self) -> Self {
         self.legal_hold = Some(LegalHoldValue::On);
         self
     }
 
+    /// Disable a legal hold on the file.
     pub fn without_legal_hold(mut self) -> Self {
         self.legal_hold = Some(LegalHoldValue::Off);
         self
     }
 
+    /// Set the file retention mode for the file.
+    ///
+    /// The bucket must be File Lock-enabled and the [Authorization] must have
+    /// [Capability::WriteFileRetentions].
     pub fn file_retention_mode(mut self, mode: FileRetentionMode) -> Self {
         self.file_retention_mode = Some(mode);
         self
     }
 
+    /// Set the expiration date and time of a file lock.
+    ///
+    /// The bucket must be File Lock-enabled and the [Authorization] must have
+    /// [Capability::WriteFileRetentions].
     pub fn retain_until(mut self, time: chrono::DateTime<chrono::Utc>)
     -> Self {
         self.file_retention_time = Some(time.timestamp());
         self
     }
 
+    /// Set the encryption settings to use for the file.
     pub fn encryption_settings(mut self, settings: ServerSideEncryption)
     -> Self {
         self.encryption = Some(settings);
         self
     }
 
+    /// Build an [UploadFile] request.
     pub fn build(self) -> Result<UploadFile<'a>, ValidationError> {
         let file_name = self.file_name.ok_or_else(||
             ValidationError::MissingData("Filename is required".into())
@@ -1417,6 +1526,10 @@ impl<'a> UploadFileBuilder<'a> {
     }
 }
 
+/// Upload a file to a B2 bucket.
+///
+/// You must first call [get_upload_authorization] to obtain an authorization to
+/// upload files to the bucket; then pass that authorization to `upload_file`.
 pub async fn upload_file<C, E>(
     auth: &mut UploadAuthorization<'_, C, E>,
     upload: UploadFile<'_>,
