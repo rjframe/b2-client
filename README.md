@@ -1,13 +1,13 @@
-# b2-client - Backend-agnostic Backblaze B2 API Client
+# B2-client - Backend-agnostic Backblaze B2 API Client
 
-b2-client provides a Rust API to Backblaze B2 services, backed by any HTTP
+B2-client provides a Rust API to Backblaze B2 services, backed by any HTTP
 client.
 
 Support for [Hyper](https://crates.io/crates/hyper),
 [Isahc](https://crates.io/crates/isahc) (soon), and
 [Surf](https://crates.io/crates/surf) are implemented out of the box.
 
-The official repository for b2-client is on SourceHut at
+The official repository for B2-client is on SourceHut at
 [https://git.sr.ht/~rjframe/b2-client](https://git.sr.ht/~rjframe/b2-client),
 with a mirror at Github on
 [https://github.com/rjframe/b2-client](https://github.com/rjframe/b2-client).
@@ -35,12 +35,8 @@ SourceHut.
 
 ## Introduction
 
-I wanted a type-safe, backend-agnostic interface to the B2 API; I don't want to
-potentially end up with two HTTP clients linked into my applications, and I
-don't want the B2 library I use to be determined by the HTTP client (or async
-runtime) I happen to be using.
-
-I intend to support the full API.
+B2-client is an async-runtime-agnostic, HTTP client-agnostic interface to the
+Backblaze B2 API.
 
 Note that most (if not all) of these functions can incur charges to your
 account. You will want to mock the B2 servers in your code's tests.
@@ -56,21 +52,23 @@ All source code is licensed under the terms of the
 
 ### Installation
 
-I will not be registering b2-client on crates.io until I've implemented enough
-that I believe the library can be useful. To use this library now, you'll need
-to clone the git repository and add it as a path-based dependency.
+The first tagged release will come after the full API is supported. To use this
+library now, you'll need to clone the git repository and add it as a path-based
+dependency.
 
 ```toml
 [dependencies]
 b2-client = { path = "../b2-client" }
 ```
 
-If using a pre-packaged HTTP client, choose the backend via the relevant
-feature. Supported features are
+If you need something that's not yet implemented, send a patch or an issue and
+I'll prioritize it.
+
+To use a pre-packaged HTTP client, choose the backend via the relevant feature.
+Supported features are
 
 * `with_surf`
 * `with_hyper`
-* `with_isahc` (soon)
 
 This list will eventually use the lower-level client libraries instead (e.g., h1
 and h2 instead of hyper).
@@ -84,15 +82,15 @@ the `--no-default-features` flag.
 
 ### Testing
 
-Run `cargo test` to run all tests; the `surf` backend is used to test fake
-(pre-recorded) responses against the B2 API, so by default no tests are making
-real API calls.
+Run `cargo test` to run all tests (with default features); the `surf` backend is
+used to test fake (pre-recorded) responses against the B2 API, so no tests are
+making real API calls.
 
 To run a test against the live B2 API, set the environment variables
 `B2_CLIENT_TEST_KEY` and `B2_CLIENT_TEST_KEY_ID` to a key/id pair capable of
 performing the task you wish to test, and change the test's `VcrMode` to
 `Record`. Although there will be no major-destructive tests (like deleting all
-buckets), don't run a test against the API unless you know what it's doing,
+buckets), don't run a test against the live API unless you know what it's doing,
 especially if you have production keys or buckets on your account.
 
 A few tests will need minor modifications or setup to run against the B2 API
@@ -101,6 +99,11 @@ sessions with the environment variables set.
 
 
 ### Known Issues
+
+* Error handling is bifurcated a bit; for example, uploading a file without the
+  `WriteFiles` capability will return `Error::Unauthorized`, but uploading to a
+  private bucket without the `ReadFiles` capabillity returns `Error::B2Error`.
+* Small design inconsistencies, some private data should be public, etc.
 
 
 ## Contributing
