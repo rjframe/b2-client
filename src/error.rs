@@ -174,22 +174,27 @@ impl<E> From<ValidationError> for Error<E>
 }
 
 /// An error code from the B2 API.
+///
+/// The HTTP status code is not necessarily constant for any given error code.
+/// See the B2 documentation for the relevant API call to match HTTP status
+/// codes and B2 error codes.
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ErrorCode {
     // 400
     BadBucketId,
     BadRequest,
     DuplicateBucketName,
+    FileNotPresent,
     TooManyBuckets,
 
     // 401
+    AccessDenied, // Also 403
     BadAuthToken,
     ExpiredAuthToken,
     Unauthorized,
     Unsupported,
 
     // 403
-    AccessDenied,
     CapExceeded,
     StorageCapExceeded,
     TransactionCapExceeded,
@@ -224,6 +229,7 @@ impl ErrorCode {
             "bad_bucket_id" => Ok(Self::BadBucketId),
             "bad_request" => Ok(Self::BadRequest),
             "duplicate_bucket_name" => Ok(Self::DuplicateBucketName),
+            "file_not_present" => Ok(Self::FileNotPresent),
             "too_many_buckets" => Ok(Self::TooManyBuckets),
 
             "bad_auth_token" => Ok(Self::BadAuthToken),
@@ -253,31 +259,6 @@ impl ErrorCode {
             _ => Err(String::from(code.as_ref())),
         }
     }
-
-    /// Get the HTTP status code of this error.
-    fn status(&self) -> u16 {
-        match self {
-            Self::BadBucketId => 400,
-            Self::BadRequest => 400,
-            Self::DuplicateBucketName => 400,
-            Self::TooManyBuckets => 400,
-            Self::BadAuthToken => 401,
-            Self::ExpiredAuthToken => 401,
-            Self::Unauthorized => 401,
-            Self::Unsupported => 401,
-            Self::AccessDenied => 403,
-            Self::CapExceeded => 403,
-            Self::StorageCapExceeded => 403,
-            Self::TransactionCapExceeded => 403,
-            Self::NotFound => 404,
-            Self::MethodNotAllowed => 405,
-            Self::RequestTimeout => 408,
-            Self::Conflict => 409,
-            Self::RangeNotSatisfiable => 416,
-            Self::InternalError => 500,
-            Self::ServiceUnavailable => 503,
-        }
-    }
 }
 
 /// An error response from the Backblaze B2 API.
@@ -285,8 +266,9 @@ impl ErrorCode {
 /// See <https://www.backblaze.com/b2/docs/calling.html#error_handling> for
 /// information on B2 error handling.
 #[derive(Debug, Deserialize)]
-// TODO: Manually impl Serialize to JSON. Include HTTP status code.
 pub struct B2Error {
+    /// The HTTP status code accompanying the error.
+    status: u16,
     /// A code that identifies the error.
     // TODO: Store an `ErrorCode` instead?
     #[serde(rename = "code")]
@@ -297,13 +279,13 @@ pub struct B2Error {
 
 impl B2Error {
     /// Get the HTTP status code for the error.
-    pub fn http_status(&self) -> u16 {
-        self.code().status()
-    }
+    pub fn http_status(&self) -> u16 { self.status }
 
     pub fn code(&self) -> ErrorCode {
         match ErrorCode::from_api_code(&self.code_str) {
             Ok(code) => code,
+            // TODO: I need to avoid the panic. We don't need to halt someone
+            // else's code for this.
             Err(code) => panic!(
                 "Unknown API code '{}'. Please file an issue on b2-client.",
                 code

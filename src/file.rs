@@ -378,6 +378,13 @@ pub struct CancelledFileUpload {
     pub file_name: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeletedFile {
+    pub file_id: String,
+    pub file_name: String,
+}
+
 /// Cancel the uploading of a large file and delete any parts already uploaded.
 pub async fn cancel_large_file<C, E>(auth: &mut Authorization<C>, file: File)
 -> Result<CancelledFileUpload, Error<E>>
@@ -858,6 +865,73 @@ pub async fn copy_file_part<C, E>(
 
     let part: B2Result<FilePart> = serde_json::from_value(res)?;
     part.into()
+}
+
+/// Declare whether to bypass file lock restrictions when performing an action
+/// on a [File].
+///
+/// Bypassing governance rules requires [Capability::BypassGovernance].
+pub enum BypassGovernance { Yes, No }
+
+/// Delete a version of a file.
+///
+/// If the version is the file's latest version and there are older versions,
+/// the most-recent older version will become the current version of the file.
+///
+/// If called on an unfinished large file, has the same effect as
+/// [cancel_large_file].
+pub async fn delete_file_version<C, E>(
+    auth: &mut Authorization<C>,
+    file: File,
+    bypass_governance: BypassGovernance,
+) -> Result<DeletedFile, Error<E>>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    delete_file_version_by_name_id(
+        auth,
+        &file.file_name,
+        &file.file_id,
+        bypass_governance
+    ).await
+}
+
+/// Delete a version of a file.
+///
+/// If the version is the file's latest version and there are older versions,
+/// the most-recent older version will become the current version of the file.
+///
+/// If called on an unfinished large file, has the same effect as
+/// [cancel_large_file].
+pub async fn delete_file_version_by_name_id<C, E>(
+    auth: &mut Authorization<C>,
+    file_name: impl AsRef<str>,
+    file_id: impl AsRef<str>,
+    bypass_governance: BypassGovernance,
+) -> Result<DeletedFile, Error<E>>
+    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    require_capability!(auth, Capability::DeleteFiles);
+
+    let mut body = serde_json::json!({
+        "fileName": &file_name.as_ref(),
+        "fileId": &file_id.as_ref(),
+    });
+
+    if matches!(bypass_governance, BypassGovernance::Yes) {
+        require_capability!(auth, Capability::BypassGovernance);
+        body["bypassGovernance"] = serde_json::Value::Bool(true);
+    }
+
+    let res = auth.client.post(auth.api_url("b2_delete_file_version"))
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .with_body_json(body)
+        .send().await?;
+
+    let file: B2Result<DeletedFile> = serde_json::from_value(res)?;
+    file.into()
 }
 
 /// Complete the upload of a large file, merging all parts into a single [File].
@@ -1929,6 +2003,37 @@ mod tests_mocked {
         assert_eq!(part2.part_number, 2);
 
         let _file = cancel_large_file(&mut auth, file).await?;
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn delete_file_success() -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/delete_file.yaml"
+        ).await?;
+
+        let mut auth = create_test_auth(
+            client,
+            vec![Capability::DeleteFiles, Capability::WriteFiles]
+        ).await;
+
+        let mut upload_auth = get_upload_authorization_by_id(
+            &mut auth,
+            "8d625eb63be2775577c70e1a"
+        ).await?;
+
+        let file = UploadFile::builder()
+            .file_name("test-file-upload.txt")?
+            .sha1_checksum("81fe8bfe87576c3ecb22426f8e57847382917acf")
+            .build()?;
+
+        let file = upload_file(&mut upload_auth, file, b"abcd").await?;
+
+
+        let _ = delete_file_version(&mut auth, file, BypassGovernance::No)
+            .await?;
+
         Ok(())
     }
 

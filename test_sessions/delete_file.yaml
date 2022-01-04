@@ -1,0 +1,96 @@
+---
+- Request:
+    method: GET
+    url: "https://api.backblazeb2.com/b2api/v2/b2_authorize_account"
+    headers:
+      authorization:
+        - Basic hidden-account-id
+    body: ""
+- Response:
+    status: 200
+    version: ~
+    headers:
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      content-type:
+        - application/json;charset=UTF-8
+      content-length:
+        - "1014"
+      date:
+        - "Tue, 04 Jan 2022 15:01:16 GMT"
+    body: "{\"absoluteMinimumPartSize\":5000000,\"accountId\":\"hidden-account-id\",\"allowed\":{\"bucketId\":null,\"bucketName\":null,\"capabilities\":[\"readBucketEncryption\",\"bypassGovernance\",\"writeFileLegalHolds\",\"readFiles\",\"writeFiles\",\"writeFileRetentions\",\"listKeys\",\"writeBucketEncryption\",\"readBucketRetentions\",\"deleteBuckets\",\"readBuckets\",\"listBuckets\",\"writeBuckets\",\"readFileRetentions\",\"shareFiles\",\"listAllBucketNames\",\"deleteFiles\",\"writeKeys\",\"listFiles\",\"readFileLegalHolds\",\"writeBucketRetentions\",\"deleteKeys\"],\"namePrefix\":null},\"apiUrl\":\"https://api002.backblazeb2.com\",\"authorizationToken\":\"hidden-authorization-token\",\"downloadUrl\":\"https://f002.backblazeb2.com\",\"recommendedPartSize\":100000000,\"s3ApiUrl\":\"https://s3.us-west-002.backblazeb2.com\"}"
+---
+- Request:
+    method: POST
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_get_upload_url"
+    headers:
+      authorization:
+        - hidden-authorization-token
+      content-type:
+        - application/json
+    body: "{\"bucketId\":\"8d625eb63be2775577c70e1a\"}"
+- Response:
+    status: 200
+    version: ~
+    headers:
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      date:
+        - "Tue, 04 Jan 2022 15:01:17 GMT"
+      content-length:
+        - "275"
+      content-type:
+        - application/json;charset=UTF-8
+    body: "{\"authorizationToken\":\"hidden-authorization-token\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"uploadUrl\":\"https://pod-000-1112-04.backblaze.com/b2api/v2/b2_upload_file/8d625eb63be2775577c70e1a/c002_v0001112_t0058\"}"
+---
+- Request:
+    method: POST
+    url: "https://pod-000-1112-04.backblaze.com/b2api/v2/b2_upload_file/8d625eb63be2775577c70e1a/c002_v0001112_t0058"
+    headers:
+      authorization:
+        - hidden-authorization-token
+      content-length:
+        - "4"
+      x-bz-content-sha1:
+        - 81fe8bfe87576c3ecb22426f8e57847382917acf
+      x-bz-file-name:
+        - test-file-upload.txt
+      content-type:
+        - b2/x-auto
+    body: abcd
+- Response:
+    status: 200
+    version: ~
+    headers:
+      date:
+        - "Tue, 04 Jan 2022 15:01:17 GMT"
+      content-type:
+        - application/json;charset=UTF-8
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      content-length:
+        - "746"
+    body: "{\"accountId\":\"hidden-account-id\",\"action\":\"upload\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentLength\":4,\"contentMd5\":\"e2fc714c4727ee9395f324cd2e7f331f\",\"contentSha1\":\"81fe8bfe87576c3ecb22426f8e57847382917acf\",\"contentType\":\"text/plain\",\"fileId\":\"4_z8d625eb63be2775577c70e1a_f104134a06c69d2a2_d20220104_m150118_c002_v0001112_t0011\",\"fileInfo\":{},\"fileName\":\"test-file-upload.txt\",\"fileRetention\":{\"isClientAuthorizedToRead\":true,\"value\":{\"mode\":null,\"retainUntilTimestamp\":null}},\"legalHold\":{\"isClientAuthorizedToRead\":true,\"value\":null},\"serverSideEncryption\":{\"algorithm\":null,\"mode\":null},\"uploadTimestamp\":1641308478000}"
+---
+- Request:
+    method: POST
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_delete_file_version"
+    headers:
+      authorization:
+        - hidden-authorization-token
+      content-type:
+        - application/json
+    body: "{\"fileId\":\"4_z8d625eb63be2775577c70e1a_f104134a06c69d2a2_d20220104_m150118_c002_v0001112_t0011\",\"fileName\":\"test-file-upload.txt\"}"
+- Response:
+    status: 200
+    version: ~
+    headers:
+      date:
+        - "Tue, 04 Jan 2022 15:01:18 GMT"
+      content-type:
+        - application/json;charset=UTF-8
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      content-length:
+        - "140"
+    body: "{\"fileId\":\"4_z8d625eb63be2775577c70e1a_f104134a06c69d2a2_d20220104_m150118_c002_v0001112_t0011\",\"fileName\":\"test-file-upload.txt\"}"

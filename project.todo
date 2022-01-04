@@ -12,7 +12,7 @@ Project:
     ☐ We should likely use a type for FileInfo rather than deal with JSON in the public API
     ☐ Efficient byte management in HttpClients.
     ☐ Document API differences from upstream and reasons for doing so.
-    ☐ Make tests easily reproducible for others and me in the future - move bucket ID, etc. to environment variables.
+    ☐ Make tests easily reproducible for others and me in the future - move bucket ID, etc. to environment variables, clean up afterward.
     ☐ I have DateTime<Local> and DateTime<Utc> objects; check whether they're correct or should be changed
     ☐ Allow uploads via streams/chunked/buffers/local filesystem
 
@@ -21,17 +21,11 @@ API:
     ✓ Implement bucket endpoints @done(2021-11-11 19:57) @project(API)
     ☐ Implement file endpoints
 
-    Buckets:
-        ✓ create_bucket @done(2021-11-01 09:48) @project(API \ Buckets)
-        ✓ delete_bucket @done(2021-11-01 10:58) @project(API \ Buckets)
-        ✓ list_buckets @done(2021-11-11 08:31) @project(API \ Buckets)
-        ✓ update_bucket @done(2021-11-11 19:57) @project(API \ Buckets)
-
     Files:
         ✓ cancel_large_file @done(2021-11-16 14:25) @project(API \ Files)
         ✓ copy_file @done(2021-11-18 11:54) @project(API \ Files)
         ✓ copy_part @done(2021-12-21 10:36) @project(API \ Files)
-        ☐ delete_file_version
+        ✓ delete_file_version @done(2022-01-04 10:11) @project(API \ Files)
         ☐ download_file_by_id
         ☐ download_file_by_name
         ✓ finish_large_file @done(2021-12-17 10:21) @project(API \ Files)
@@ -51,6 +45,10 @@ API:
 
 ＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿
 Archive:
+    ✓ create_bucket @done(2021-11-01 09:48) @project(API \ Buckets)
+    ✓ delete_bucket @done(2021-11-01 10:58) @project(API \ Buckets)
+    ✓ list_buckets @done(2021-11-11 08:31) @project(API \ Buckets)
+    ✓ update_bucket @done(2021-11-11 19:57) @project(API \ Buckets)
     ✓ Fix stack overflow on error. @done(2021-10-18 21:10) @project(Project \ Maybe Upstream)
     ✓ authorize_account @done(2021-10-13 15:01) @project(API \ Account)
     ✓ create_key @done(2021-10-14 14:55) @project(API \ Account)
