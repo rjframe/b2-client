@@ -26,7 +26,6 @@ pub mod prelude {
     pub(crate) use super::{
         account::{Authorization, Capability},
         types::{B2Result, Duration},
-        expect_json,
         require_capability,
     };
 }
@@ -40,19 +39,6 @@ macro_rules! require_capability {
     }
 }
 
-// TODO: Any failure here is a bug in this library, the B2 service, or corrupt
-// network transmission. Since the latter is possible we should be returning an
-// error rather than panicking. Functions will likely handle that code
-// themselves, so this macro is likely temporary.
-#[macro_export]
-macro_rules! expect_json {
-    ($data:expr, $unwrapped:ident, $func:block) => {
-        match $data {
-            $crate::client::ResponseBody::Json($unwrapped) => $func,
-            _ => panic!("Expected a JSON string, received bytes"),
-        }
-    }
-}
 
 pub use account::*;
 pub use bucket::*;

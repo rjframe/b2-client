@@ -5,7 +5,7 @@ use std::fmt;
 
 use b2_client::{
     account::authorize_account,
-    client::{HeaderMap, HttpClient, ResponseBody},
+    client::{HeaderMap, HttpClient},
     error::{ValidationError, Error},
 };
 
@@ -59,12 +59,12 @@ impl HttpClient for FakeClient {
         self
     }
 
-    async fn send(&mut self) -> Result<ResponseBody, Self::Error> {
+    async fn send(&mut self) -> Result<Vec<u8>, Self::Error> {
         Err(Error::Client(FakeError))
     }
 
     async fn send_keep_headers(&mut self)
-    -> Result<(ResponseBody, HeaderMap), Self::Error> {
+    -> Result<(Vec<u8>, HeaderMap), Self::Error> {
         Err(Error::Client(FakeError))
     }
 }

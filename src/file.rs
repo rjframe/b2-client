@@ -411,10 +411,8 @@ pub async fn cancel_large_file_by_id<C, E>(
         .with_body_json(serde_json::json!({ "fileId": id.as_ref() }))
         .send().await?;
 
-    expect_json!(res, json, {
-        let info: B2Result<CancelledFileUpload> = serde_json::from_value(json)?;
-        info.into()
-    })
+    let info: B2Result<CancelledFileUpload> = serde_json::from_slice(&res)?;
+    info.into()
 }
 
 /// A byte-range to retrieve a portion of a file.
@@ -704,10 +702,8 @@ pub async fn copy_file<'a, C, E>(
         .with_body_json(serde_json::to_value(file)?)
         .send().await?;
 
-    expect_json!(res, json, {
-        let file: B2Result<File> = serde_json::from_value(json)?;
-        file.into()
-    })
+    let file: B2Result<File> = serde_json::from_slice(&res)?;
+    file.into()
 }
 
 /// A request to copy from an existing file to a part of a large file.
@@ -866,10 +862,8 @@ pub async fn copy_file_part<C, E>(
         .with_body_json(serde_json::to_value(file_part)?)
         .send().await?;
 
-    expect_json!(res, json, {
-        let part: B2Result<FilePart> = serde_json::from_value(json)?;
-        part.into()
-    })
+    let part: B2Result<FilePart> = serde_json::from_slice(&res)?;
+    part.into()
 }
 
 /// Declare whether to bypass file lock restrictions when performing an action
@@ -935,10 +929,8 @@ pub async fn delete_file_version_by_name_id<C, E>(
         .with_body_json(body)
         .send().await?;
 
-    expect_json!(res, json, {
-        let file: B2Result<DeletedFile> = serde_json::from_value(json)?;
-        file.into()
-    })
+    let file: B2Result<DeletedFile> = serde_json::from_slice(&res)?;
+    file.into()
 }
 
 /// Complete the upload of a large file, merging all parts into a single [File].
@@ -985,10 +977,8 @@ pub async fn finish_large_file_upload_by_id<C, E>(
         }))
         .send().await?;
 
-    expect_json!(res, json, {
-        let file: B2Result<File> = serde_json::from_value(json)?;
-        file.into()
-    })
+    let file: B2Result<File> = serde_json::from_slice(&res)?;
+    file.into()
 }
 
 /// An authorization to upload file contents to a B2 file.
@@ -1063,16 +1053,14 @@ pub async fn get_upload_part_authorization_by_id<'a, 'b, C, E>(
         .with_body_json(json!({ "fileId": file_id.as_ref() }))
         .send().await?;
 
-    expect_json!(res, json, {
-        let upload_auth: B2Result<UploadPartAuthorization<'_, '_, _, _>> =
-            serde_json::from_value(json)?;
+    let upload_auth: B2Result<UploadPartAuthorization<'_, '_, _, _>> =
+        serde_json::from_slice(&res)?;
 
-        upload_auth.map(move |mut a| {
-            a.auth = Some(auth);
-            a.encryption = encryption;
-            a
-        }).into()
-    })
+    upload_auth.map(move |mut a| {
+        a.auth = Some(auth);
+        a.encryption = encryption;
+        a
+    }).into()
 }
 
 /// An authorization to upload a file to a B2 bucket.
@@ -1137,12 +1125,10 @@ pub async fn get_upload_authorization_by_id<'a, 'b, C, E>(
         .with_body_json(json!({ "bucketId": bucket_id.as_ref() }))
         .send().await?;
 
-    expect_json!(res, json, {
-        let upload_auth: B2Result<UploadAuthorization<'_, _, _>> =
-            serde_json::from_value(json)?;
+    let upload_auth: B2Result<UploadAuthorization<'_, _, _>> =
+        serde_json::from_slice(&res)?;
 
-        upload_auth.map(move |mut a| { a.auth = Some(auth); a }).into()
-    })
+    upload_auth.map(move |mut a| { a.auth = Some(auth); a }).into()
 }
 
 /// A request to prepare to upload a large file.
@@ -1368,10 +1354,8 @@ pub async fn start_large_file<'a, C, E>(
         .with_body_json(serde_json::to_value(file)?)
         .send().await?;
 
-    expect_json!(res, json, {
-        let file: B2Result<File> = serde_json::from_value(json)?;
-        file.into()
-    })
+    let file: B2Result<File> = serde_json::from_slice(&res)?;
+    file.into()
 }
 
 /// A request to upload a file to B2.
@@ -1713,10 +1697,8 @@ pub async fn upload_file<C, E>(
 
     let res = req.with_body(data).send().await?;
 
-    expect_json!(res, json, {
-        let file: B2Result<File> = serde_json::from_value(json)?;
-        file.into()
-    })
+    let file: B2Result<File> = serde_json::from_slice(&res)?;
+    file.into()
 }
 
 /// Upload a part of a large file to B2.
@@ -1795,10 +1777,8 @@ pub async fn upload_file_part<C, E>(
 
     let res = req.with_body(data).send().await?;
 
-    expect_json!(res, json, {
-        let part: B2Result<FilePart> = serde_json::from_value(json)?;
-        part.into()
-    })
+    let part: B2Result<FilePart> = serde_json::from_slice(&res)?;
+    part.into()
 }
 
 #[cfg(all(test, feature = "with_surf"))]

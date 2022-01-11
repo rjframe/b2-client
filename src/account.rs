@@ -272,10 +272,8 @@ pub async fn authorize_account<C, E>(mut client: C, key_id: &str, key: &str)
 
     let res = req.send().await?;
 
-    expect_json!(res, json, {
-        let auth: B2Result<ProtoAuthorization> = serde_json::from_value(json)?;
-        auth.map(|v| v.create_authorization(client)).into()
-    })
+    let auth: B2Result<ProtoAuthorization> = serde_json::from_slice(&res)?;
+    auth.map(|v| v.create_authorization(client)).into()
 }
 
 /// A request to create a B2 API key with certain capabilities.
@@ -584,10 +582,8 @@ pub async fn create_key<C, E>(
         .with_body_json(serde_json::to_value(new_key_info)?)
         .send().await?;
 
-    expect_json!(res, json, {
-        let new_key: B2Result<NewlyCreatedKey> = serde_json::from_value(json)?;
-        new_key.map(|key| key.create_public_key()).into()
-    })
+    let new_key: B2Result<NewlyCreatedKey> = serde_json::from_slice(&res)?;
+    new_key.map(|key| key.create_public_key()).into()
 }
 
 /// Delete the given [Key].
@@ -666,10 +662,8 @@ pub async fn delete_key_by_id<C, E, S: AsRef<str>>(
         .with_body_json(serde_json::json!({"applicationKeyId": key_id.as_ref()}))
         .send().await?;
 
-    expect_json!(res, json, {
-        let key: B2Result<Key> = serde_json::from_value(json)?;
-        key.into()
-    })
+    let key: B2Result<Key> = serde_json::from_slice(&res)?;
+    key.into()
 }
 
 /// A Content-Disposition value.
@@ -909,12 +903,8 @@ pub async fn get_download_authorization<'a, C, E>(
         .with_body_json(serde_json::to_value(download_req)?)
         .send().await?;
 
-    expect_json!(res, json, {
-        let auth: B2Result<DownloadAuthorization> =
-            serde_json::from_value(json)?;
-
-        auth.into()
-    })
+    let auth: B2Result<DownloadAuthorization> = serde_json::from_slice(&res)?;
+    auth.into()
 }
 
 /// A request to obtain a list of keys associated with an account.
@@ -1065,10 +1055,8 @@ pub async fn list_keys<C, E>(
         .with_body_json(serde_json::to_value(list_req)?)
         .send().await?;
 
-    expect_json!(res, json, {
-        let keys: B2Result<KeyList> = serde_json::from_value(json)?;
-        keys.map(|k| (k.keys, k.next_application_key_id)).into()
-    })
+    let keys: B2Result<KeyList> = serde_json::from_slice(&res)?;
+    keys.map(|k| (k.keys, k.next_application_key_id)).into()
 }
 
 

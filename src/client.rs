@@ -72,21 +72,12 @@ pub trait HttpClient
     fn read_body_from_file(&mut self, path: impl Into<PathBuf>) -> &mut Self;
 
     /// Send the previously-constructed request and return a response.
-    async fn send(&mut self) -> Result<ResponseBody, Self::Error>;
+    async fn send(&mut self) -> Result<Vec<u8>, Self::Error>;
 
     /// Send the previously-constructed request and return a response with the
     /// returned HTTP headers.
     async fn send_keep_headers(&mut self)
-    -> Result<(ResponseBody, HeaderMap), Self::Error>;
-}
-
-
-/// The HTTP response body from the remote server.
-#[derive(Debug, serde::Serialize)]
-#[serde(untagged)]
-pub enum ResponseBody {
-    Json(serde_json::Value),
-    Bytes(Vec<u8>),
+    -> Result<(Vec<u8>, HeaderMap), Self::Error>;
 }
 
 // TODO: Use http_types::{HeaderName, HeaderValue} instead of Strings?
@@ -130,10 +121,7 @@ mod surf_client {
         }
 
         async fn send_impl(&mut self, keep_headers: bool)
-        -> Result<
-            (ResponseBody, Option<HeaderMap>),
-            <Self as HttpClient>::Error
-        > {
+        -> Result<(Vec<u8>, Option<HeaderMap>), <Self as HttpClient>::Error> {
             if let Some(mut req) = self.req.to_owned() {
                 if let Some(body) = &self.body {
                     match body {
@@ -146,11 +134,6 @@ mod surf_client {
 
                 let mut res = self.client.send(req).await?;
                 let body = res.body_bytes().await?;
-
-                let body = match serde_json::from_slice(&body) {
-                    Ok(val) => ResponseBody::Json(val),
-                    Err(_) => ResponseBody::Bytes(body),
-                };
 
                 let headers = if keep_headers {
                     let headers: &surf::http::Headers = res.as_ref();
@@ -242,7 +225,7 @@ mod surf_client {
         ///
         /// * If a request has not been created, returns [Error::NoRequest].
         /// * Returns any underlying HTTP client errors in [Error::Client].
-        async fn send(&mut self) -> Result<ResponseBody, Self::Error> {
+        async fn send(&mut self) -> Result<Vec<u8>, Self::Error> {
             self.send_impl(false).await.map(|v| v.0)
         }
 
@@ -254,7 +237,7 @@ mod surf_client {
         /// * If a request has not been created, returns [Error::NoRequest].
         /// * Returns any underlying HTTP client errors in [Error::Client].
         async fn send_keep_headers(&mut self)
-        -> Result<(ResponseBody, HeaderMap), Self::Error> {
+        -> Result<(Vec<u8>, HeaderMap), Self::Error> {
             self.send_impl(true).await.map(|(r, m)| (r, m.unwrap()))
         }
     }
@@ -323,10 +306,7 @@ mod hyper_client {
         }
 
         async fn send_impl(&mut self, keep_headers: bool)
-        -> Result<
-            (ResponseBody, Option<HeaderMap>),
-            <Self as HttpClient>::Error
-        > {
+        -> Result<(Vec<u8>, Option<HeaderMap>), <Self as HttpClient>::Error> {
             if self.method.is_none() {
                 return Err(Error::NoRequest);
             }
@@ -370,11 +350,6 @@ mod hyper_client {
                 .into_parts();
 
             let body = hyper::body::to_bytes(body).await?.to_vec();
-
-            let body = match serde_json::from_slice(&body) {
-                Ok(val) => ResponseBody::Json(val),
-                Err(_) => ResponseBody::Bytes(body),
-            };
 
             let headers = if keep_headers {
                 let mut headers = HeaderMap::new();
@@ -474,12 +449,12 @@ mod hyper_client {
         ///
         /// * If a request has not been created, returns [Error::NoRequest].
         /// * Returns any underlying HTTP client errors in [Error::Client].
-        async fn send(&mut self) -> Result<ResponseBody, Self::Error> {
+        async fn send(&mut self) -> Result<Vec<u8>, Self::Error> {
             self.send_impl(false).await.map(|v| v.0)
         }
 
         async fn send_keep_headers(&mut self)
-        -> Result<(ResponseBody, HeaderMap), Self::Error> {
+        -> Result<(Vec<u8>, HeaderMap), Self::Error> {
             self.send_impl(true).await.map(|(r, m)| (r, m.unwrap()))
         }
     }

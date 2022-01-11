@@ -902,10 +902,8 @@ pub async fn create_bucket<C, E>(
         .with_body_json(serde_json::to_value(new_bucket_info)?)
         .send().await?;
 
-    expect_json!(res, json, {
-        let new_bucket: B2Result<Bucket> = serde_json::from_value(json)?;
-        new_bucket.into()
-    })
+    let new_bucket: B2Result<Bucket> = serde_json::from_slice(&res)?;
+    new_bucket.into()
 }
 
 /// Delete the bucket with the given ID.
@@ -932,10 +930,8 @@ pub async fn delete_bucket<C, E>(
         }))
         .send().await?;
 
-    expect_json!(res, json, {
-        let new_bucket: B2Result<Bucket> = serde_json::from_value(json)?;
-        new_bucket.into()
-    })
+    let new_bucket: B2Result<Bucket> = serde_json::from_slice(&res)?;
+    new_bucket.into()
 }
 
 // The B2 API intention is that only an ID or name is supplied when listing
@@ -1068,10 +1064,8 @@ pub async fn list_buckets<C, E>(
         .with_body_json(serde_json::to_value(list_info)?)
         .send().await?;
 
-    expect_json!(res, json, {
-        let buckets: B2Result<BucketList> = serde_json::from_value(json)?;
-        buckets.map(|b| b.buckets).into()
-    })
+    let buckets: B2Result<BucketList> = serde_json::from_slice(&res)?;
+    buckets.map(|b| b.buckets).into()
 }
 
 /// A request to update one or more settings on a [Bucket].
@@ -1255,10 +1249,8 @@ pub async fn update_bucket<C, E>(
         .with_body_json(serde_json::to_value(bucket_info)?)
         .send().await?;
 
-    expect_json!(res, json, {
-        let bucket: B2Result<Bucket> = serde_json::from_value(json)?;
-        bucket.into()
-    })
+    let bucket: B2Result<Bucket> = serde_json::from_slice(&res)?;
+    bucket.into()
 }
 
 mod serialization {
