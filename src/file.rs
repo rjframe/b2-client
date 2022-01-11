@@ -156,14 +156,13 @@ use crate::{
         FileRetentionPolicy,
         ServerSideEncryption,
     },
-    client::HttpClient,
+    client::{HeaderMap, HttpClient},
     error::{ValidationError, Error},
     validate::{
         validate_content_disposition,
         validated_file_info,
         validated_file_name,
     },
-    require_capability,
 };
 
 pub use http_types::{
@@ -388,7 +387,7 @@ pub struct DeletedFile {
 /// Cancel the uploading of a large file and delete any parts already uploaded.
 pub async fn cancel_large_file<C, E>(auth: &mut Authorization<C>, file: File)
 -> Result<CancelledFileUpload, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     cancel_large_file_by_id(auth, file.file_id).await
@@ -401,7 +400,7 @@ pub async fn cancel_large_file_by_id<C, E>(
     auth: &mut Authorization<C>,
     id: impl AsRef<str>
 ) -> Result<CancelledFileUpload, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     require_capability!(auth, Capability::WriteFiles);
@@ -412,8 +411,10 @@ pub async fn cancel_large_file_by_id<C, E>(
         .with_body_json(serde_json::json!({ "fileId": id.as_ref() }))
         .send().await?;
 
-    let info: B2Result<CancelledFileUpload> = serde_json::from_value(res)?;
-    info.into()
+    expect_json!(res, json, {
+        let info: B2Result<CancelledFileUpload> = serde_json::from_value(json)?;
+        info.into()
+    })
 }
 
 /// A byte-range to retrieve a portion of a file.
@@ -683,7 +684,7 @@ pub async fn copy_file<'a, C, E>(
     auth: &mut Authorization<C>,
     file: CopyFile<'a>
 ) -> Result<File, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     require_capability!(auth, Capability::WriteFiles);
@@ -703,8 +704,10 @@ pub async fn copy_file<'a, C, E>(
         .with_body_json(serde_json::to_value(file)?)
         .send().await?;
 
-    let file: B2Result<File> = serde_json::from_value(res)?;
-    file.into()
+    expect_json!(res, json, {
+        let file: B2Result<File> = serde_json::from_value(json)?;
+        file.into()
+    })
 }
 
 /// A request to copy from an existing file to a part of a large file.
@@ -852,7 +855,7 @@ pub async fn copy_file_part<C, E>(
     auth: &mut Authorization<C>,
     file_part: CopyFilePart<'_>
 ) -> Result<FilePart, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     require_capability!(auth, Capability::WriteFiles);
@@ -863,8 +866,10 @@ pub async fn copy_file_part<C, E>(
         .with_body_json(serde_json::to_value(file_part)?)
         .send().await?;
 
-    let part: B2Result<FilePart> = serde_json::from_value(res)?;
-    part.into()
+    expect_json!(res, json, {
+        let part: B2Result<FilePart> = serde_json::from_value(json)?;
+        part.into()
+    })
 }
 
 /// Declare whether to bypass file lock restrictions when performing an action
@@ -885,7 +890,7 @@ pub async fn delete_file_version<C, E>(
     file: File,
     bypass_governance: BypassGovernance,
 ) -> Result<DeletedFile, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     delete_file_version_by_name_id(
@@ -909,7 +914,7 @@ pub async fn delete_file_version_by_name_id<C, E>(
     file_id: impl AsRef<str>,
     bypass_governance: BypassGovernance,
 ) -> Result<DeletedFile, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     require_capability!(auth, Capability::DeleteFiles);
@@ -930,8 +935,10 @@ pub async fn delete_file_version_by_name_id<C, E>(
         .with_body_json(body)
         .send().await?;
 
-    let file: B2Result<DeletedFile> = serde_json::from_value(res)?;
-    file.into()
+    expect_json!(res, json, {
+        let file: B2Result<DeletedFile> = serde_json::from_value(json)?;
+        file.into()
+    })
 }
 
 /// Complete the upload of a large file, merging all parts into a single [File].
@@ -948,7 +955,7 @@ pub async fn finish_large_file_upload<C, E>(
     file: &File,
     sha1_checksums: &[String],
 ) -> Result<File, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     finish_large_file_upload_by_id(auth, &file.file_id, sha1_checksums).await
@@ -962,7 +969,7 @@ pub async fn finish_large_file_upload_by_id<C, E>(
     file_id: impl AsRef<str>,
     sha1_checksums: &[String],
 ) -> Result<File, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     use serde_json::json;
@@ -978,15 +985,17 @@ pub async fn finish_large_file_upload_by_id<C, E>(
         }))
         .send().await?;
 
-    let file: B2Result<File> = serde_json::from_value(res)?;
-    file.into()
+    expect_json!(res, json, {
+        let file: B2Result<File> = serde_json::from_value(json)?;
+        file.into()
+    })
 }
 
 /// An authorization to upload file contents to a B2 file.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UploadPartAuthorization<'a, 'b, C, E>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     #[serde(skip_deserializing)]
@@ -1022,7 +1031,7 @@ pub async fn get_upload_part_authorization<'a, 'b, C, E>(
     auth: &'a mut Authorization<C>,
     file: &'b File,
 ) -> Result<UploadPartAuthorization<'a, 'b, C, E>, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     get_upload_part_authorization_by_id(
@@ -1041,7 +1050,7 @@ pub async fn get_upload_part_authorization_by_id<'a, 'b, C, E>(
     file_id: impl AsRef<str>,
     encryption: Option<&'b ServerSideEncryption>,
 ) -> Result<UploadPartAuthorization<'a, 'b, C, E>, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     use serde_json::json;
@@ -1054,21 +1063,23 @@ pub async fn get_upload_part_authorization_by_id<'a, 'b, C, E>(
         .with_body_json(json!({ "fileId": file_id.as_ref() }))
         .send().await?;
 
-    let upload_auth: B2Result<UploadPartAuthorization<'_, '_, _, _>> =
-        serde_json::from_value(res)?;
+    expect_json!(res, json, {
+        let upload_auth: B2Result<UploadPartAuthorization<'_, '_, _, _>> =
+            serde_json::from_value(json)?;
 
-    upload_auth.map(move |mut a| {
-        a.auth = Some(auth);
-        a.encryption = encryption;
-        a
-    }).into()
+        upload_auth.map(move |mut a| {
+            a.auth = Some(auth);
+            a.encryption = encryption;
+            a
+        }).into()
+    })
 }
 
 /// An authorization to upload a file to a B2 bucket.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UploadAuthorization<'a, C, E>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     #[serde(skip_deserializing)]
@@ -1099,7 +1110,7 @@ pub async fn get_upload_authorization<'a, 'b, C, E>(
     auth: &'a mut Authorization<C>,
     bucket: &'b Bucket,
 ) -> Result<UploadAuthorization<'a, C, E>, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     get_upload_authorization_by_id(auth, &bucket.bucket_id).await
@@ -1113,7 +1124,7 @@ pub async fn get_upload_authorization_by_id<'a, 'b, C, E>(
     auth: &'a mut Authorization<C>,
     bucket_id: impl AsRef<str>,
 ) -> Result<UploadAuthorization<'a, C, E>, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     use serde_json::json;
@@ -1126,10 +1137,12 @@ pub async fn get_upload_authorization_by_id<'a, 'b, C, E>(
         .with_body_json(json!({ "bucketId": bucket_id.as_ref() }))
         .send().await?;
 
-    let upload_auth: B2Result<UploadAuthorization<'_, _, _>> =
-        serde_json::from_value(res)?;
+    expect_json!(res, json, {
+        let upload_auth: B2Result<UploadAuthorization<'_, _, _>> =
+            serde_json::from_value(json)?;
 
-    upload_auth.map(move |mut a| { a.auth = Some(auth); a }).into()
+        upload_auth.map(move |mut a| { a.auth = Some(auth); a }).into()
+    })
 }
 
 /// A request to prepare to upload a large file.
@@ -1335,7 +1348,7 @@ pub async fn start_large_file<'a, C, E>(
     auth: &mut Authorization<C>,
     file: StartLargeFile<'a>
 ) -> Result<File, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     require_capability!(auth, Capability::WriteFiles);
@@ -1355,8 +1368,10 @@ pub async fn start_large_file<'a, C, E>(
         .with_body_json(serde_json::to_value(file)?)
         .send().await?;
 
-    let file: B2Result<File> = serde_json::from_value(res)?;
-    file.into()
+    expect_json!(res, json, {
+        let file: B2Result<File> = serde_json::from_value(json)?;
+        file.into()
+    })
 }
 
 /// A request to upload a file to B2.
@@ -1609,7 +1624,7 @@ pub async fn upload_file<C, E>(
     upload: UploadFile<'_>,
     data: &[u8],
 ) -> Result<File, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     // Unwrap safety: an `UploadAuthorization` can only be created from
@@ -1698,8 +1713,10 @@ pub async fn upload_file<C, E>(
 
     let res = req.with_body(data).send().await?;
 
-    let file: B2Result<File> = serde_json::from_value(res)?;
-    file.into()
+    expect_json!(res, json, {
+        let file: B2Result<File> = serde_json::from_value(json)?;
+        file.into()
+    })
 }
 
 /// Upload a part of a large file to B2.
@@ -1744,7 +1761,7 @@ pub async fn upload_file_part<C, E>(
     sha1_checksum: Option<impl AsRef<str>>,
     data: &[u8],
 ) -> Result<FilePart, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     #[allow(clippy::manual_range_contains)]
@@ -1778,8 +1795,10 @@ pub async fn upload_file_part<C, E>(
 
     let res = req.with_body(data).send().await?;
 
-    let part: B2Result<FilePart> = serde_json::from_value(res)?;
-    part.into()
+    expect_json!(res, json, {
+        let part: B2Result<FilePart> = serde_json::from_value(json)?;
+        part.into()
+    })
 }
 
 #[cfg(all(test, feature = "with_surf"))]

@@ -12,7 +12,10 @@
 //! To use a custom HTTP client backend, implement [HttpClient] over an object
 //! that wraps your client.
 
-use std::path::PathBuf;
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+};
 
 use crate::error::{ValidationError, Error};
 
@@ -22,13 +25,12 @@ pub use surf_client::SurfClient;
 #[cfg(feature = "with_hyper")]
 pub use hyper_client::HyperClient;
 
+
 /// A trait that wraps an HTTP client to send HTTP requests.
 #[async_trait::async_trait]
 pub trait HttpClient
     where Self: Sized,
 {
-    /// The response type of the request.
-    type Response;
     /// The HTTP client's Error type.
     type Error;
 
@@ -70,13 +72,30 @@ pub trait HttpClient
     fn read_body_from_file(&mut self, path: impl Into<PathBuf>) -> &mut Self;
 
     /// Send the previously-constructed request and return a response.
-    async fn send(&mut self) -> Result<Self::Response, Self::Error>;
+    async fn send(&mut self) -> Result<ResponseBody, Self::Error>;
+
+    /// Send the previously-constructed request and return a response with the
+    /// returned HTTP headers.
+    async fn send_keep_headers(&mut self)
+    -> Result<(ResponseBody, HeaderMap), Self::Error>;
 }
+
+
+/// The HTTP response body from the remote server.
+#[derive(Debug, serde::Serialize)]
+#[serde(untagged)]
+pub enum ResponseBody {
+    Json(serde_json::Value),
+    Bytes(Vec<u8>),
+}
+
+// TODO: Use http_types::{HeaderName, HeaderValue} instead of Strings?
+pub type HeaderMap = HashMap<String, String>;
 
 #[cfg(feature = "with_surf")]
 mod surf_client {
     use std::path::PathBuf;
-    use super::{HttpClient, ValidationError, Error};
+    use super::*;
     use surf::{
         http::Method,
         Request,
@@ -90,6 +109,7 @@ mod surf_client {
         body: Option<Body>,
     }
 
+    // Body type for sending; TODO rename to avoid ambiguity?
     #[derive(Debug)]
     enum Body {
         Json(serde_json::Value),
@@ -108,6 +128,50 @@ mod surf_client {
             self.client = client;
             self
         }
+
+        async fn send_impl(&mut self, keep_headers: bool)
+        -> Result<
+            (ResponseBody, Option<HeaderMap>),
+            <Self as HttpClient>::Error
+        > {
+            if let Some(mut req) = self.req.to_owned() {
+                if let Some(body) = &self.body {
+                    match body {
+                        Body::Json(val) => req.body_json(val)?,
+                        Body::Bytes(data) => req.body_bytes(data),
+                        Body::File(path) =>
+                            req.set_body(surf::Body::from_file(path).await?),
+                    }
+                }
+
+                let mut res = self.client.send(req).await?;
+                let body = res.body_bytes().await?;
+
+                let body = match serde_json::from_slice(&body) {
+                    Ok(val) => ResponseBody::Json(val),
+                    Err(_) => ResponseBody::Bytes(body),
+                };
+
+                let headers = if keep_headers {
+                    let headers: &surf::http::Headers = res.as_ref();
+                    let mut ret = HeaderMap::new();
+
+                    for (k, v) in headers.iter() {
+                        ret.insert(k.to_string(), v.to_string());
+                    }
+
+                    Some(ret)
+                } else {
+                    None
+                };
+
+                self.req = None;
+
+                Ok((body, headers))
+            } else {
+                Err(Error::NoRequest)
+            }
+        }
     }
 
     macro_rules! gen_method_func {
@@ -124,8 +188,6 @@ mod surf_client {
 
     #[async_trait::async_trait]
     impl HttpClient for SurfClient {
-        /// The JSON response received from a server.
-        type Response = serde_json::Value;
         /// Errors that can be returned by a `SurfClient`.
         type Error = Error<surf::Error>;
 
@@ -180,26 +242,20 @@ mod surf_client {
         ///
         /// * If a request has not been created, returns [Error::NoRequest].
         /// * Returns any underlying HTTP client errors in [Error::Client].
-        async fn send(&mut self) -> Result<Self::Response, Self::Error> {
-            if let Some(mut req) = self.req.to_owned() {
-                if let Some(body) = &self.body {
-                    match body {
-                        Body::Json(val) => req.body_json(val)?,
-                        Body::Bytes(data) => req.body_bytes(data),
-                        Body::File(path) =>
-                            req.set_body(surf::Body::from_file(path).await?),
-                    }
-                }
+        async fn send(&mut self) -> Result<ResponseBody, Self::Error> {
+            self.send_impl(false).await.map(|v| v.0)
+        }
 
-                let res = self.client.send(req).await?
-                    .body_json().await?;
-
-                self.req = None;
-
-                Ok(res)
-            } else {
-                Err(Error::NoRequest)
-            }
+        /// Send the previously-constructed request and return a response with
+        /// the returned HTTP headers.
+        ///
+        /// # Errors
+        ///
+        /// * If a request has not been created, returns [Error::NoRequest].
+        /// * Returns any underlying HTTP client errors in [Error::Client].
+        async fn send_keep_headers(&mut self)
+        -> Result<(ResponseBody, HeaderMap), Self::Error> {
+            self.send_impl(true).await.map(|(r, m)| (r, m.unwrap()))
         }
     }
 }
@@ -207,7 +263,7 @@ mod surf_client {
 #[cfg(feature = "with_hyper")]
 mod hyper_client {
     use std::path::PathBuf;
-    use super::{HttpClient, ValidationError, Error};
+    use super::*;
     use hyper::{
         client::connect::HttpConnector,
         header::{HeaderName, HeaderValue},
@@ -265,12 +321,94 @@ mod hyper_client {
             self.body = Some(Body::Bytes(bytes));
             self
         }
+
+        async fn send_impl(&mut self, keep_headers: bool)
+        -> Result<
+            (ResponseBody, Option<HeaderMap>),
+            <Self as HttpClient>::Error
+        > {
+            if self.method.is_none() {
+                return Err(Error::NoRequest);
+            }
+
+            let mut req = hyper::Request::builder()
+                .method(self.method.as_ref().unwrap())
+                .uri(&self.url);
+
+            for (name, value) in &self.headers {
+                req = req.header(name, value);
+            }
+
+            let body = match &self.body {
+                Some(body) => match body {
+                    Body::Json(val) => hyper::Body::from(val.to_string()),
+                    Body::Bytes(data) => hyper::Body::from(data.clone()),
+                    Body::File(path) => {
+                        use tokio::{
+                            fs::File,
+                            io::AsyncReadExt as _,
+                        };
+
+                        // TODO: We might do better to create a stream over the
+                        // file and pass it to the hyper::Body.
+                        let mut file = File::open(path).await?;
+                        let mut buf = vec![];
+                        file.read_to_end(&mut buf).await?;
+
+                        hyper::Body::from(buf)
+                    },
+                },
+                None => hyper::Body::empty(),
+            };
+
+            let req = req.body(body).expect(concat!(
+                "Invalid request. Please file an issue on b2-client for ",
+                "improper validation"
+            ));
+
+            let (mut parts, body) = self.client.request(req).await?
+                .into_parts();
+
+            let body = hyper::body::to_bytes(body).await?.to_vec();
+
+            let body = match serde_json::from_slice(&body) {
+                Ok(val) => ResponseBody::Json(val),
+                Err(_) => ResponseBody::Bytes(body),
+            };
+
+            let headers = if keep_headers {
+                let mut headers = HeaderMap::new();
+
+                headers.extend(
+                    parts.headers.drain()
+                        .filter(|(k, _)| k.is_some())
+                        .map(|(k, v)|
+                            // TODO: Ensure that all possible header values from
+                            // B2 are required to be valid strings on their
+                            // side.
+                            (
+                                k.unwrap().to_string(),
+                                v.to_str().unwrap().to_owned()
+                            )
+                        )
+                );
+
+                Some(headers)
+            } else {
+                None
+            };
+
+            self.method = None;
+            self.url = String::default();
+            self.headers.clear();
+            self.body = None;
+
+            Ok((body, headers))
+        }
     }
 
     #[async_trait::async_trait]
     impl HttpClient for HyperClient {
-        /// The JSON response received from the server.
-        type Response = serde_json::Value;
         type Error = Error<hyper::Error>;
 
         /// Create a new `HttpClient`.
@@ -336,56 +474,13 @@ mod hyper_client {
         ///
         /// * If a request has not been created, returns [Error::NoRequest].
         /// * Returns any underlying HTTP client errors in [Error::Client].
-        async fn send(&mut self) -> Result<Self::Response, Self::Error> {
-            if self.method.is_none() {
-                return Err(Error::NoRequest);
-            }
+        async fn send(&mut self) -> Result<ResponseBody, Self::Error> {
+            self.send_impl(false).await.map(|v| v.0)
+        }
 
-            let mut req = hyper::Request::builder()
-                .method(self.method.as_ref().unwrap())
-                .uri(&self.url);
-
-            for (name, value) in &self.headers {
-                req = req.header(name, value);
-            }
-
-            let body = match &self.body {
-                Some(body) => match body {
-                    Body::Json(val) => hyper::Body::from(val.to_string()),
-                    Body::Bytes(data) => hyper::Body::from(data.clone()),
-                    Body::File(path) => {
-                        use tokio::{
-                            fs::File,
-                            io::AsyncReadExt as _,
-                        };
-
-                        // TODO: We might do better to create a stream over the
-                        // file and pass it to the hyper::Body.
-                        let mut file = File::open(path).await?;
-                        let mut buf = vec![];
-                        file.read_to_end(&mut buf).await?;
-
-                        hyper::Body::from(buf)
-                    },
-                },
-                None => hyper::Body::empty(),
-            };
-
-            let req = req.body(body).expect(concat!(
-                "Invalid request. Please file an issue on b2-client for ",
-                "improper validation"
-            ));
-
-            let res = self.client.request(req).await?
-                .into_body();
-            let res = hyper::body::to_bytes(res).await?;
-
-            self.method = None;
-            self.url = String::default();
-            self.headers.clear();
-            self.body = None;
-
-            Ok(serde_json::from_slice(&res)?)
+        async fn send_keep_headers(&mut self)
+        -> Result<(ResponseBody, HeaderMap), Self::Error> {
+            self.send_impl(true).await.map(|(r, m)| (r, m.unwrap()))
         }
     }
 }

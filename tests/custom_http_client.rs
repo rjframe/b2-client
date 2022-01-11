@@ -5,7 +5,7 @@ use std::fmt;
 
 use b2_client::{
     account::authorize_account,
-    client::HttpClient,
+    client::{HeaderMap, HttpClient, ResponseBody},
     error::{ValidationError, Error},
 };
 
@@ -34,7 +34,6 @@ macro_rules! gen_send_func {
 
 #[async_trait::async_trait]
 impl HttpClient for FakeClient {
-    type Response = serde_json::Value;
     type Error = Error<FakeError>;
 
     fn new() -> Self { FakeClient }
@@ -60,7 +59,12 @@ impl HttpClient for FakeClient {
         self
     }
 
-    async fn send(&mut self) -> Result<Self::Response, Self::Error> {
+    async fn send(&mut self) -> Result<ResponseBody, Self::Error> {
+        Err(Error::Client(FakeError))
+    }
+
+    async fn send_keep_headers(&mut self)
+    -> Result<(ResponseBody, HeaderMap), Self::Error> {
         Err(Error::Client(FakeError))
     }
 }

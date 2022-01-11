@@ -256,7 +256,7 @@ pub enum Capability {
 /// ```
 pub async fn authorize_account<C, E>(mut client: C, key_id: &str, key: &str)
 -> Result<Authorization<C>, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     let id_and_key = format!("{}:{}", key_id, key);
@@ -272,8 +272,10 @@ pub async fn authorize_account<C, E>(mut client: C, key_id: &str, key: &str)
 
     let res = req.send().await?;
 
-    let auth: B2Result<ProtoAuthorization> = serde_json::from_value(res)?;
-    auth.map(|v| v.create_authorization(client)).into()
+    expect_json!(res, json, {
+        let auth: B2Result<ProtoAuthorization> = serde_json::from_value(json)?;
+        auth.map(|v| v.create_authorization(client)).into()
+    })
 }
 
 /// A request to create a B2 API key with certain capabilities.
@@ -568,7 +570,7 @@ pub async fn create_key<C, E>(
     auth: &mut Authorization<C>,
     new_key_info: CreateKey<'_>
 ) -> Result<(String, Key), Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     require_capability!(auth, Capability::WriteKeys);
@@ -582,8 +584,10 @@ pub async fn create_key<C, E>(
         .with_body_json(serde_json::to_value(new_key_info)?)
         .send().await?;
 
-    let new_key: B2Result<NewlyCreatedKey> = serde_json::from_value(res)?;
-    new_key.map(|key| key.create_public_key()).into()
+    expect_json!(res, json, {
+        let new_key: B2Result<NewlyCreatedKey> = serde_json::from_value(json)?;
+        new_key.map(|key| key.create_public_key()).into()
+    })
 }
 
 /// Delete the given [Key].
@@ -618,7 +622,7 @@ pub async fn create_key<C, E>(
 /// ```
 pub async fn delete_key<C, E>(auth: &mut Authorization<C>, key: Key)
 -> Result<Key, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     delete_key_by_id(auth, key.application_key_id).await
@@ -651,7 +655,7 @@ pub async fn delete_key_by_id<C, E, S: AsRef<str>>(
     auth: &mut Authorization<C>,
     key_id: S
 ) -> Result<Key, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     require_capability!(auth, Capability::DeleteKeys);
@@ -662,8 +666,10 @@ pub async fn delete_key_by_id<C, E, S: AsRef<str>>(
         .with_body_json(serde_json::json!({"applicationKeyId": key_id.as_ref()}))
         .send().await?;
 
-    let key: B2Result<Key> = serde_json::from_value(res)?;
-    key.into()
+    expect_json!(res, json, {
+        let key: B2Result<Key> = serde_json::from_value(json)?;
+        key.into()
+    })
 }
 
 /// A Content-Disposition value.
@@ -892,7 +898,7 @@ pub async fn get_download_authorization<'a, C, E>(
     auth: &mut Authorization<C>,
     download_req: DownloadAuthorizationRequest<'a>
 ) -> Result<DownloadAuthorization, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     require_capability!(auth, Capability::ShareFiles);
@@ -903,8 +909,12 @@ pub async fn get_download_authorization<'a, C, E>(
         .with_body_json(serde_json::to_value(download_req)?)
         .send().await?;
 
-    let auth: B2Result<DownloadAuthorization> = serde_json::from_value(res)?;
-    auth.into()
+    expect_json!(res, json, {
+        let auth: B2Result<DownloadAuthorization> =
+            serde_json::from_value(json)?;
+
+        auth.into()
+    })
 }
 
 /// A request to obtain a list of keys associated with an account.
@@ -1041,7 +1051,7 @@ pub async fn list_keys<C, E>(
     auth: &mut Authorization<C>,
     list_req: KeyListRequest<'_>
 ) -> Result<(Vec<Key>, Option<String>), Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     require_capability!(auth, Capability::ListKeys);
@@ -1055,8 +1065,10 @@ pub async fn list_keys<C, E>(
         .with_body_json(serde_json::to_value(list_req)?)
         .send().await?;
 
-    let keys: B2Result<KeyList> = serde_json::from_value(res)?;
-    keys.map(|k| (k.keys, k.next_application_key_id)).into()
+    expect_json!(res, json, {
+        let keys: B2Result<KeyList> = serde_json::from_value(json)?;
+        keys.map(|k| (k.keys, k.next_application_key_id)).into()
+    })
 }
 
 

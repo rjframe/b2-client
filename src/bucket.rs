@@ -882,7 +882,7 @@ pub async fn create_bucket<C, E>(
     auth: &mut Authorization<C>,
     new_bucket_info: CreateBucket<'_>
 ) -> Result<Bucket, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     require_capability!(auth, Capability::WriteBuckets);
@@ -902,8 +902,10 @@ pub async fn create_bucket<C, E>(
         .with_body_json(serde_json::to_value(new_bucket_info)?)
         .send().await?;
 
-    let new_bucket: B2Result<Bucket> = serde_json::from_value(res)?;
-    new_bucket.into()
+    expect_json!(res, json, {
+        let new_bucket: B2Result<Bucket> = serde_json::from_value(json)?;
+        new_bucket.into()
+    })
 }
 
 /// Delete the bucket with the given ID.
@@ -916,7 +918,7 @@ pub async fn delete_bucket<C, E>(
     auth: &mut Authorization<C>,
     bucket_id: impl AsRef<str>
 ) -> Result<Bucket, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     require_capability!(auth, Capability::DeleteBuckets);
@@ -930,8 +932,10 @@ pub async fn delete_bucket<C, E>(
         }))
         .send().await?;
 
-    let new_bucket: B2Result<Bucket> = serde_json::from_value(res)?;
-    new_bucket.into()
+    expect_json!(res, json, {
+        let new_bucket: B2Result<Bucket> = serde_json::from_value(json)?;
+        new_bucket.into()
+    })
 }
 
 // The B2 API intention is that only an ID or name is supplied when listing
@@ -1050,7 +1054,7 @@ pub async fn list_buckets<C, E>(
     auth: &mut Authorization<C>,
     list_info: ListBuckets<'_>
 ) -> Result<Vec<Bucket>, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     require_capability!(auth, Capability::ListBuckets);
@@ -1064,8 +1068,10 @@ pub async fn list_buckets<C, E>(
         .with_body_json(serde_json::to_value(list_info)?)
         .send().await?;
 
-    let buckets: B2Result<BucketList> = serde_json::from_value(res)?;
-    buckets.map(|b| b.buckets).into()
+    expect_json!(res, json, {
+        let buckets: B2Result<BucketList> = serde_json::from_value(json)?;
+        buckets.map(|b| b.buckets).into()
+    })
 }
 
 /// A request to update one or more settings on a [Bucket].
@@ -1229,7 +1235,7 @@ pub async fn update_bucket<C, E>(
     auth: &mut Authorization<C>,
     bucket_info: UpdateBucket<'_>
 ) -> Result<Bucket, Error<E>>
-    where C: HttpClient<Response=serde_json::Value, Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
     require_capability!(auth, Capability::WriteBuckets);
@@ -1249,8 +1255,10 @@ pub async fn update_bucket<C, E>(
         .with_body_json(serde_json::to_value(bucket_info)?)
         .send().await?;
 
-    let bucket: B2Result<Bucket> = serde_json::from_value(res)?;
-    bucket.into()
+    expect_json!(res, json, {
+        let bucket: B2Result<Bucket> = serde_json::from_value(json)?;
+        bucket.into()
+    })
 }
 
 mod serialization {
