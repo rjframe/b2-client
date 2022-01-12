@@ -20,7 +20,7 @@ use percent_encoding::{AsciiSet, CONTROLS};
 // We can ignore control characters; they will fail the filename validator.
 // But the percent_encoded library won't let us create an empty set, so we're
 // starting with the set of ASCII control characters anyway.
-pub(crate) const FILENAME_ENCODE_SET: AsciiSet = CONTROLS
+pub(crate) const QUERY_ENCODE_SET: AsciiSet = CONTROLS
     .add(b' ')
     .add(b'"')
     .add(b'#')
@@ -39,6 +39,9 @@ pub(crate) const FILENAME_ENCODE_SET: AsciiSet = CONTROLS
     .add(b'{')
     .add(b'|')
     .add(b'}');
+
+#[deprecated(note = "Use QUERY_ENCODE_SET instead")]
+pub(crate) const FILENAME_ENCODE_SET: AsciiSet = QUERY_ENCODE_SET;
 
 /// Returns the provided HTTP header if it's valid; otherwise ValidationError.
 ///

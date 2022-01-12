@@ -95,7 +95,7 @@ pub(crate) mod test_utils {
 
                 let body = match &mut req.body {
                     Body::Str(s) => s,
-                    _ => panic!("Response body was in bytes"),
+                    _ => return,
                 };
 
                 let body_json: Result<serde_json::Value, _> =
@@ -115,49 +115,56 @@ pub(crate) mod test_utils {
             .with_modify_response(|res| {
                 let body = match &mut res.body {
                     Body::Str(s) => s,
-                    _ => panic!("Response body was in bytes"),
+                    _ => return,
                 };
 
-                let mut body: serde_json::Value = serde_json::from_str(body)
-                    .unwrap();
+                let json: Result<serde_json::Value, _> =
+                    serde_json::from_str(body);
 
-                // TODO: It would be better/safer to walk through all
-                // dictionaries/arrays and check their keys for these instead of
-                // adding them as I find them.
-                if let Some(buckets) = body.get_mut("buckets") {
-                    if let Some(buckets) = buckets.as_array_mut() {
-                        for bucket in buckets.iter_mut() {
-                            bucket.get_mut("accountId")
-                                .map(|v|
-                                    *v = serde_json::json!("hidden-account-id")
-                                );
+                // If the body isn't JSON we'll have nothing to modify.
+                if let Ok(mut json) = json {
+                    // TODO: It would be better/safer to walk through all
+                    // dictionaries/arrays and check their keys for these
+                    // instead of adding them as I find them.
+                    if let Some(buckets) = json.get_mut("buckets") {
+                        if let Some(buckets) = buckets.as_array_mut() {
+                            for bucket in buckets.iter_mut() {
+                                bucket.get_mut("accountId")
+                                    .map(|v|
+                                        *v = serde_json::json!(
+                                            "hidden-account-id"
+                                        )
+                                    );
+                            }
                         }
                     }
+
+                    json.get_mut("accountId")
+                        .map(|v| *v = serde_json::json!("hidden-account-id"));
+
+                    json.get_mut("authorizationToken")
+                        .map(|v| *v = serde_json::json!(
+                            "hidden-authorization-token")
+                        );
+
+                    json.get_mut("keys")
+                        .map(|v| *v = serde_json::json!([{
+                            "accountId": "hidden-account-id",
+                            "applicationKeyId": "hidden-app-key-id",
+                            "bucketId": "abcdefghijklmnop",
+                            "capabilities": [
+                                "listFiles",
+                                "readFiles",
+                            ],
+                            "expirationTimestamp": null,
+                            "keyName": "dev-b2-client-tester",
+                            "namePrefix": null,
+                            "options": ["s3"],
+                            "nextApplicationId": null,
+                        }]));
+
+                    res.body = Body::Str(json.to_string());
                 }
-
-                body.get_mut("accountId")
-                    .map(|v| *v = serde_json::json!("hidden-account-id"));
-
-                body.get_mut("authorizationToken")
-                    .map(|v| *v = serde_json::json!("hidden-authorization-token"));
-
-                body.get_mut("keys")
-                    .map(|v| *v = serde_json::json!([{
-                        "accountId": "hidden-account-id",
-                        "applicationKeyId": "hidden-app-key-id",
-                        "bucketId": "abcdefghijklmnop",
-                        "capabilities": [
-                            "listFiles",
-                            "readFiles",
-                        ],
-                        "expirationTimestamp": null,
-                        "keyName": "dev-b2-client-tester",
-                        "namePrefix": null,
-                        "options": ["s3"],
-                        "nextApplicationId": null,
-                    }]));
-
-                res.body = Body::Str(body.to_string());
             });
 
         let surf = surf::Client::new()
@@ -209,7 +216,7 @@ pub(crate) mod test_utils {
                 "some-key-id".into(),
                 Capabilities::new(capabilities, None, None, None),
                 "https://api002.backblazeb2.com".into(),
-                "https://f002.backblaze.com".into(),
+                "https://f002.backblazeb2.com".into(),
                 100000000,
                 5000000,
                 "https://s3.us-west-002.backblazeb2.com".into(),

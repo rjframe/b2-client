@@ -108,7 +108,14 @@ impl<C> Authorization<C>
         format!("{}/b2api/v2/{}", self.api_url, endpoint.as_ref())
     }
 
-    /// Return the API url to the specified service download endpoint.
+    /// Return the API url for GET requests to the specified service download
+    /// endpoint.
+    pub(crate) fn download_get_url(&self) -> &str {
+        &self.download_url
+    }
+
+    /// Return the API url for POST requests to the specified service download
+    /// endpoint.
     pub(crate) fn download_url<S: AsRef<str>>(&self, endpoint: S) -> String {
         format!("{}/b2api/v2/{}", self.download_url, endpoint.as_ref())
     }
@@ -850,13 +857,14 @@ impl DownloadAuthorization {
     pub fn file_name_prefix(&self) -> &str { &self.file_name_prefix }
 }
 
+// TODO: MOve this and its structs to file.rs?
 /// Generate a download authorization token to download files with a specific
 /// prefix from a private B2 bucket.
 ///
 /// The [Authorization] token must have [Capability::ShareFiles].
 ///
 /// The returned [DownloadAuthorization] can be passed to
-/// [download_file_by_name].
+/// [download_file](crate::file::download_file) (not yet implemented).
 ///
 /// See <https://www.backblaze.com/b2/docs/b2_get_download_authorization.html>
 /// for further information.

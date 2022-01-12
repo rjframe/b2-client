@@ -174,6 +174,41 @@ pub use http_types::{
 use serde::{Serialize, Deserialize};
 
 
+// Shortcut to add a header to a request if `$obj` is not `None`.
+macro_rules! add_opt_header {
+    ($req:ident, $obj:expr, $name:expr) => {
+        if let Some(o) = $obj {
+            $req = $req.with_header($name, o)
+        }
+    };
+    // `unwrapped` and `conv` provide the ability to convert the type if
+    // necessary; e.g., to call to_string() on the unwrapped value.
+    ($req:ident, $obj:expr, $name:expr, $unwrapped:ident, $conv:expr) => {
+        if let Some($unwrapped) = $obj {
+            $req = $req.with_header($name, $conv)
+        }
+    };
+}
+
+// Add a query parameter to a URL string if `obj` is not `None`.
+macro_rules! add_opt_param {
+    ($str:ident, $name:literal, $obj:expr) => {
+        if let Some(s) = $obj {
+            add_param!($str, $name, &s);
+        }
+    };
+}
+
+// Add a query parameter to a URL string.
+macro_rules! add_param {
+    ($str:ident, $name:literal, $obj:expr) => {
+        $str.push_str($name);
+        $str.push('=');
+        $str.push_str($obj);
+        $str.push('&'); // The trailing & will be ignored, so this is fine.
+    };
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename = "camelCase")]
 enum LegalHoldValue {
@@ -428,12 +463,10 @@ impl From<ByteRange> for String {
     }
 }
 
-/// Describe the action to take with file metadata when copying a file.
-#[derive(Debug, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "UPPERCASE")]
-pub enum MetadataDirective {
-    Copy,
-    Replace,
+impl fmt::Display for ByteRange {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "bytes={}-{}", self.start, self.end)
+    }
 }
 
 impl ByteRange {
@@ -453,6 +486,14 @@ impl ByteRange {
 
     pub fn start(&self) -> u64 { self.start }
     pub fn end(&self) -> u64 { self.end }
+}
+
+/// Describe the action to take with file metadata when copying a file.
+#[derive(Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum MetadataDirective {
+    Copy,
+    Replace,
 }
 
 /// A request to copy a file from a bucket, potentially to a different bucket.
@@ -895,6 +936,435 @@ pub async fn delete_file_version<C, E>(
     ).await
 }
 
+/// Retrieve the headers that will be returned when the specified file is
+/// downloaded.
+///
+/// See <https://www.backblaze.com/b2/docs/b2_download_file_by_id.html> for a
+/// list of headers that may be returned.
+pub async fn download_file_headers<C, E>(
+    auth: &mut Authorization<C>,
+    file: &File
+) -> Result<HeaderMap, Error<E>>
+    where C: HttpClient<Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    download_file_headers_by_id(auth, &file.file_id).await
+}
+
+/// Retrieve the headers that will be returned when the specified file is
+/// downloaded.
+///
+/// See <https://www.backblaze.com/b2/docs/b2_download_file_by_id.html> for a
+/// list of headers that may be returned.
+pub async fn download_file_headers_by_id<C, E>(
+    auth: &mut Authorization<C>,
+    file_id: impl AsRef<str>
+) -> Result<HeaderMap, Error<E>>
+    where C: HttpClient<Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    // TODO: This is probably only required for private buckets; public buckets
+    // don't require an authorization token, but the docs read as if this is
+    // necessary if provided. Need to test, and if necessary allow downloading
+    // the file without passing the authorization token.
+    require_capability!(auth, Capability::ReadFiles);
+
+    let res = auth.client.head(
+            format!("{}?fileId={}",
+                auth.download_url("b2_download_file_by_id"),
+                file_id.as_ref()
+            )
+        )
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .send_keep_headers().await?;
+
+    Ok(res.1)
+}
+
+// TODO: Implement download_file_headers_by_name
+
+enum FileHandle<'a> {
+    Id(&'a str),
+    Name((String, &'a str)), // (Percent-encoded file name, bucket name)
+}
+
+/// A request to download a file or a portion of a file from the B2 API.
+///
+/// A simple file request can be created via [with_name](Self::with_name) or
+/// [with_id](Self::with_id); for more complex requests use a
+/// [DownloadFileBuilder].
+///
+/// If you use self-managed server-side encryption, you must use
+/// [DownloadFileBuilder] to pass the encryption information.
+///
+/// See <https://www.backblaze.com/b2/docs/b2_download_file_by_id.html> for
+/// information on downloading files, including the list of headers that may be
+/// returned.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadFile<'a> {
+    #[serde(skip_serializing)]
+    file: FileHandle<'a>,
+    #[serde(skip_serializing)]
+    range: Option<ByteRange>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    b2_content_disposition: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    b2_content_language: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    b2_expires: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    b2_cache_control: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    b2_content_encoding: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    b2_content_type: Option<String>,
+    #[serde(skip_serializing)]
+    encryption: Option<ServerSideEncryption>,
+}
+
+impl<'a> DownloadFile<'a> {
+    /// Download a file with the specified file ID.
+    pub fn with_id(id: &'a str) -> Self {
+        Self {
+            file: FileHandle::Id(id),
+            range: None,
+            b2_content_disposition: None,
+            b2_content_language: None,
+            b2_expires: None,
+            b2_cache_control: None,
+            b2_content_encoding: None,
+            b2_content_type: None,
+            encryption: None,
+        }
+    }
+
+    /// Download a file with the specified file name.
+    ///
+    /// The name will be percent-encoded.
+    pub fn with_name(name: &str, bucket: &'a str) -> Self {
+        use crate::validate::QUERY_ENCODE_SET;
+        use percent_encoding::utf8_percent_encode;
+
+        Self {
+            file: FileHandle::Name((
+                utf8_percent_encode(name, &QUERY_ENCODE_SET).to_string(),
+                bucket
+            )),
+            range: None,
+            b2_content_disposition: None,
+            b2_content_language: None,
+            b2_expires: None,
+            b2_cache_control: None,
+            b2_content_encoding: None,
+            b2_content_type: None,
+            encryption: None,
+        }
+    }
+
+    pub fn builder() -> DownloadFileBuilder<'a> {
+        DownloadFileBuilder::default()
+    }
+
+    /// Generate the public URL for a GET request for a file in a public bucket.
+    ///
+    /// A file in a public bucket does not require an authorization token to
+    /// access, making this link suitable for distribution (e.g., embedding in a
+    /// web page).
+    pub fn public_url<C, E>(&self, auth: &Authorization<C>) -> String
+        where C: HttpClient<Error=Error<E>>,
+              E: fmt::Debug + fmt::Display,
+    {
+        match &self.file {
+            FileHandle::Id(id) => format!(
+                "{}?fileId={}",
+                auth.download_url("b2_download_file_by_id"),
+                id
+            ),
+            FileHandle::Name((name, bucket)) => format!(
+                "{}/file/{}/{}?",
+                auth.download_get_url(),
+                bucket,
+                name
+            ),
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct DownloadFileBuilder<'a> {
+    file: Option<FileHandle<'a>>,
+    range: Option<ByteRange>,
+    content_disposition: Option<&'a str>,
+    content_language: Option<&'a str>,
+    expires: Option<String>,
+    cache_control: Option<String>,
+    content_encoding: Option<String>,
+    content_type: Option<String>,
+    encryption: Option<ServerSideEncryption>,
+}
+
+impl<'a> DownloadFileBuilder<'a> {
+    /// Download a file with the specified file name.
+    ///
+    /// The name will be percent-encoded.
+    ///
+    /// If both [file_name](Self::file_name) and [file_id](Self::file_id) are
+    /// provided, the last one will be used.
+    pub fn file_name(mut self, name: &str, bucket: &'a str) -> Self {
+        use crate::validate::QUERY_ENCODE_SET;
+        use percent_encoding::utf8_percent_encode;
+
+        let name = utf8_percent_encode(name, &QUERY_ENCODE_SET).to_string();
+
+        self.file = Some(FileHandle::Name((name, bucket)));
+        self
+    }
+
+    /// Download a file with the specified file ID.
+    ///
+    /// If both [file_name](Self::file_name) and [file_id](Self::file_id) are
+    /// provided, the last one will be used.
+    pub fn file_id(mut self, id: &'a str) -> Self {
+        self.file = Some(FileHandle::Id(id));
+        self
+    }
+
+    /// Specify the byte range of the file to download.
+    ///
+    /// There will be a Content-Range header that specifies the bytes returned
+    /// and the total number of bytes.
+    ///
+    /// The HTTP status code when a partial file is returned is `206 Partial
+    /// Content` rather than `200 OK`.
+    pub fn range(mut self, range: ByteRange) -> Self {
+        self.range = Some(range);
+        self
+    }
+
+    /// Override the Content-Disposition header of the response with the one
+    /// provided.
+    ///
+    /// If including this header will exceed the 7,000 byte header limit (2,048
+    /// bytes if using server-side encryption), the request will be rejected.
+    pub fn content_disposition(mut self, disposition: &'a ContentDisposition)
+    -> Result<Self, ValidationError> {
+        validate_content_disposition(&disposition.0, false)?;
+        self.content_disposition = Some(&disposition.0);
+        Ok(self)
+    }
+
+    /// Override the Content-Language header of the response with the one
+    /// provided.
+    ///
+    /// If including this header will exceed the 7,000 byte header limit (2,048
+    /// bytes if using server-side encryption), the request will be rejected.
+    pub fn content_language(mut self, language: &'a str) -> Self {
+        // TODO: validate content_language
+        self.content_language = Some(language);
+        self
+    }
+
+    /// Override the Expires header of the response with the one provided.
+    ///
+    /// If including this header will exceed the 7,000 byte header limit (2,048
+    /// bytes if using server-side encryption), the request will be rejected.
+    pub fn expiration(mut self, expiration: Expires) -> Self {
+        self.expires = Some(expiration.value().to_string());
+        self
+    }
+
+    /// Override the Cache-Control header of the response with the one provided.
+    ///
+    /// If including this header will exceed the 7,000 byte header limit (2,048
+    /// bytes if using server-side encryption), the request will be rejected.
+    pub fn cache_control(mut self, directive: CacheDirective) -> Self {
+        use http_types::headers::HeaderValue;
+
+        self.cache_control = Some(HeaderValue::from(directive).to_string());
+        self
+    }
+
+    /// Override the Content-Encoding header of the response with the one
+    /// provided.
+    ///
+    /// If including this header will exceed the 7,000 byte header limit (2,048
+    /// bytes if using server-side encryption), the request will be rejected.
+    pub fn content_encoding(mut self, encoding: ContentEncoding) -> Self {
+        self.content_encoding = Some(format!("{}", encoding.encoding()));
+        self
+    }
+
+    /// Override the Content-Type header of the response with the one provided.
+    ///
+    /// If including this header will exceed the 7,000 byte header limit (2,048
+    /// bytes if using server-side encryption), the request will be rejected.
+    pub fn content_type(mut self, content_type: Mime) -> Self {
+        self.content_type = Some(content_type.to_string());
+        self
+    }
+
+    /// Set the encryption settings to use for the file.
+    ///
+    /// This is required if using self-managed server-side encryption.
+    pub fn encryption_settings(mut self, settings: ServerSideEncryption)
+    -> Self {
+        self.encryption = Some(settings);
+        self
+    }
+
+    /// Build a [DownloadFile] request.
+    pub fn build(self) -> Result<DownloadFile<'a>, ValidationError> {
+        let file = self.file.ok_or_else(|| ValidationError::MissingData(
+            "Must specify the file to download".into()
+        ))?;
+
+        Ok(DownloadFile {
+            file,
+            range: self.range,
+            b2_content_disposition: self.content_disposition,
+            b2_content_language: self.content_language,
+            b2_expires: self.expires,
+            b2_cache_control: self.cache_control,
+            b2_content_encoding: self.content_encoding,
+            b2_content_type: self.content_type,
+            encryption: self.encryption,
+        })
+    }
+}
+
+/// Download a file from the B2 service.
+pub async fn download_file<C, E>(
+    auth: &mut Authorization<C>,
+    file: DownloadFile<'_>
+) -> Result<(Vec<u8>, HeaderMap), Error<E>>
+    where C: HttpClient<Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    // Due to the nature of the respective API calls, it's better to separate
+    // each into its own (private) function. This function hides the complexity
+    // and differences in our public API.
+    match file.file {
+        FileHandle::Id(_) => download_file_by_id(auth, file).await,
+        FileHandle::Name(_) => download_file_by_name(auth, file).await
+    }
+}
+
+async fn download_file_by_id<C, E>(
+    auth: &mut Authorization<C>,
+    file: DownloadFile<'_>
+) -> Result<(Vec<u8>, HeaderMap), Error<E>>
+    where C: HttpClient<Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    use crate::error::B2Error;
+
+    // TODO: This is probably only required for private buckets; public buckets
+    // don't require an authorization token, but the docs read as if this is
+    // necessary if provided. Need to test, and if necessary allow downloading
+    // the file without passing the authorization token.
+    require_capability!(auth, Capability::ReadFiles);
+
+    let file_id = match file.file {
+        FileHandle::Id(id) => id,
+        FileHandle::Name(_) => panic!("Call download_file_by_name() instead"),
+    };
+
+    let mut file_req = serde_json::to_value(&file)?;
+    file_req["fileId"] = serde_json::Value::String(file_id.into());
+
+    let mut req = auth.client.post(auth.download_url("b2_download_file_by_id"))
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .with_body_json(file_req);
+
+    add_opt_header!(req, file.range, "Range", range, &range.to_string());
+
+    if let Some(ServerSideEncryption::SelfManaged(enc)) = file.encryption {
+        req = req
+            .with_header(
+                "X-Bz-Server-Side-Encryption-Customer-Algorithm",
+                &enc.algorithm.to_string()
+            )
+            .with_header(
+                "X-Bz-Server-Side-Encryption-Customer-Key",
+                &enc.key
+            )
+            .with_header(
+                "X-Bz-Server-Side-Encryption-Customer-Key-Md5",
+                &enc.digest
+            );
+    }
+
+    let (body, headers) = req.send_keep_headers().await?;
+
+    // An error from Backblaze would successfully deserialize as Vec<u8>, so we
+    // need to check for it specifically.
+    let res: Result<B2Error, _> = serde_json::from_slice(&body);
+    match res {
+        Ok(e) => Err(e.into()),
+        Err(_) => Ok((body, headers)),
+    }
+}
+
+async fn download_file_by_name<C, E>(
+    auth: &mut Authorization<C>,
+    file: DownloadFile<'_>
+) -> Result<(Vec<u8>, HeaderMap), Error<E>>
+    where C: HttpClient<Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    use crate::error::B2Error;
+
+    // TODO: This is probably only required for private buckets; public buckets
+    // don't require an authorization token, but the docs read as if this is
+    // necessary if provided. Need to test, and if necessary allow downloading
+    // the file without passing the authorization token.
+    require_capability!(auth, Capability::ReadFiles);
+    assert!(matches!(file.file, FileHandle::Name(_)));
+
+    let mut url = file.public_url(auth);
+
+    add_opt_param!(url, "b2ContentDisposition", file.b2_content_disposition);
+    add_opt_param!(url, "b2ContentLanguage", file.b2_content_language);
+    add_opt_param!(url, "b2Expires", file.b2_expires);
+    add_opt_param!(url, "b2CacheControl", file.b2_cache_control);
+    add_opt_param!(url, "b2ContentEncoding", file.b2_content_encoding);
+    add_opt_param!(url, "b2ContentType", file.b2_content_type);
+
+    if let Some(ServerSideEncryption::SelfManaged(enc)) = file.encryption {
+        add_param!(url,
+            "X-Bz-Server-Side-Encryption-Customer-Algorithm",
+            &enc.algorithm.to_string()
+        );
+        add_param!(url,
+            "X-Bz-Server-Side-Encryption-Customer-Key",
+            &enc.key
+        );
+        add_param!(url,
+            "X-Bz-Server-Side-Encryption-Customer-Key-Md5",
+            &enc.digest
+        );
+    }
+
+    let mut req = auth.client.get(url)
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token);
+
+    add_opt_header!(req, file.range, "Range", range, &range.to_string());
+
+    let (body, headers) = req.send_keep_headers().await?;
+
+    // An error from Backblaze would successfully deserialize as Vec<u8>, so we
+    // need to check for it specifically.
+    let res: Result<B2Error, _> = serde_json::from_slice(&body);
+    match res {
+        Ok(e) => Err(e.into()),
+        Err(_) => Ok((body, headers)),
+    }
+}
+
 /// Delete a version of a file.
 ///
 /// If the version is the file's latest version and there are older versions,
@@ -1173,7 +1643,7 @@ impl<'a> StartLargeFileBuilder<'a> {
 
     /// Set the file's name.
     ///
-    /// The provied name will be percent-encoded.
+    /// The provided name will be percent-encoded.
     pub fn file_name(mut self, name: impl AsRef<str>)
     -> Result<Self, ValidationError> {
         use crate::validate::FILENAME_ENCODE_SET;
@@ -2004,6 +2474,80 @@ mod tests_mocked {
         let _file = cancel_large_file(&mut auth, file).await?;
         Ok(())
     }
+
+    // TODO: File header tests.
+
+    #[async_std::test]
+    async fn download_file_by_id_success() -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/file.yaml"
+        ).await?;
+
+        let mut auth = create_test_auth(client, vec![Capability::ReadFiles])
+            .await;
+
+        let req = DownloadFile::with_id(concat!("4_z8d625eb63be2775577c70e1a_f",
+            "111954e3108ff3f6_d20211118_m151810_c002_v0001168_t0010"));
+
+        let (file, _headers) = download_file(&mut auth, req).await?;
+        assert_eq!(file, b"Some text\n");
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn download_file_by_name_success() -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/file.yaml"
+        ).await?;
+
+        let mut auth = create_test_auth(client, vec![Capability::ReadFiles])
+            .await;
+
+        let req = DownloadFile::with_name("test-file.txt", "testing-b2-client");
+
+        let (file, _headers) = download_file(&mut auth, req).await?;
+        assert_eq!(file, b"Some text\n");
+
+        Ok(())
+    }
+
+    /* TODO: Setup, write these tests.
+    #[async_std::test]
+    async fn download_file_not_authorized() -> anyhow::Result<()> {
+        todo!()
+    }
+
+    #[async_std::test]
+    async fn download_public_file_without_read_cap() -> anyhow::Result<()> {
+        todo!()
+    }
+    */
+
+    #[async_std::test]
+    async fn download_file_range_success() -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/file.yaml"
+        ).await?;
+
+        let mut auth = create_test_auth(client, vec![Capability::ReadFiles])
+            .await;
+
+        let req = DownloadFile::builder()
+            .file_name("test-file.txt", "testing-b2-client")
+            .range(ByteRange::new(5, 8)?)
+            .build()?;
+
+        let (file, _headers) = download_file(&mut auth, req).await?;
+        assert_eq!(file, b"text");
+
+        Ok(())
+    }
+
+    // TODO: Test download with custom headers.
 
     #[async_std::test]
     async fn delete_file_success() -> anyhow::Result<()> {

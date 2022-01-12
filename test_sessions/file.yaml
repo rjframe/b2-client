@@ -71,3 +71,102 @@
       content-type:
         - application/json;charset=UTF-8
     body: "{\"accountId\":\"hidden-account-id\",\"action\":\"upload\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentLength\":4,\"contentMd5\":\"e2fc714c4727ee9395f324cd2e7f331f\",\"contentSha1\":\"81fe8bfe87576c3ecb22426f8e57847382917acf\",\"contentType\":\"text/plain\",\"fileId\":\"4_z8d625eb63be2775577c70e1a_f1187926dea44b322_d20211230_m171512_c002_v0001110_t0055\",\"fileInfo\":{},\"fileName\":\"test-file-upload.txt\",\"fileRetention\":{\"isClientAuthorizedToRead\":true,\"value\":{\"mode\":null,\"retainUntilTimestamp\":null}},\"legalHold\":{\"isClientAuthorizedToRead\":true,\"value\":null},\"serverSideEncryption\":{\"algorithm\":null,\"mode\":null},\"uploadTimestamp\":1640884512000}"
+---
+- Request:
+    method: POST
+    url: "https://f002.backblazeb2.com/b2api/v2/b2_download_file_by_id"
+    headers:
+      content-type:
+        - application/json
+      authorization:
+        - hidden-authorization-token
+    body: "{\"fileId\":\"4_z8d625eb63be2775577c70e1a_f111954e3108ff3f6_d20211118_m151810_c002_v0001168_t0010\"}"
+- Response:
+    status: 200
+    version: ~
+    headers:
+      date:
+        - "Wed, 12 Jan 2022 20:21:18 GMT"
+      accept-ranges:
+        - bytes
+      x-bz-upload-timestamp:
+        - "1637248690000"
+      x-bz-file-name:
+        - test-file.txt
+      x-bz-file-id:
+        - 4_z8d625eb63be2775577c70e1a_f111954e3108ff3f6_d20211118_m151810_c002_v0001168_t0010
+      x-bz-info-src_last_modified_millis:
+        - "1637248673875"
+      content-length:
+        - "10"
+      content-type:
+        - text/plain
+      x-bz-content-sha1:
+        - 5a08924b0ef1cccfb5de1d94e3d75c38dc0d3c79
+    body: "Some text\n"
+---
+- Request:
+    method: GET
+    url: "https://f002.backblazeb2.com/file/testing-b2-client/test-file.txt?"
+    headers:
+      authorization:
+        - Basic hidden-account-id
+    body: ""
+- Response:
+    status: 200
+    version: ~
+    headers:
+      content-type:
+        - text/plain
+      content-length:
+        - "10"
+      x-bz-info-src_last_modified_millis:
+        - "1637248673875"
+      x-bz-content-sha1:
+        - 5a08924b0ef1cccfb5de1d94e3d75c38dc0d3c79
+      date:
+        - "Wed, 12 Jan 2022 20:46:52 GMT"
+      x-bz-file-id:
+        - 4_z8d625eb63be2775577c70e1a_f111954e3108ff3f6_d20211118_m151810_c002_v0001168_t0010
+      x-bz-upload-timestamp:
+        - "1637248690000"
+      x-bz-file-name:
+        - test-file.txt
+      accept-ranges:
+        - bytes
+    body: "Some text\n"
+---
+- Request:
+    method: GET
+    url: "https://f002.backblazeb2.com/file/testing-b2-client/test-file.txt?"
+    headers:
+      range:
+        - bytes=5-8
+      authorization:
+        - Basic hidden-account-id
+    body: ""
+- Response:
+    status: 206
+    version: ~
+    headers:
+      x-bz-content-sha1:
+        - 5a08924b0ef1cccfb5de1d94e3d75c38dc0d3c79
+      x-bz-info-src_last_modified_millis:
+        - "1637248673875"
+      x-bz-upload-timestamp:
+        - "1637248690000"
+      content-length:
+        - "4"
+      accept-ranges:
+        - bytes
+      content-range:
+        - bytes 5-8/10
+      date:
+        - "Wed, 12 Jan 2022 20:46:52 GMT"
+      x-bz-file-id:
+        - 4_z8d625eb63be2775577c70e1a_f111954e3108ff3f6_d20211118_m151810_c002_v0001168_t0010
+      x-bz-file-name:
+        - test-file.txt
+      content-type:
+        - text/plain
+    body: text

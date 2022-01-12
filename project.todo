@@ -15,6 +15,9 @@ Project:
     ☐ Make tests easily reproducible for others and me in the future - move bucket ID, etc. to environment variables, clean up afterward.
     ☐ I have DateTime<Local> and DateTime<Utc> objects; check whether they're correct or should be changed
     ☐ Allow uploads via streams/chunked/buffers/local filesystem
+    ☐ Percent-encode X-Bz-File-Name and X-Bz-Info-* headers
+    ☐ Use add_opt_header for upload_file
+    ☐ b2_download_file_by_name allows using a DownloadAuthorization for files with prefixes covered by that auth; we should support that too.
 
 API:
     ✓ Implement account endpoints @done(2021-10-18 17:20) @project(API)
@@ -26,8 +29,8 @@ API:
         ✓ copy_file @done(2021-11-18 11:54) @project(API \ Files)
         ✓ copy_part @done(2021-12-21 10:36) @project(API \ Files)
         ✓ delete_file_version @done(2022-01-04 10:11) @project(API \ Files)
-        ☐ download_file_by_id
-        ☐ download_file_by_name
+        ✓ download_file_by_id @done(2022-01-12 16:50) @project(API \ Files)
+        ✓ download_file_by_name @done(2022-01-12 16:50) @project(API \ Files)
         ✓ finish_large_file @done(2021-12-17 10:21) @project(API \ Files)
         ☐ get_file_info
         ✓ get_upload_part_url @done(2021-12-17 10:21) @project(API \ Files)
