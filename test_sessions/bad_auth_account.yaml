@@ -5,6 +5,8 @@
     headers:
       authorization:
         - Basic hidden-account-id
+      user-agent:
+        - rust-b2-client/version; surf
     body: ""
 - Response:
     status: 401

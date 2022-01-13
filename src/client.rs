@@ -63,6 +63,8 @@ pub trait HttpClient
     -> Result<&mut Self, ValidationError>;
 
     /// Add a header to the request.
+    ///
+    /// To add a `User-Agent` header, call [user_agent](Self::user_agent).
     fn with_header<S: AsRef<str>>(&mut self, name: S, value: S) -> &mut Self;
     /// Use the provided bytes as the request body.
     fn with_body(&mut self, data: impl Into<Vec<u8>>) -> &mut Self;
@@ -70,6 +72,10 @@ pub trait HttpClient
     fn with_body_json(&mut self, body: serde_json::Value) -> &mut Self;
     /// Read the provided path as the request's body.
     fn read_body_from_file(&mut self, path: impl Into<PathBuf>) -> &mut Self;
+
+    /// Set the User-Agent header value to send with requests.
+    fn user_agent(&mut self, user_agent_string: impl Into<String>)
+    -> Result<&mut Self, ValidationError>;
 
     /// Send the previously-constructed request and return a response.
     async fn send(&mut self) -> Result<Vec<u8>, Self::Error>;
@@ -98,6 +104,7 @@ mod surf_client {
         client: surf::Client,
         req: Option<Request>,
         body: Option<Body>,
+        user_agent: String,
     }
 
     // Body type for sending; TODO rename to avoid ambiguity?
@@ -131,6 +138,8 @@ mod surf_client {
                             req.set_body(surf::Body::from_file(path).await?),
                     }
                 }
+
+                req.insert_header("User-Agent", &self.user_agent);
 
                 let mut res = self.client.send(req).await?;
                 let body = res.body_bytes().await?;
@@ -176,10 +185,15 @@ mod surf_client {
 
         /// Create a new `SurfClient`.
         fn new() -> Self {
+            let user_agent = format!("rust-b2-client/{}; surf",
+                option_env!("CARGO_PKG_VERSION").unwrap_or("unknown")
+            );
+
             Self {
                 client: surf::Client::new(),
                 req: None,
                 body: None,
+                user_agent,
             }
         }
 
@@ -217,6 +231,27 @@ mod surf_client {
         -> &mut Self {
             self.body = Some(Body::File(path.into()));
             self
+        }
+
+        /// Set the User-Agent header value to send with requests.
+        ///
+        /// The default User-Agent string is "rust-b2-client/<version>; surf".
+        ///
+        /// # Errors
+        ///
+        /// Returns [ValidationError] if the `user_agent_string` is empty.
+        fn user_agent(&mut self, user_agent_string: impl Into<String>)
+        -> Result<&mut Self, ValidationError> {
+            let user_agent = user_agent_string.into();
+
+            if user_agent.is_empty() {
+                Err(ValidationError::MissingData(
+                    "User-Agent is required".into()
+                ))
+            } else {
+                self.user_agent = user_agent;
+                Ok(self)
+            }
         }
 
         /// Send the previously-constructed request and return a response.
@@ -263,6 +298,7 @@ mod hyper_client {
         url: String,
         headers: Vec<(HeaderName, HeaderValue)>,
         body: Option<Body>,
+        user_agent: String,
     }
 
     #[derive(Debug)]
@@ -318,6 +354,8 @@ mod hyper_client {
             for (name, value) in &self.headers {
                 req = req.header(name, value);
             }
+
+            req = req.header("User-Agent", &self.user_agent);
 
             let body = match &self.body {
                 Some(body) => match body {
@@ -392,12 +430,17 @@ mod hyper_client {
             let client = hyper::Client::builder()
                 .build::<_, hyper::Body>(https);
 
+            let user_agent = format!("rust-b2-client/{}; hyper",
+                option_env!("CARGO_PKG_VERSION").unwrap_or("unknown")
+            );
+
             Self {
                 client,
                 method: None,
                 url: String::default(),
                 headers: vec![],
                 body: None,
+                user_agent,
             }
         }
 
@@ -441,6 +484,20 @@ mod hyper_client {
         -> &mut Self {
             self.body = Some(Body::File(path.into()));
             self
+        }
+
+        fn user_agent(&mut self, user_agent_string: impl Into<String>)
+        -> Result<&mut Self, ValidationError> {
+            let user_agent = user_agent_string.into();
+
+            if user_agent.is_empty() {
+                Err(ValidationError::MissingData(
+                    "User-Agent is required".into()
+                ))
+            } else {
+                self.user_agent = user_agent;
+                Ok(self)
+            }
         }
 
         /// Send the previously-constructed request and return a response.

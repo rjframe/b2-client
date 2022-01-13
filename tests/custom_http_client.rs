@@ -59,6 +59,12 @@ impl HttpClient for FakeClient {
         self
     }
 
+    fn user_agent(&mut self, _user_agent_string: impl Into<String>)
+    -> Result<&mut Self, ValidationError>
+    {
+        Ok(self)
+    }
+
     async fn send(&mut self) -> Result<Vec<u8>, Self::Error> {
         Err(Error::Client(FakeError))
     }

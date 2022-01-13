@@ -6,6 +6,8 @@
         - hidden-authorization-token
       content-type:
         - application/json
+      user-agent:
+        - rust-b2-client/version; surf
     body: "{\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentType\":\"b2/x-auto\",\"fileInfo\":null,\"fileName\":\"test-large-file\",\"fileRetention\":null,\"legalHold\":null,\"serverSideEncryption\":null}"
 - Response:
     status: 200
@@ -29,6 +31,8 @@
         - application/json
       authorization:
         - hidden-authorization-token
+      user-agent:
+        - rust-b2-client/version; surf
     body: "{\"fileId\":\"4_z8d625eb63be2775577c70e1a_f204261ca2ea2c4e1_d20211112_m211109_c002_v0001114_t0054\"}"
 - Response:
     status: 200
@@ -52,6 +56,8 @@
         - hidden-authorization-token
       content-type:
         - application/json
+      user-agent:
+        - rust-b2-client/version; surf
     body: "{\"fileId\":\"bad-id\"}"
 - Response:
     status: 400
@@ -77,6 +83,8 @@
         - application/json
       authorization:
         - hidden-authorization-token
+      user-agent:
+        - rust-b2-client/version; surf
     body: "{\"contentType\":null,\"destinationBucketId\":null,\"destinationServerSideEncryption\":null,\"fileInfo\":null,\"fileName\":\"new-file.txt\",\"fileRetention\":null,\"legalHold\":null,\"metadataDirective\":\"COPY\",\"range\":null,\"sourceFileId\":\"4_z8d625eb63be2775577c70e1a_f111954e3108ff3f6_d20211118_m151810_c002_v0001168_t0010\",\"sourceServerSideEncryption\":null}"
 - Response:
     status: 200
@@ -100,6 +108,8 @@
         - hidden-authorization-token
       content-type:
         - application/json
+      user-agent:
+        - rust-b2-client/version; surf
     body: "{\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentType\":\"text/plain\",\"fileInfo\":null,\"fileName\":\"Test-large-file.txt\",\"fileRetention\":null,\"legalHold\":null,\"serverSideEncryption\":null}"
 - Response:
     status: 200
@@ -123,6 +133,8 @@
         - hidden-authorization-token
       content-type:
         - application/json
+      user-agent:
+        - rust-b2-client/version; surf
     body: "{\"fileId\":\"4_z8d625eb63be2775577c70e1a_f222f9c9a66d56ef9_d20211217_m150215_c002_v0001129_t0022\"}"
 - Response:
     status: 200
@@ -152,6 +164,8 @@
         - hidden-authorization-token
       content-length:
         - "5242880"
+      user-agent:
+        - rust-b2-client/version; surf
     body: "aaaaa for 5 MB of data"
 - Response:
     status: 200
@@ -181,6 +195,8 @@
         - hidden-authorization-token
       x-bz-content-sha1:
         - 924f61661a3472da74307a35f2c8d22e07e84a4d
+      user-agent:
+        - rust-b2-client/version; surf
     body: bcd
 - Response:
     status: 200
@@ -204,6 +220,8 @@
         - application/json
       authorization:
         - hidden-authorization-token
+      user-agent:
+        - rust-b2-client/version; surf
     body: "{\"fileId\":\"4_z8d625eb63be2775577c70e1a_f222f9c9a66d56ef9_d20211217_m150215_c002_v0001129_t0022\",\"partSha1Array\":[\"61b8d6600ac94d912874f569a9341120f680c9f8\",\"924f61661a3472da74307a35f2c8d22e07e84a4d\"]}"
 - Response:
     status: 200
@@ -227,6 +245,8 @@
         - application/json
       authorization:
         - hidden-authorization-token
+      user-agent:
+        - rust-b2-client/version; surf
     body: "{\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentType\":\"text/plain\",\"fileInfo\":null,\"fileName\":\"Test-large-file2.txt\",\"fileRetention\":null,\"legalHold\":null,\"serverSideEncryption\":null}"
 - Response:
     status: 200
@@ -250,6 +270,8 @@
         - application/json
       authorization:
         - hidden-authorization-token
+      user-agent:
+        - rust-b2-client/version; surf
     body: "{\"largeFileId\":\"4_z8d625eb63be2775577c70e1a_f2162de36adfd1074_d20211221_m150428_c002_v0001156_t0016\",\"partNumber\":1,\"sourceFileId\":\"4_z8d625eb63be2775577c70e1a_f111954e3108ff3f6_d20211118_m151810_c002_v0001168_t0010\"}"
 - Response:
     status: 200
@@ -273,6 +295,8 @@
         - hidden-authorization-token
       content-type:
         - application/json
+      user-agent:
+        - rust-b2-client/version; surf
     body: "{\"largeFileId\":\"4_z8d625eb63be2775577c70e1a_f2162de36adfd1074_d20211221_m150428_c002_v0001156_t0016\",\"partNumber\":2,\"range\":\"bytes=0-3\",\"sourceFileId\":\"4_z8d625eb63be2775577c70e1a_f111954e3108ff3f6_d20211118_m151810_c002_v0001168_t0010\"}"
 - Response:
     status: 200
@@ -296,6 +320,8 @@
         - hidden-authorization-token
       content-type:
         - application/json
+      user-agent:
+        - rust-b2-client/version; surf
     body: "{\"fileId\":\"4_z8d625eb63be2775577c70e1a_f2162de36adfd1074_d20211221_m150428_c002_v0001156_t0016\"}"
 - Response:
     status: 200

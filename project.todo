@@ -1,6 +1,6 @@
 Project:
     ☐ Support Isahc
-    ☐ Allow (require?) setting user-agent
+    ✓ Allow (require?) setting user-agent @done(2022-01-13 12:50) @project(Project)
     ☐ Work with B2 metadata headers
     ☐ Default clients: use low-level libraries (h1, h2, etc.) rather than the libraries built on top of them.
     ☐ Check derived traits on objects - ensure consistency.

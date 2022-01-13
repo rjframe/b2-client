@@ -5,6 +5,8 @@
     headers:
       authorization:
         - Basic hidden-account-id
+      user-agent:
+        - rust-b2-client/version; surf
     body: ""
 - Response:
     status: 200
@@ -28,6 +30,8 @@
         - application/json
       authorization:
         - hidden-authorization-token
+      user-agent:
+        - rust-b2-client/version; surf
     body: "{\"accountId\":\"hidden-account-id\",\"bucketId\":null,\"capabilities\":[\"listFiles\"],\"keyName\":\"my-special-key\",\"namePrefix\":null,\"validDurationInSeconds\":null}"
 - Response:
     status: 200
@@ -51,6 +55,8 @@
         - application/json
       authorization:
         - hidden-authorization-token
+      user-agent:
+        - rust-b2-client/version; surf
     body: "{\"applicationKeyId\":\"002d2e6b27577ea0000000008\"}"
 - Response:
     status: 200
@@ -74,6 +80,8 @@
         - hidden-authorization-token
       content-type:
         - application/json
+      user-agent:
+        - rust-b2-client/version; surf
     body: "{\"b2CacheControl\":\"must-revalidate\",\"b2ContentDisposition\":\"Attachment; filename=example.html\",\"b2ContentEncoding\":null,\"b2ContentLanguage\":null,\"b2ContentType\":null,\"b2Expires\":null,\"bucketId\":\"8d625eb63be2775577c70e1a\",\"fileNamePrefix\":\"files/\",\"validDurationInSeconds\":30000}"
 - Response:
     status: 200
@@ -97,6 +105,8 @@
         - application/json
       authorization:
         - hidden-authorization-token
+      user-agent:
+        - rust-b2-client/version; surf
     body: "{\"b2CacheControl\":null,\"b2ContentDisposition\":null,\"b2ContentEncoding\":null,\"b2ContentLanguage\":null,\"b2ContentType\":null,\"b2Expires\":null,\"bucketId\":\"8d625eb63be2775577c70e1a\",\"fileNamePrefix\":\"files/\",\"validDurationInSeconds\":30000}"
 - Response:
     status: 200
@@ -120,6 +130,8 @@
         - hidden-authorization-token
       content-type:
         - application/json
+      user-agent:
+        - rust-b2-client/version; surf
     body: "{\"accountId\":\"hidden-account-id\",\"maxKeyCount\":100,\"startApplicationKeyId\":null}"
 - Response:
     status: 200

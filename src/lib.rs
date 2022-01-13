@@ -93,6 +93,29 @@ pub(crate) mod test_utils {
                 req.headers.entry("authorization".into())
                     .and_modify(|v| *v = vec![val]);
 
+                req.headers.entry("user-agent".into())
+                    .and_modify(|v| {
+                        // We need to replace the version number with a constant
+                        // value.
+
+                        let range = if v[0].len() > 7 {
+                            let start = v[0][7..]
+                                .find(|c| char::is_ascii_digit(&c))
+                                .expect("User-agent string is incorrect");
+
+                            let end = v[0][start..].find(';')
+                                .expect("User-agent string is incorrect");
+
+                            Some((start + 7, end + start))
+                        } else {
+                            None
+                        };
+
+                        if let Some((start, end)) = range {
+                            v[0].replace_range(start..end, "version");
+                        }
+                    });
+
                 let body = match &mut req.body {
                     Body::Str(s) => s,
                     _ => return,

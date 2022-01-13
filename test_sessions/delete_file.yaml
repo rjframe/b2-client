@@ -5,6 +5,8 @@
     headers:
       authorization:
         - Basic hidden-account-id
+      user-agent:
+        - rust-b2-client/version; surf
     body: ""
 - Response:
     status: 200
@@ -28,6 +30,8 @@
         - hidden-authorization-token
       content-type:
         - application/json
+      user-agent:
+        - rust-b2-client/version; surf
     body: "{\"bucketId\":\"8d625eb63be2775577c70e1a\"}"
 - Response:
     status: 200
@@ -57,6 +61,8 @@
         - test-file-upload.txt
       content-type:
         - b2/x-auto
+      user-agent:
+        - rust-b2-client/version; surf
     body: abcd
 - Response:
     status: 200
@@ -80,6 +86,8 @@
         - hidden-authorization-token
       content-type:
         - application/json
+      user-agent:
+        - rust-b2-client/version; surf
     body: "{\"fileId\":\"4_z8d625eb63be2775577c70e1a_f104134a06c69d2a2_d20220104_m150118_c002_v0001112_t0011\",\"fileName\":\"test-file-upload.txt\"}"
 - Response:
     status: 200

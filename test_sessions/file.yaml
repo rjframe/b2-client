@@ -5,6 +5,8 @@
     headers:
       authorization:
         - Basic hidden-account-id
+      user-agent:
+        - rust-b2-client/version; surf
     body: ""
 - Response:
     status: 200
@@ -28,6 +30,8 @@
         - application/json
       authorization:
         - hidden-authorization-token
+      user-agent:
+        - rust-b2-client/version; surf
     body: "{\"bucketId\":\"8d625eb63be2775577c70e1a\"}"
 - Response:
     status: 200
@@ -57,6 +61,8 @@
         - hidden-authorization-token
       content-length:
         - "4"
+      user-agent:
+        - rust-b2-client/version; surf
     body: abcd
 - Response:
     status: 200
@@ -80,6 +86,8 @@
         - application/json
       authorization:
         - hidden-authorization-token
+      user-agent:
+        - rust-b2-client/version; surf
     body: "{\"fileId\":\"4_z8d625eb63be2775577c70e1a_f111954e3108ff3f6_d20211118_m151810_c002_v0001168_t0010\"}"
 - Response:
     status: 200
@@ -111,6 +119,8 @@
     headers:
       authorization:
         - Basic hidden-account-id
+      user-agent:
+        - rust-b2-client/version; surf
     body: ""
 - Response:
     status: 200
@@ -144,6 +154,8 @@
         - bytes=5-8
       authorization:
         - Basic hidden-account-id
+      user-agent:
+        - rust-b2-client/version; surf
     body: ""
 - Response:
     status: 206
