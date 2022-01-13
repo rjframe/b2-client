@@ -2102,38 +2102,57 @@ pub async fn upload_file<C, E>(
         .with_header("Content-Length", &data.len().to_string())
         .with_header("X-Bz-Content-Sha1", &upload.sha1_checksum);
 
-    if let Some(time) = upload.last_modified {
-        req = req.with_header(
-            "X-Bz-Info-src_last_modified_millis",
-            &time.to_string()
-        );
-    }
+    add_opt_header!(
+        req,
+        upload.last_modified,
+        "X-Bz-Info-src_last_modified_millis",
+        val,
+        &val.to_string()
+    );
 
-    if let Some(disp) = upload.content_disposition {
-        req = req.with_header("X-Bz-Info-b2-content-disposition", &disp);
-    }
+    add_opt_header!(
+        req,
+        upload.content_disposition,
+        "X-Bz-Info-b2-content-disposition",
+        val,
+        &val
+    );
 
-    if let Some(lang) = upload.content_language {
-        req = req.with_header("X-Bz-Info-b2-content-language", &lang);
-    }
+    add_opt_header!(
+        req,
+        upload.content_language,
+        "X-Bz-Info-b2-content-language",
+        val,
+        &val
+    );
 
-    if let Some(expiration) = upload.expires {
-        req = req.with_header("X-Bz-Info-b2-expireq", &expiration);
-    }
+    add_opt_header!(req, upload.expires, "X-Bz-Info-b2-expires", val, &val);
 
-    if let Some(cache_control) = upload.cache_control {
-        req = req.with_header("X-Bz-Info-b2-cache-control", &cache_control);
-    }
+    add_opt_header!(
+        req,
+        upload.cache_control,
+        "X-Bz-Info-b2-cache-control",
+        val,
+        &val
+    );
 
-    if let Some(encoding) = upload.content_encoding {
-        req = req.with_header("X-Bz-Info-b2-content-encoding", &encoding);
-    }
+    add_opt_header!(
+        req,
+        upload.content_encoding,
+        "X-Bz-Info-b2-content-encoding",
+        val,
+        &val
+    );
 
     // TODO: custom headers
 
-    if let Some(legal_hold) = upload.legal_hold {
-        req = req.with_header("X-Bz-File-Legal-Hold", &legal_hold.to_string());
-    }
+    add_opt_header!(
+        req,
+        upload.legal_hold,
+        "X-Bz-File-Legal-Hold",
+        val,
+        &val.to_string()
+    );
 
     if let Some((mode, timestamp)) = upload.file_retention {
         req = req

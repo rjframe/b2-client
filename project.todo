@@ -16,7 +16,7 @@ Project:
     ☐ I have DateTime<Local> and DateTime<Utc> objects; check whether they're correct or should be changed
     ☐ Allow uploads via streams/chunked/buffers/local filesystem
     ☐ Percent-encode X-Bz-File-Name and X-Bz-Info-* headers
-    ☐ Use add_opt_header for upload_file
+    ✓ Use add_opt_header for upload_file @done(2022-01-13 08:10) @project(Project)
     ☐ b2_download_file_by_name allows using a DownloadAuthorization for files with prefixes covered by that auth; we should support that too.
 
 API:
