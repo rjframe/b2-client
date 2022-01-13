@@ -28,9 +28,9 @@ issue/PR or start a discussion.
 
 ## How Can I Contribute?
 
-* [Create tickets](https://todo.sr.ht/~rjframe/upim) for discovered bugs and
-  ideas for improvement.
-  reference material to answering questions other people have.
+* [Create tickets](https://todo.sr.ht/~rjframe/b2-client) for discovered bugs
+  and ideas for improvement, reference material to answering questions other
+  people have.
 * Improve tests -- in particular, we should be testing against multiple HTTP
   clients.
 * Help implement the B2 API.
@@ -42,16 +42,16 @@ Before submitting a PR or patchset, be sure to check that you haven't broken
 various feature combinations:
 
 * Can you build documentation with all HTTP client backends?
-    - `cargo doc --no-deps --features=with_surf,with_hyper`
+    - `cargo doc --no-deps --all-features
 * Can you run tests with no default features?
     - `cargo test --no-default-features`
 * Can you run tests with all HTTP client backends?
-    - `cargo test --features=with_surf,with_hyper`
+    - `cargo test --all-features
 
 All new tests related to sending and receiving data from the B2 service need to
 be based on real communication with the service, rather than generated solely
 from their documentation; creating those tests will potentially result in
-monetary charges; if you submit tests that have not been based on a real session
+monetary charges. If you submit tests that have not been based on a real session
 with B2, please let me know in the PR so that I can do so.
 
 
