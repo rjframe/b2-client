@@ -226,7 +226,7 @@ impl fmt::Display for LegalHoldValue {
 }
 
 /// Determines whether there is a legal hold on a file.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct FileLegalHold {
     #[serde(rename = "isClientAuthorizedToRead")]
     can_read: bool,
@@ -472,8 +472,9 @@ impl fmt::Display for ByteRange {
 impl ByteRange {
     // TODO: It would be reasonable to misremember/assume that the range is
     // exclusive of the end byte; should we use `new_inclusive` and
-    // `new_exclusive` functions instead? This forces explicitly choosing one or
-    // the other. Name them `new_end_xxx` to be truly clear?
+    // `new_exclusive` (bounded/unbounded?) functions instead? This forces
+    // explicitly choosing one or the other. Name them `new_end_xxx` to be truly
+    // clear?
     fn new(start: u64, end: u64) -> Result<Self, ValidationError> {
         if start < end {
             Ok(Self { start, end })
@@ -503,17 +504,25 @@ pub enum MetadataDirective {
 #[serde(rename_all = "camelCase")]
 pub struct CopyFile<'a> {
     source_file_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     destination_bucket_id: Option<String>,
     file_name: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
     range: Option<ByteRange>,
     metadata_directive: MetadataDirective,
+    #[serde(skip_serializing_if = "Option::is_none")]
     content_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     file_info: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     file_retention: Option<FileRetentionPolicy>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     legal_hold: Option<LegalHoldValue>,
     #[serde(rename = "sourceServerSideEncryption")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     source_encryption: Option<ServerSideEncryption>,
     #[serde(rename = "destinationServerSideEncryption")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     dest_encryption: Option<ServerSideEncryption>,
 }
 
@@ -1608,9 +1617,13 @@ pub struct StartLargeFile<'a> {
     bucket_id: &'a str,
     file_name: String,
     content_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     file_info: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     file_retention: Option<FileRetentionPolicy>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     legal_hold: Option<LegalHoldValue>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     server_side_encryption: Option<ServerSideEncryption>,
 }
 

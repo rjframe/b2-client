@@ -8,7 +8,7 @@
         - application/json
       user-agent:
         - rust-b2-client/version; surf
-    body: "{\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentType\":\"b2/x-auto\",\"fileInfo\":null,\"fileName\":\"test-large-file\",\"fileRetention\":null,\"legalHold\":null,\"serverSideEncryption\":null}"
+    body: "{\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentType\":\"b2/x-auto\",\"fileName\":\"test-large-file\"}"
 - Response:
     status: 200
     version: ~
@@ -85,7 +85,7 @@
         - hidden-authorization-token
       user-agent:
         - rust-b2-client/version; surf
-    body: "{\"contentType\":null,\"destinationBucketId\":null,\"destinationServerSideEncryption\":null,\"fileInfo\":null,\"fileName\":\"new-file.txt\",\"fileRetention\":null,\"legalHold\":null,\"metadataDirective\":\"COPY\",\"range\":null,\"sourceFileId\":\"4_z8d625eb63be2775577c70e1a_f111954e3108ff3f6_d20211118_m151810_c002_v0001168_t0010\",\"sourceServerSideEncryption\":null}"
+    body: "{\"fileName\":\"new-file.txt\",\"metadataDirective\":\"COPY\",\"sourceFileId\":\"4_z8d625eb63be2775577c70e1a_f111954e3108ff3f6_d20211118_m151810_c002_v0001168_t0010\"}"
 - Response:
     status: 200
     version: ~
@@ -110,7 +110,7 @@
         - application/json
       user-agent:
         - rust-b2-client/version; surf
-    body: "{\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentType\":\"text/plain\",\"fileInfo\":null,\"fileName\":\"Test-large-file.txt\",\"fileRetention\":null,\"legalHold\":null,\"serverSideEncryption\":null}"
+    body: "{\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentType\":\"text/plain\",\"fileName\":\"Test-large-file.txt\"}"
 - Response:
     status: 200
     version: ~
@@ -247,7 +247,7 @@
         - hidden-authorization-token
       user-agent:
         - rust-b2-client/version; surf
-    body: "{\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentType\":\"text/plain\",\"fileInfo\":null,\"fileName\":\"Test-large-file2.txt\",\"fileRetention\":null,\"legalHold\":null,\"serverSideEncryption\":null}"
+    body: "{\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentType\":\"text/plain\",\"fileName\":\"Test-large-file2.txt\"}"
 - Response:
     status: 200
     version: ~

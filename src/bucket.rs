@@ -86,7 +86,9 @@ pub struct CorsRule {
     cors_rule_name: String,
     allowed_origins: Vec<String>,
     allowed_operations: Vec<CorsOperation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     allowed_headers: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     expose_headers: Option<Vec<String>>,
     max_age_seconds: u16,
 }
@@ -570,10 +572,14 @@ pub struct CreateBucket<'a> {
     account_id: Option<&'a str>,
     bucket_name: String,
     bucket_type: BucketType,
+    #[serde(skip_serializing_if = "Option::is_none")]
     bucket_info: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     cors_rules: Option<Vec<CorsRule>>,
     file_lock_enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
     lifecycle_rules: Option<Vec<LifecycleRule>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     default_server_side_encryption: Option<ServerSideEncryption>,
 }
 
@@ -827,6 +833,9 @@ impl From<Period> for chrono::Duration {
 /// A file's B2 retention policy.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FileRetentionPolicy {
+    // TODO: mode and period must either both be set or both be (explicitly)
+    // null; we can better utilize types (or simply use a constructor) to
+    // enforce that.
     mode: Option<FileRetentionMode>,
     period: Option<Period>,
 }
@@ -840,7 +849,7 @@ impl FileRetentionPolicy {
 }
 
 /// Response from B2 with the configured bucket encryption settings.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BucketEncryptionInfo {
     is_client_authorized_to_read: bool,
@@ -972,7 +981,9 @@ impl fmt::Display for BucketFilter {
 #[serde(into = "serialization::InnerListBuckets")]
 pub struct ListBuckets<'a> {
     account_id: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     bucket: Option<BucketRef>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     bucket_types: Option<Vec<BucketFilter>>,
 }
 

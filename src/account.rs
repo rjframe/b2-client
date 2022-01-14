@@ -162,7 +162,7 @@ impl ProtoAuthorization {
 
 /// The set of capabilities and associated information granted by an
 /// authorization token.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Capabilities {
     capabilities: Vec<Capability>,
@@ -294,8 +294,11 @@ pub struct CreateKey<'a> {
     account_id: Option<&'a str>,
     capabilities: Vec<Capability>,
     key_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     valid_duration_in_seconds: Option<Duration>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     bucket_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     name_prefix: Option<String>,
 }
 
@@ -467,7 +470,7 @@ impl CreateKeyBuilder {
 }
 
 /// An application key and associated information.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Key {
     key_name: String,
@@ -691,13 +694,17 @@ pub struct DownloadAuthorizationRequest<'a> {
     bucket_id: &'a str,
     file_name_prefix: &'a str,
     valid_duration_in_seconds: Duration,
+    #[serde(skip_serializing_if = "Option::is_none")]
     b2_content_disposition: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     b2_content_language: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     b2_expires: Option<String>,
-    // Storing and converting these will be expensive, but I don't want to try
-    // manually implementing a non_exhaustive enum that I don't control.
+    #[serde(skip_serializing_if = "Option::is_none")]
     b2_cache_control: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     b2_content_encoding: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     b2_content_type: Option<String>,
 }
 
@@ -925,6 +932,7 @@ pub struct KeyListRequest<'a> {
     // account_id is provided by an Authorization.
     account_id: Option<&'a str>,
     max_key_count: u16,
+    #[serde(skip_serializing_if = "Option::is_none")]
     start_application_key_id: Option<String>,
 }
 

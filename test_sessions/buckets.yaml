@@ -9,7 +9,7 @@
         - hidden-authorization-token
       user-agent:
         - rust-b2-client/version; surf
-    body: "{\"accountId\":\"hidden-account-id\",\"bucketInfo\":null,\"bucketName\":\"testing-new-b2-client\",\"bucketType\":\"allPrivate\",\"corsRules\":null,\"defaultServerSideEncryption\":null,\"fileLockEnabled\":false,\"lifecycleRules\":[{\"daysFromHidingToDeleting\":5,\"daysFromUploadingToHiding\":null,\"fileNamePrefix\":\"my-files/\"}]}"
+    body: "{\"accountId\":\"hidden-account-id\",\"bucketName\":\"testing-new-b2-client\",\"bucketType\":\"allPrivate\",\"fileLockEnabled\":false,\"lifecycleRules\":[{\"daysFromHidingToDeleting\":5,\"daysFromUploadingToHiding\":null,\"fileNamePrefix\":\"my-files/\"}]}"
 - Response:
     status: 200
     version: ~
@@ -34,7 +34,7 @@
         - application/json
       user-agent:
         - rust-b2-client/version; surf
-    body: "{\"accountId\":\"hidden-account-id\",\"bucketInfo\":null,\"bucketName\":\"testing-b2-client\",\"bucketType\":\"allPrivate\",\"corsRules\":null,\"defaultServerSideEncryption\":null,\"fileLockEnabled\":false,\"lifecycleRules\":[{\"daysFromHidingToDeleting\":5,\"daysFromUploadingToHiding\":null,\"fileNamePrefix\":\"my-files/\"}]}"
+    body: "{\"accountId\":\"hidden-account-id\",\"bucketName\":\"testing-b2-client\",\"bucketType\":\"allPrivate\",\"fileLockEnabled\":false,\"lifecycleRules\":[{\"daysFromHidingToDeleting\":5,\"daysFromUploadingToHiding\":null,\"fileNamePrefix\":\"my-files/\"}]}"
 - Response:
     status: 400
     version: ~
