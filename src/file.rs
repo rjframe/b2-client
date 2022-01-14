@@ -209,6 +209,15 @@ macro_rules! add_param {
     };
 }
 
+macro_rules! percent_encode {
+    ($str:expr) => {
+        percent_encoding::utf8_percent_encode(
+            &$str,
+            &crate::validate::QUERY_ENCODE_SET
+        ).to_string()
+    };
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename = "camelCase")]
 enum LegalHoldValue {
@@ -1053,14 +1062,8 @@ impl<'a> DownloadFile<'a> {
     ///
     /// The name will be percent-encoded.
     pub fn with_name(name: &str, bucket: &'a str) -> Self {
-        use crate::validate::QUERY_ENCODE_SET;
-        use percent_encoding::utf8_percent_encode;
-
         Self {
-            file: FileHandle::Name((
-                utf8_percent_encode(name, &QUERY_ENCODE_SET).to_string(),
-                bucket
-            )),
+            file: FileHandle::Name((percent_encode!(name), bucket)),
             range: None,
             b2_content_disposition: None,
             b2_content_language: None,
@@ -1122,12 +1125,7 @@ impl<'a> DownloadFileBuilder<'a> {
     /// If both [file_name](Self::file_name) and [file_id](Self::file_id) are
     /// provided, the last one will be used.
     pub fn file_name(mut self, name: &str, bucket: &'a str) -> Self {
-        use crate::validate::QUERY_ENCODE_SET;
-        use percent_encoding::utf8_percent_encode;
-
-        let name = utf8_percent_encode(name, &QUERY_ENCODE_SET).to_string();
-
-        self.file = Some(FileHandle::Name((name, bucket)));
+        self.file = Some(FileHandle::Name((percent_encode!(name), bucket)));
         self
     }
 
@@ -1659,15 +1657,9 @@ impl<'a> StartLargeFileBuilder<'a> {
     /// The provided name will be percent-encoded.
     pub fn file_name(mut self, name: impl AsRef<str>)
     -> Result<Self, ValidationError> {
-        use crate::validate::FILENAME_ENCODE_SET;
-        use percent_encoding::utf8_percent_encode;
-
         let name = validated_file_name(name.as_ref())?;
 
-        self.file_name = Some(
-            utf8_percent_encode(name, &FILENAME_ENCODE_SET).to_string()
-        );
-
+        self.file_name = Some(percent_encode!(name));
         Ok(self)
     }
 
@@ -1908,15 +1900,9 @@ impl<'a> UploadFileBuilder<'a> {
     /// The provided name will be percent-encoded.
     pub fn file_name(mut self, name: impl AsRef<str>)
     -> Result<Self, ValidationError> {
-        use crate::validate::FILENAME_ENCODE_SET;
-        use percent_encoding::utf8_percent_encode;
-
         let name = validated_file_name(name.as_ref())?;
 
-        self.file_name = Some(
-            utf8_percent_encode(name, &FILENAME_ENCODE_SET).to_string()
-        );
-
+        self.file_name = Some(percent_encode!(name));
         Ok(self)
     }
 
@@ -1959,7 +1945,8 @@ impl<'a> UploadFileBuilder<'a> {
     pub fn content_disposition(mut self, disposition: ContentDisposition)
     -> Result<Self, ValidationError> {
         validate_content_disposition(&disposition.0, false)?;
-        self.content_disposition = Some(disposition.0);
+
+        self.content_disposition = Some(percent_encode!(disposition.0));
         Ok(self)
     }
 
@@ -1969,7 +1956,7 @@ impl<'a> UploadFileBuilder<'a> {
     /// Note that the download request can override this value.
     pub fn content_language(mut self, language: impl Into<String>) -> Self {
         // TODO: validate content_language
-        self.content_language = Some(language.into());
+        self.content_language = Some(percent_encode!(language.into()));
         self
     }
 
@@ -1977,7 +1964,9 @@ impl<'a> UploadFileBuilder<'a> {
     ///
     /// Note that the download request can override this value.
     pub fn expiration(mut self, expiration: Expires) -> Self {
-        self.expires = Some(expiration.value().to_string());
+        let expires = percent_encode!(expiration.value().to_string());
+
+        self.expires = Some(expires);
         self
     }
 
@@ -1989,7 +1978,8 @@ impl<'a> UploadFileBuilder<'a> {
     pub fn cache_control(mut self, directive: CacheDirective) -> Self {
         use http_types::headers::HeaderValue;
 
-        self.cache_control = Some(HeaderValue::from(directive).to_string());
+        let cc = percent_encode!(HeaderValue::from(directive).to_string());
+        self.cache_control = Some(cc);
         self
     }
 
@@ -1998,7 +1988,8 @@ impl<'a> UploadFileBuilder<'a> {
     ///
     /// Note that this can be overriden by a download request.
     pub fn content_encoding(mut self, encoding: ContentEncoding) -> Self {
-        self.content_encoding = Some(format!("{}", encoding.encoding()));
+        let encoding = percent_encode!(format!("{}", encoding.encoding()));
+        self.content_encoding = Some(encoding);
         self
     }
 
