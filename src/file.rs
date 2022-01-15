@@ -213,7 +213,7 @@ macro_rules! percent_encode {
     ($str:expr) => {
         percent_encoding::utf8_percent_encode(
             &$str,
-            &crate::validate::QUERY_ENCODE_SET
+            &crate::types::QUERY_ENCODE_SET
         ).to_string()
     };
 }
