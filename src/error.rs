@@ -77,7 +77,6 @@ impl From<url::ParseError> for ValidationError {
     }
 }
 
-// TODO: Rename?
 /// Errors related to making B2 API calls.
 #[derive(Debug)]
 pub enum Error<E>

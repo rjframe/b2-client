@@ -100,7 +100,6 @@ pub(crate) fn validated_cors_rule_name(name: impl Into<String>)
 ///
 /// We do not check the byte length limit since the limit applies to both the
 /// file info and the name.
-// TODO: Check limit anyway? If we exceed the limit here we can fail faster.
 pub(crate) fn validated_file_info(info: serde_json::Value)
 -> Result<serde_json::Value, ValidationError> {
     let obj = info.as_object()
