@@ -18,7 +18,6 @@ use crate::{
     client::HttpClient,
     error::{ValidationError, Error},
     validate::*,
-    require_capability,
 };
 
 use serde::{Serialize, Deserialize};

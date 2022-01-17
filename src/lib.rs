@@ -30,7 +30,6 @@ pub mod prelude {
     };
 }
 
-#[macro_export]
 macro_rules! require_capability {
     ($auth:expr, $cap:expr) => {
         if ! $auth.has_capability($cap) {
@@ -38,6 +37,7 @@ macro_rules! require_capability {
         }
     }
 }
+pub(crate) use require_capability;
 
 
 pub use account::*;

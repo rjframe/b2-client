@@ -23,7 +23,6 @@ use crate::{
     error::{ValidationError, Error},
     types::Duration,
     validate::validated_file_name,
-    require_capability,
 };
 
 use chrono::{DateTime, Local};
