@@ -11,6 +11,7 @@ use serde::{Serialize, Deserialize};
 // TODO: If/when Try trait is stable, impl it here.
 #[derive(serde::Deserialize)]
 #[serde(untagged)]
+#[must_use]
 pub(crate) enum B2Result<T> {
     Ok(T),
     Err(B2Error),
