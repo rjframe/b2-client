@@ -739,7 +739,7 @@ impl<'a> CopyFileBuilder<'a> {
 /// account.
 pub async fn copy_file<'a, C, E>(
     auth: &mut Authorization<C>,
-    file: CopyFile<'a>
+    file: CopyFile<'_>
 ) -> Result<File, Error<E>>
     where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
@@ -1648,7 +1648,7 @@ pub struct StartLargeFileBuilder<'a> {
 impl<'a> StartLargeFileBuilder<'a> {
     /// Specify the bucket in which to store the new file.
     pub fn bucket_id(mut self, id: &'a str) -> Self {
-        self.bucket_id = Some(id.as_ref());
+        self.bucket_id = Some(id);
         self
     }
 
@@ -1807,7 +1807,7 @@ impl<'a> StartLargeFileBuilder<'a> {
 // both a source file and the large (destination) file IDs together.
 pub async fn start_large_file<'a, C, E>(
     auth: &mut Authorization<C>,
-    file: StartLargeFile<'a>
+    file: StartLargeFile<'_>
 ) -> Result<File, Error<E>>
     where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
@@ -2104,7 +2104,7 @@ pub async fn upload_file<C, E>(
         .with_header("X-Bz-File-Name", &upload.file_name)
         .with_header("Content-Type", &upload.content_type)
         .with_header("Content-Length", &data.len().to_string())
-        .with_header("X-Bz-Content-Sha1", &upload.sha1_checksum);
+        .with_header("X-Bz-Content-Sha1", upload.sha1_checksum);
 
     add_opt_header!(
         req,

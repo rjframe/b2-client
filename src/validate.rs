@@ -69,8 +69,7 @@ pub(crate) fn validated_bucket_name(name: impl Into<String>)
 ///
 /// Note that B2 disallows ASCII control characters, but other control
 /// characters defined by Unicode are allowed.
-pub(crate) fn validated_file_name<'a>(name: &'a str)
--> Result<&'a str, ValidationError> {
+pub(crate) fn validated_file_name(name: &str) -> Result<&str, ValidationError> {
     for ch in name.chars() {
         if ch.is_ascii_control() {
             return Err(ValidationError::BadFormat(format!(

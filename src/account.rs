@@ -741,7 +741,7 @@ impl<'a> DownloadAuthorizationRequestBuilder<'a> {
     /// Create a download authorization for the specified bucket ID.
     pub fn bucket_id(mut self, id: &'a str) -> Self {
         // TODO: Validate id.
-        self.bucket_id = Some(id.as_ref());
+        self.bucket_id = Some(id);
         self
     }
 
@@ -750,7 +750,7 @@ impl<'a> DownloadAuthorizationRequestBuilder<'a> {
     pub fn file_name_prefix(mut self, name: &'a str)
     -> Result<Self, ValidationError> {
 
-        self.file_name_prefix = Some(validated_file_name(name.as_ref())?);
+        self.file_name_prefix = Some(validated_file_name(name)?);
         Ok(self)
     }
 
@@ -904,7 +904,7 @@ impl DownloadAuthorization {
 // TODO: Once download endpoints are implemented, add one to the example above.
 pub async fn get_download_authorization<'a, C, E>(
     auth: &mut Authorization<C>,
-    download_req: DownloadAuthorizationRequest<'a>
+    download_req: DownloadAuthorizationRequest<'_>
 ) -> Result<DownloadAuthorization, Error<E>>
     where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
