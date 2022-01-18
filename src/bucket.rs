@@ -687,12 +687,8 @@ impl CreateBucketBuilder {
     ///
     /// No file within a bucket can be subject to multiple lifecycle rules. If
     /// any of the rules provided apply to multiple files or folders, we return
-    /// a [ValidationError::ConflictingRules] with a map of the conflicting
-    /// rules. The map's key is the broadest rule (highest in the path
-    /// hierarchy).
-    ///
-    /// There can be duplicate entries in the map when rules involving
-    /// subfolders exist.
+    /// a [LifecycleRuleValidationError::ConflictingRules] with a list of the
+    /// conflicts.
     ///
     /// The empty string (`""`) matches all paths, so if provided it must be the
     /// only lifecycle rule. If it is provided along with other rules, all of
