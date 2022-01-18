@@ -16,7 +16,7 @@ use std::fmt;
 use crate::{
     prelude::*,
     client::HttpClient,
-    error::{ValidationError, Error},
+    error::{LifecycleRuleValidationError, ValidationError, Error},
     validate::*,
 };
 
@@ -362,7 +362,7 @@ impl CorsRuleBuilder {
 ///
 /// See <https://www.backblaze.com/b2/docs/lifecycle_rules.html> for further
 /// information.
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LifecycleRule {
     pub(crate) file_name_prefix: String,
@@ -747,9 +747,10 @@ impl CreateBucketBuilder {
     /// }
     /// ```
     pub fn lifecycle_rules(mut self, rules: impl Into<Vec<LifecycleRule>>)
-    -> Result<Self, ValidationError> {
+    -> Result<Self, LifecycleRuleValidationError> {
         let rules = validated_lifecycle_rules(rules)?;
         self.lifecycle_rules = Some(rules);
+
         Ok(self)
     }
 
@@ -1197,9 +1198,10 @@ impl UpdateBucketBuilder {
     /// See the documentation for [CreateBucketBuilder::lifecycle_rules] for
     /// the lifecycle requirements and examples.
     pub fn lifecycle_rules(mut self, rules: impl Into<Vec<LifecycleRule>>)
-    -> Result<Self, ValidationError> {
+    -> Result<Self, LifecycleRuleValidationError> {
         let rules = validated_lifecycle_rules(rules)?;
         self.lifecycle_rules = Some(rules);
+
         Ok(self)
     }
 

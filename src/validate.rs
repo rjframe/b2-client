@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use crate::{
     bucket::LifecycleRule,
-    error::ValidationError,
+    error::{LifecycleRuleValidationError, ValidationError},
 };
 
 use http_types::{
@@ -311,47 +311,34 @@ fn is_valid_quoted_string(s: &str) -> bool {
 /// No file within a bucket can be subject to multiple lifecycle rules. If any
 /// of the rules provided apply to multiple files or folders, we return the
 /// conflicting rules. The map's key is the broadest rule (highest in the
-/// hierarchy).
-///
-/// There can be duplicate entries when subfolders are involved.
+/// hierarchy). The map may have duplicate entries when subfolders are
+/// involved.
 ///
 /// The empty string (`""`) matches all paths, so if provided it must be the
 /// only lifecycle rule. If it is provided along with other rules, all of those
 /// rules will be listed as a conflict.
-// TODO: The current implementation clones all conflicting rule paths twice.
-// Three times if the initial into() requires cloning them.
 pub(crate) fn validated_lifecycle_rules(rules: impl Into<Vec<LifecycleRule>>)
--> Result<Vec<LifecycleRule>, ValidationError> {
+-> Result<Vec<LifecycleRule>, LifecycleRuleValidationError> {
     let mut rules = rules.into();
-    rules.sort();
 
-    let mut checked: Vec<Vec<String>> = vec![];
-
-    if rules.is_empty() {
-        // There is nothing particularly wrong about having no lifecycle rules,
-        // but we assume that if a list of rules is provided that it should
-        // contain at least one object.
-        Err(ValidationError::MissingData(
-            "No lifecycle rules were specified".into()
-        ))
-    } else if rules.len() > 100 {
-        Err(ValidationError::OutOfBounds(
-            "There can be no more than 100 lifecycle rules on a bucket".into()
-        ))
-    } else if rules.len() == 1 {
+    if rules.len() <= 1 {
         Ok(rules)
+    } else if rules.len() > 100 {
+        Err(LifecycleRuleValidationError::TooManyRules(rules.len()))
     } else {
-        let first_rule = &rules[0].file_name_prefix;
-        checked.push(vec![first_rule.to_owned()]);
+        rules.sort();
 
-        for rule in rules.iter().map(|r| &r.file_name_prefix).skip(1) {
+        // TODO: May be worthwhile to reserve rules.len()/2 or something.
+        let mut checked: Vec<Vec<&LifecycleRule>> = vec![vec![&rules[0]]];
+
+        for rule in rules.iter().skip(1) {
             for i in 0 .. checked.len() {
                 let root = &checked[i][0];
 
-                if rule.starts_with(root) {
-                    checked[i].push(rule.to_owned());
+                if rule.file_name_prefix.starts_with(&root.file_name_prefix) {
+                    checked[i].push(rule);
                 }  else {
-                    checked.push(vec![rule.to_owned()]);
+                    checked.push(vec![rule]);
                 }
             }
         }
@@ -359,17 +346,19 @@ pub(crate) fn validated_lifecycle_rules(rules: impl Into<Vec<LifecycleRule>>)
         let mut map = HashMap::new();
 
         checked.into_iter()
-            .filter(|l| l.len() > 1) // Keep only conflicts.
-            // TODO: We're cloning all elements here. See if the optimizer takes
-            // care of it.
-            .for_each(|l| {
-                let key = l[0].to_owned();
-                let val = Vec::from(&l[1..]);
+            .filter(|list| list.len() > 1) // Keep only conflicts.
+            .for_each(|list| {
+                let key = list[0].file_name_prefix.to_owned();
+
+                let val = list[1..].iter()
+                    .map(|v| (*v).to_owned())
+                    .collect::<Vec<LifecycleRule>>();
+
                 map.insert(key, val);
             });
 
         if ! map.is_empty() {
-            Err(ValidationError::ConflictingRules(map))
+            Err(LifecycleRuleValidationError::ConflictingRules(map))
         } else {
             Ok(rules)
         }
@@ -480,10 +469,13 @@ mod tests {
         ];
 
         match validated_lifecycle_rules(rules).unwrap_err() {
-            ValidationError::ConflictingRules(conflicts) => {
+            LifecycleRuleValidationError::ConflictingRules(conflicts) => {
                 assert_eq!(conflicts.len(), 1);
-                assert_eq!(conflicts["Legal/"],
-                    vec!["Legal/Taxes/".to_owned()]);
+
+                let conflicts = &conflicts["Legal/"];
+
+                assert_eq!(conflicts.len(), 1);
+                assert_eq!(conflicts[0].file_name_prefix, "Legal/Taxes/");
             },
             e => panic!("Unexpected error: {}", e),
         }
@@ -503,25 +495,35 @@ mod tests {
         ];
 
         match validated_lifecycle_rules(rules).unwrap_err() {
-            ValidationError::ConflictingRules(c) => {
+            LifecycleRuleValidationError::ConflictingRules(c) => {
                 assert_eq!(c.len(), 3);
-                assert_eq!(c["Docs/"],
-                    vec![
-                        "Docs/Documents/".to_owned(),
-                        "Docs/Photos/".to_owned(),
-                        "Docs/Photos/Vacations/".to_owned(),
-                    ]
+
+                let conflicts = &c["Docs/"];
+
+                assert_eq!(conflicts.len(), 3);
+                assert_eq!(conflicts[0].file_name_prefix, "Docs/Documents/");
+                assert_eq!(conflicts[1].file_name_prefix, "Docs/Photos/");
+                assert_eq!(
+                    conflicts[2].file_name_prefix,
+                    "Docs/Photos/Vacations/"
                 );
 
                 // This is a duplicated record owing its existence to the way
                 // we've happened to implement the loops. I don't want to
                 // iterate the vectors yet again to eliminate it, and I think
                 // I'm OK with the duplication.
-                assert_eq!(c["Docs/Photos/"],
-                    vec!["Docs/Photos/Vacations/".to_owned()]
+                let conflicts = &c["Docs/Photos/"];
+
+                assert_eq!(conflicts.len(), 1);
+                assert_eq!(
+                    conflicts[0].file_name_prefix,
+                    "Docs/Photos/Vacations/"
                 );
-                assert_eq!(c["Archive/"],
-                    vec!["Archive/Temporary/".to_owned()]);
+
+                let conflicts = &c["Archive/"];
+
+                assert_eq!(conflicts.len(), 1);
+                assert_eq!(conflicts[0].file_name_prefix, "Archive/Temporary/");
             },
             e => panic!("Unexpected error: {}", e),
         }
@@ -538,15 +540,21 @@ mod tests {
         ];
 
         match validated_lifecycle_rules(rules).unwrap_err() {
-            ValidationError::ConflictingRules(c) => {
-                assert_eq!(c.len(), 1);
-                assert_eq!(c["Docs/"],
-                    vec![
-                        "Docs/Documents/".to_owned(),
-                        "Docs/Photos/".to_owned(),
-                        "Docs/Photos/Buildings/".to_owned(),
-                        "Docs/Photos/Vacations/".to_owned(),
-                    ]
+            LifecycleRuleValidationError::ConflictingRules(conflicts) => {
+                assert_eq!(conflicts.len(), 1);
+
+                let conflicts = &conflicts["Docs/"];
+
+                assert_eq!(conflicts.len(), 4);
+                assert_eq!(conflicts[0].file_name_prefix, "Docs/Documents/");
+                assert_eq!(conflicts[1].file_name_prefix, "Docs/Photos/");
+                assert_eq!(
+                    conflicts[2].file_name_prefix,
+                    "Docs/Photos/Buildings/"
+                );
+                assert_eq!(
+                    conflicts[3].file_name_prefix,
+                    "Docs/Photos/Vacations/"
                 );
             },
             e => panic!("Unexpected error: {}", e),
@@ -575,16 +583,16 @@ mod tests {
         ];
 
         match validated_lifecycle_rules(rules).unwrap_err() {
-            ValidationError::ConflictingRules(conflicts) => {
+            LifecycleRuleValidationError::ConflictingRules(conflicts) => {
                 assert_eq!(conflicts.len(), 1);
-                assert_eq!(conflicts[""],
-                    vec![
-                        "Archive/".to_owned(),
-                        "Docs/Photos/".to_owned(),
-                        "Legal/".to_owned(),
-                        "Legal/Taxes/".to_owned(),
-                    ]
-                );
+
+                let conflicts = &conflicts[""];
+
+                assert_eq!(conflicts.len(), 4);
+                assert_eq!(conflicts[0].file_name_prefix, "Archive/");
+                assert_eq!(conflicts[1].file_name_prefix, "Docs/Photos/");
+                assert_eq!(conflicts[2].file_name_prefix, "Legal/");
+                assert_eq!(conflicts[3].file_name_prefix, "Legal/Taxes/");
             },
             e => panic!("Unexpected error: {}", e),
         }

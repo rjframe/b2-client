@@ -8,7 +8,9 @@
 //! Errors are divided into two types:
 //!
 //! * [ValidationError] for data validation errors prior to sending a request to
-//!   the B2 API.
+//!   the B2 API. This is currently being split into multiple errors as
+//!   appropriate:
+//!     * [LifecycleRuleValidationError]
 //! * [Error] for errors returned by the Backblaze B2 API or the HTTP client.
 
 use std::{
@@ -16,14 +18,14 @@ use std::{
     fmt,
 };
 
+use crate::bucket::LifecycleRule;
+
 use serde::{Serialize, Deserialize};
 
 
 // TODO: Splitting these up will provide nicer error handling when the user
-// actually wants to handle them, rather than merely print them. It also means
-// many error types, so may make learning/using the library more difficult.
-// TODO: Some of these would be good for code to be able to inspect; we need
-// data-oriented errors rather than string-oriented errors.
+// actually wants to handle them, rather than merely print them. As part of
+// this, we need data-oriented errors rather than string-oriented errors.
 /// Errors from validating B2 requests prior to making the request.
 #[derive(Debug)]
 pub enum ValidationError {
@@ -47,12 +49,6 @@ pub enum ValidationError {
     ///
     /// The string is a short description of the failure.
     Incompatible(String),
-    /// Multiple [LifecycleRule](crate::bucket::LifecycleRule)s exist for the
-    /// same file.
-    ///
-    /// Returns a map of conflicting filename prefixes; the most broad prefix
-    /// (the base path) for each group of conflicts is the key.
-    ConflictingRules(HashMap<String, Vec<String>>),
 }
 
 impl std::error::Error for ValidationError {}
@@ -65,8 +61,6 @@ impl fmt::Display for ValidationError {
             Self::MissingData(s) => write!(f, "{}", s),
             Self::OutOfBounds(s) => write!(f, "{}", s),
             Self::Incompatible(s) => write!(f, "{}", s),
-            Self::ConflictingRules(_) => write!(f,
-                "Only one lifecycle rule can apply to any given set of files"),
         }
     }
 }
@@ -74,6 +68,35 @@ impl fmt::Display for ValidationError {
 impl From<url::ParseError> for ValidationError {
     fn from(e: url::ParseError) -> Self {
         Self::BadUrl(format!("{}", e))
+    }
+}
+
+/// Error type from failure to validate a set of [LifecycleRule]s.
+#[derive(Debug)]
+pub enum LifecycleRuleValidationError {
+    /// The maximum number of rules (100) was exceeded for the bucket.
+    TooManyRules(usize),
+    /// Multiple [LifecycleRule]s exist for the same file.
+    ///
+    /// Returns a map of conflicting filename prefixes; the most broad prefix
+    /// (the base path) for each group of conflicts is the key and the
+    /// conflicting rules are in the value.
+    ConflictingRules(HashMap<String, Vec<LifecycleRule>>),
+}
+
+impl std::error::Error for LifecycleRuleValidationError {}
+
+impl fmt::Display for LifecycleRuleValidationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::TooManyRules(i) => write!(f, concat!(
+                "A bucket can have no more than 100 rules;",
+                "you have provided {}"), i
+            ),
+            Self::ConflictingRules(_) => (write!(f,
+                "Only one lifecycle rule can apply to any given set of files"
+            )),
+        }
     }
 }
 
