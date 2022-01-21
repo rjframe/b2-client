@@ -149,7 +149,7 @@ use std::fmt;
 
 use crate::{
     prelude::*,
-    account::{Capability, ContentDisposition},
+    account::Capability,
     bucket::{
         Bucket,
         FileRetentionMode,
@@ -158,6 +158,7 @@ use crate::{
     },
     client::{HeaderMap, HttpClient},
     error::{ValidationError, Error},
+    types::ContentDisposition,
     validate::{
         validate_content_disposition,
         validated_file_info,

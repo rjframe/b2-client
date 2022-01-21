@@ -6,22 +6,13 @@
 //! Account-related B2 API calls.
 // TODO: Timestamps are likely UTC. Is that documented anywhere?
 
-// TODO: export these from another/a sub module.
-// crate::file_data? data_types? file_metadata?
-// The ContentDisposition type defined in this module needs to go with them.
-pub use http_types::{
-    cache::{CacheDirective, Expires},
-    content::ContentEncoding,
-    mime::Mime,
-};
-
 use std::fmt;
 
 use crate::{
     prelude::*,
     client::HttpClient,
     error::{ValidationError, Error},
-    types::Duration,
+    types::*,
     validate::validated_file_name,
 };
 
@@ -674,13 +665,6 @@ pub async fn delete_key_by_id<C, E, S: AsRef<str>>(
     let key: B2Result<Key> = serde_json::from_slice(&res)?;
     key.into()
 }
-
-/// A Content-Disposition value.
-///
-/// The grammar is specified in RFC 6266, except parameter names that contain an
-/// '*' are not allowed.
-// TODO: Implement; parse/validate.
-pub struct ContentDisposition(pub(crate) String);
 
 /// A request to obtain a [DownloadAuthorization].
 ///

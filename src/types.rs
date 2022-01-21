@@ -6,6 +6,12 @@ use super::error::{B2Error, Error};
 use percent_encoding::{AsciiSet, CONTROLS};
 use serde::{Serialize, Deserialize};
 
+pub use http_types::{
+    cache::{CacheDirective, Expires},
+    content::ContentEncoding,
+    mime::Mime,
+};
+
 
 // This gives us nicer error handling when deserializing JSON responses.
 // TODO: If/when Try trait is stable, impl it here.
@@ -38,6 +44,13 @@ impl<T> B2Result<T> {
         }
     }
 }
+
+/// A Content-Disposition value.
+///
+/// The grammar is specified in RFC 6266, except parameter names that contain an
+/// '*' are not allowed.
+// TODO: Implement; parse/validate.
+pub struct ContentDisposition(pub(crate) String);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct Duration(pub(crate) chrono::Duration);
