@@ -1189,10 +1189,40 @@ mod tests {
 
     #[async_std::test]
     async fn test_get_download_authorization() -> Result<(), anyhow::Error> {
+        // I need two copies of an identical expiration, but it doesn't
+        // implement Clone.
+        let (expires1, expires2) = {
+            use http_types::Trailers;
+
+            let mut header = Trailers::new();
+            header.insert("Expires", "Fri, 21 Jan 2022 14:10:49 GMT");
+
+            let e1 = Expires::from_headers(header.as_ref())
+                .unwrap().unwrap().value().to_string();
+            let e2 = Expires::from_headers(header.as_ref()).unwrap().unwrap();
+
+            (e1, e2)
+        };
+
         let client = create_test_client(
             VcrMode::Replay,
             "test_sessions/auth_account.yaml",
-            None, None
+            Some(Box::new(move |req| {
+                use surf_vcr::Body;
+
+                if let Body::Str(body) = &mut req.body {
+                    let body_json: Result<serde_json::Value, _> =
+                        serde_json::from_str(body);
+
+                    if let Ok(mut body) = body_json {
+                        body.get_mut("b2Expires")
+                            .map(|v| *v = serde_json::json!(expires1));
+
+                        req.body = Body::Str(body.to_string());
+                    }
+                }
+            })),
+            None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::ShareFiles])
@@ -1205,8 +1235,7 @@ mod tests {
             .content_disposition(
                 ContentDisposition("Attachment; filename=example.html".into())
             )
-            // TODO: Use middleware to modify these so we can test it.
-            //.expiration(Expires::new(std::time::Duration::from_secs(60)))
+            .expiration(expires2)
             .cache_control(CacheDirective::MustRevalidate)
             .build()?;
 
