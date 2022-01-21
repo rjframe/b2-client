@@ -385,10 +385,7 @@ impl CreateKeyBuilder {
     /// Limit the key's access to the specified bucket.
     pub fn limit_to_bucket<S: Into<String>>(mut self, id: S)
     -> Result<Self, ValidationError> {
-        let id = id.into();
-        // TODO: Validate bucket id.
-
-        self.bucket_id = Some(id);
+        self.bucket_id = Some(id.into());
         Ok(self)
     }
 
@@ -724,7 +721,6 @@ pub struct DownloadAuthorizationRequestBuilder<'a> {
 impl<'a> DownloadAuthorizationRequestBuilder<'a> {
     /// Create a download authorization for the specified bucket ID.
     pub fn bucket_id(mut self, id: &'a str) -> Self {
-        // TODO: Validate id.
         self.bucket_id = Some(id);
         self
     }
@@ -972,7 +968,6 @@ impl KeyListRequestBuilder {
     /// Set the key ID at which to begin listing.
     pub fn start_at_key(mut self, id: impl Into<String>)
     -> Result<Self, ValidationError> {
-        // TODO: Validate id
         self.start_key_id = Some(id.into());
         Ok(self)
     }
