@@ -2290,7 +2290,8 @@ mod tests_mocked {
     async fn start_large_file_upload_success() -> anyhow::Result<()> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/large_file.yaml"
+            "test_sessions/large_file.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::WriteFiles])
@@ -2312,7 +2313,8 @@ mod tests_mocked {
     async fn cancel_large_file_upload_success() -> anyhow::Result<()> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/large_file.yaml"
+            "test_sessions/large_file.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::WriteFiles])
@@ -2335,7 +2337,8 @@ mod tests_mocked {
     async fn cancel_large_file_upload_doesnt_exist() -> anyhow::Result<()> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/large_file.yaml"
+            "test_sessions/large_file.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::WriteFiles])
@@ -2353,7 +2356,8 @@ mod tests_mocked {
     async fn obtain_part_upload_authorization() -> anyhow::Result<()> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/large_file.yaml"
+            "test_sessions/large_file.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::WriteFiles])
@@ -2378,7 +2382,8 @@ mod tests_mocked {
     async fn obtain_upload_authorization() -> anyhow::Result<()> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/file.yaml"
+            "test_sessions/file.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::WriteFiles])
@@ -2398,7 +2403,8 @@ mod tests_mocked {
     async fn upload_file_success() -> anyhow::Result<()> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/file.yaml"
+            "test_sessions/file.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::WriteFiles])
@@ -2425,7 +2431,8 @@ mod tests_mocked {
     async fn copy_file_success() -> anyhow::Result<()> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/large_file.yaml"
+            "test_sessions/large_file.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(
@@ -2454,7 +2461,8 @@ mod tests_mocked {
     async fn copy_file_part_success() -> anyhow::Result<()> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/large_file.yaml"
+            "test_sessions/large_file.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(
@@ -2505,7 +2513,8 @@ mod tests_mocked {
     async fn download_file_by_id_success() -> anyhow::Result<()> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/file.yaml"
+            "test_sessions/file.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::ReadFiles])
@@ -2524,7 +2533,8 @@ mod tests_mocked {
     async fn download_file_by_name_success() -> anyhow::Result<()> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/file.yaml"
+            "test_sessions/file.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::ReadFiles])
@@ -2554,7 +2564,8 @@ mod tests_mocked {
     async fn download_file_range_success() -> anyhow::Result<()> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/file.yaml"
+            "test_sessions/file.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::ReadFiles])
@@ -2577,7 +2588,8 @@ mod tests_mocked {
     async fn delete_file_success() -> anyhow::Result<()> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/delete_file.yaml"
+            "test_sessions/delete_file.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(
@@ -2608,7 +2620,18 @@ mod tests_mocked {
     async fn upload_large_file_full_process() -> anyhow::Result<()> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/large_file.yaml"
+            "test_sessions/large_file.yaml",
+            Some(Box::new(|req| {
+                use surf_vcr::Body;
+
+                if let Body::Str(body) = &mut req.body {
+                    if body.starts_with("aaaaa") {
+                        // We don't need to store 5 MB of nothing for our test.
+                        req.body = Body::Str("aaaaa for 5 MB of data".into());
+                    }
+                }
+            })),
+            None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::WriteFiles])

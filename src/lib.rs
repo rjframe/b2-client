@@ -49,11 +49,12 @@ pub use error::Error;
 
 #[cfg(all(test, feature = "with_surf"))]
 pub(crate) mod test_utils {
+    use std::boxed::Box;
     use crate::{
         account::{Authorization, Capability, Capabilities},
         client::{SurfClient, HttpClient},
     };
-    use surf_vcr::{Body, VcrMiddleware, VcrMode, VcrError};
+    use surf_vcr::*;
     use surf::http::Method;
 
 
@@ -75,16 +76,19 @@ pub(crate) mod test_utils {
     ///     * `applicationKeyId`
     ///     * `bucketId`
     ///
-    /// We probably should remove them for safety; we could store a
-    /// cryptographic hash of the data so that we can still test against their
-    /// values. In the meantime, create new objects for the tests as needed, and
-    /// delete them afterward.
-    pub async fn create_test_client(mode: VcrMode, cassette: &'static str)
-    -> std::result::Result<SurfClient, VcrError> {
+    /// You may optionally pass in functions to make additional modifications to
+    /// a response or request as needed for specific tests. Note that if the
+    /// response body is not valid JSON, nothing in the response can be
+    /// modified.
+    pub async fn create_test_client(
+        mode: VcrMode, cassette: &'static str,
+        req_mod: Option<Box<dyn Fn(&mut VcrRequest) + Send + Sync + 'static>>,
+        res_mod: Option<Box<dyn Fn(&mut VcrResponse) + Send + Sync + 'static>>,
+    ) -> std::result::Result<SurfClient, VcrError> {
         #![allow(clippy::option_map_unit_fn)]
 
         let vcr = VcrMiddleware::new(mode, cassette).await.unwrap()
-            .with_modify_request(|req| {
+            .with_modify_request(move |req| {
                 let val = match req.method {
                     Method::Get => "Basic hidden-account-id".into(),
                     _ => "hidden-authorization-token".into(),
@@ -116,26 +120,24 @@ pub(crate) mod test_utils {
                         }
                     });
 
-                let body = match &mut req.body {
-                    Body::Str(s) => s,
-                    _ => return,
+                if let Body::Str(body) = &mut req.body {
+                    let body_json: Result<serde_json::Value, _> =
+                        serde_json::from_str(body);
+
+                    if let Ok(mut body) = body_json {
+                        body.get_mut("accountId")
+                            .map(|v| *v =
+                                serde_json::json!("hidden-account-id"));
+
+                        req.body = Body::Str(body.to_string());
+                    }
                 };
 
-                let body_json: Result<serde_json::Value, _> =
-                    serde_json::from_str(body);
-
-                if let Ok(mut body) = body_json {
-                    body.get_mut("accountId")
-                        .map(|v| *v = serde_json::json!("hidden-account-id"));
-
-                    req.body = Body::Str(body.to_string());
-                } else if body.starts_with("aaaaa") {
-                    // Our large-file upload test has 5 MB of 'a'. There's
-                    // no need to store it though.
-                    req.body = Body::Str("aaaaa for 5 MB of data".into());
+                if let Some(req_mod) = req_mod.as_ref() {
+                    req_mod(req);
                 }
             })
-            .with_modify_response(|res| {
+            .with_modify_response(move |res| {
                 // If the response isn't JSON, there's nothing we need to
                 // modify.
                 let mut json: serde_json::Value = match &mut res.body {
@@ -170,6 +172,10 @@ pub(crate) mod test_utils {
                     }]));
 
                 res.body = Body::Str(json.to_string());
+
+                if let Some(res_mod) = res_mod.as_ref() {
+                    res_mod(res);
+                }
             });
 
         let surf = surf::Client::new()

@@ -1443,7 +1443,8 @@ mod tests_mocked {
     async fn create_bucket_success() -> anyhow::Result<()> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/buckets.yaml"
+            "test_sessions/buckets.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::WriteBuckets])
@@ -1476,7 +1477,8 @@ mod tests_mocked {
         // cassette.
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/buckets.yaml"
+            "test_sessions/buckets.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::WriteBuckets])
@@ -1508,7 +1510,8 @@ mod tests_mocked {
         // bucket ID.
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/buckets.yaml"
+            "test_sessions/buckets.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::DeleteBuckets])
@@ -1526,7 +1529,8 @@ mod tests_mocked {
     async fn delete_bucket_does_not_exist() -> anyhow::Result<()> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/buckets.yaml"
+            "test_sessions/buckets.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::DeleteBuckets])
@@ -1546,7 +1550,8 @@ mod tests_mocked {
     async fn test_list_buckets() -> anyhow::Result<()> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/buckets.yaml"
+            "test_sessions/buckets.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::ListBuckets])
@@ -1570,7 +1575,8 @@ mod tests_mocked {
         // changed to a valid ID.
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/buckets.yaml"
+            "test_sessions/buckets.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::WriteBuckets])
@@ -1599,7 +1605,8 @@ mod tests_mocked {
         // changed to a valid ID.
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/buckets.yaml"
+            "test_sessions/buckets.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::WriteBuckets])

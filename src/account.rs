@@ -1085,7 +1085,8 @@ mod tests {
     async fn test_authorize_account() -> Result<(), anyhow::Error> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/auth_account.yaml"
+            "test_sessions/auth_account.yaml",
+            None, None
         ).await?;
 
         let (id, key) = get_key();
@@ -1100,7 +1101,8 @@ mod tests {
     async fn authorize_account_bad_key() -> Result<(), anyhow::Error> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/bad_auth_account.yaml"
+            "test_sessions/bad_auth_account.yaml",
+            None, None
         ).await?;
 
         let (id, _) = get_key();
@@ -1120,7 +1122,8 @@ mod tests {
     async fn authorize_account_bad_key_id() -> Result<(), anyhow::Error> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/bad_auth_account.yaml"
+            "test_sessions/bad_auth_account.yaml",
+            None, None
         ).await?;
 
         let (_, key) = get_key();
@@ -1140,7 +1143,8 @@ mod tests {
     async fn test_create_key() -> Result<(), anyhow::Error> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/auth_account.yaml"
+            "test_sessions/auth_account.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::WriteKeys])
@@ -1167,7 +1171,8 @@ mod tests {
 
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/auth_account.yaml"
+            "test_sessions/auth_account.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::DeleteKeys])
@@ -1186,7 +1191,8 @@ mod tests {
     async fn test_get_download_authorization() -> Result<(), anyhow::Error> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/auth_account.yaml"
+            "test_sessions/auth_account.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::ShareFiles])
@@ -1215,7 +1221,8 @@ mod tests {
     -> Result<(), anyhow::Error> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/auth_account.yaml"
+            "test_sessions/auth_account.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::ShareFiles])
@@ -1237,7 +1244,8 @@ mod tests {
     async fn test_list_keys() -> Result<(), anyhow::Error> {
         let client = create_test_client(
             VcrMode::Replay,
-            "test_sessions/auth_account.yaml"
+            "test_sessions/auth_account.yaml",
+            None, None
         ).await?;
 
         let mut auth = create_test_auth(client, vec![Capability::ListKeys])
