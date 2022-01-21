@@ -81,6 +81,9 @@ pub enum LifecycleRuleValidationError {
     /// Returns a map of conflicting filename prefixes; the most broad prefix
     /// (the base path) for each group of conflicts is the key and the
     /// conflicting rules are in the value.
+    ///
+    /// There can be duplicate entries in the map when rules involving
+    /// subfolders exist.
     ConflictingRules(HashMap<String, Vec<LifecycleRule>>),
 }
 
