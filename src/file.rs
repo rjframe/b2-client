@@ -1459,6 +1459,240 @@ pub async fn finish_large_file_upload_by_id<C, E>(
     file.into()
 }
 
+/// A request to obtain a [DownloadAuthorization].
+///
+/// Use [DownloadAuthorizationRequestBuilder] to create a
+/// `DownloadAuthorizationRequest`, then pass it to [get_download_authorization]
+/// to obtain a [DownloadAuthorization].
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadAuthorizationRequest<'a> {
+    bucket_id: &'a str,
+    file_name_prefix: &'a str,
+    valid_duration_in_seconds: Duration,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    b2_content_disposition: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    b2_content_language: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    b2_expires: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    b2_cache_control: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    b2_content_encoding: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    b2_content_type: Option<String>,
+}
+
+impl<'a> DownloadAuthorizationRequest<'a> {
+    pub fn builder() -> DownloadAuthorizationRequestBuilder<'a> {
+        DownloadAuthorizationRequestBuilder::default()
+    }
+}
+
+/// A builder to create a [DownloadAuthorizationRequest].
+///
+/// After building the `DownloadAuthorizationRequest`, pass it to
+/// [get_download_authorization] to obtain a [DownloadAuthorization]
+///
+/// The bucket ID, file name prefix, and valid duration are required.
+///
+/// See <https://www.backblaze.com/b2/docs/b2_get_download_authorization.html>
+/// for furter information.
+#[derive(Default)]
+pub struct DownloadAuthorizationRequestBuilder<'a> {
+    // Required:
+    bucket_id: Option<&'a str>,
+    file_name_prefix: Option<&'a str>,
+    valid_duration_in_seconds: Option<Duration>,
+    // Optional:
+    b2_content_disposition: Option<String>,
+    b2_content_language: Option<String>,
+    b2_expires: Option<String>,
+    b2_cache_control: Option<String>,
+    b2_content_encoding: Option<String>,
+    b2_content_type: Option<String>,
+}
+
+impl<'a> DownloadAuthorizationRequestBuilder<'a> {
+    /// Create a download authorization for the specified bucket ID.
+    pub fn bucket_id(mut self, id: &'a str) -> Self {
+        self.bucket_id = Some(id);
+        self
+    }
+
+    /// Use the given file name prefix to determine what files the
+    /// [DownloadAuthorization] will allow access to.
+    pub fn file_name_prefix(mut self, name: &'a str)
+    -> Result<Self, ValidationError> {
+
+        self.file_name_prefix = Some(validated_file_name(name)?);
+        Ok(self)
+    }
+
+    /// Specify the amount of time for which the [DownloadAuthorization] will be
+    /// valid.
+    ///
+    /// This must be between one second and one week, inclusive.
+    pub fn duration(mut self, dur: chrono::Duration)
+    -> Result<Self, ValidationError> {
+        if dur < chrono::Duration::seconds(1)
+            || dur > chrono::Duration::weeks(1)
+        {
+            return Err(ValidationError::OutOfBounds(
+                "Duration must be between 1 and 604,800 seconds, inclusive"
+                    .into()
+            ));
+        }
+
+        self.valid_duration_in_seconds = Some(Duration(dur));
+        Ok(self)
+    }
+
+    /// If specified, download requests must have this content disposition. The
+    /// grammar is specified in RFC 6266, except that parameter names containing
+    /// a '*' are not allowed.
+    pub fn content_disposition(mut self, disposition: ContentDisposition)
+    -> Self {
+        self.b2_content_disposition = Some(disposition.0);
+        self
+    }
+
+    /// If specified, download requests must have this content language. The
+    /// grammar is specified in RFC 2616.
+    pub fn content_language<S: Into<String>>(mut self, lang: S) -> Self {
+        // TODO: Validate language.
+        self.b2_content_language = Some(lang.into());
+        self
+    }
+
+    /// If specified, download requests must have this expiration.
+    pub fn expiration(mut self, expiration: Expires) -> Self {
+        self.b2_expires = Some(expiration.value().to_string());
+        self
+    }
+
+    /// If specified, download requests must have this cache control.
+    pub fn cache_control(mut self, directive: CacheDirective) -> Self {
+        use http_types::headers::HeaderValue;
+
+        self.b2_cache_control = Some(HeaderValue::from(directive).to_string());
+        self
+    }
+
+    /// If specified, download requests must have this content encoding.
+    pub fn content_encoding(mut self, encoding: ContentEncoding) -> Self {
+        self.b2_content_encoding = Some(format!("{}", encoding.encoding()));
+        self
+    }
+
+    /// If specified, download requests must have this content type.
+    pub fn content_type(mut self, content_type: Mime) -> Self {
+        self.b2_content_type = Some(content_type.to_string());
+        self
+    }
+
+    /// Build a [DownloadAuthorizationRequest].
+    pub fn build(self)
+    -> Result<DownloadAuthorizationRequest<'a>, ValidationError> {
+        let bucket_id = self.bucket_id
+            .ok_or_else(|| ValidationError::MissingData(
+                "A bucket ID must be provided".into()
+            ))?;
+        let file_name_prefix = self.file_name_prefix
+            .ok_or_else(|| ValidationError::MissingData(
+                "A filename prefix must be provided".into()
+            ))?;
+        let valid_duration_in_seconds = self.valid_duration_in_seconds
+            .ok_or_else(|| ValidationError::MissingData(
+                "The duration of the authorization token must be set".into()
+            ))?;
+
+        Ok(DownloadAuthorizationRequest {
+            bucket_id,
+            file_name_prefix,
+            valid_duration_in_seconds,
+            b2_content_disposition: self.b2_content_disposition,
+            b2_content_language: self.b2_content_language,
+            b2_expires: self.b2_expires,
+            b2_cache_control: self.b2_cache_control,
+            b2_content_encoding: self.b2_content_encoding,
+            b2_content_type: self.b2_content_type,
+        })
+    }
+}
+
+/// A capability token that authorizes downloading files from a private bucket.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadAuthorization {
+    bucket_id: String,
+    file_name_prefix: String,
+    authorization_token: String,
+}
+
+impl DownloadAuthorization {
+    /// Get the ID of the bucket this `DownloadAuthorization` can access.
+    pub fn bucket_id(&self) -> &str { &self.bucket_id }
+    /// The file prefix that determines what files in the bucket are accessible
+    /// via this `DownloadAuthorization`.
+    pub fn file_name_prefix(&self) -> &str { &self.file_name_prefix }
+}
+
+/// Generate a download authorization token to download files with a specific
+/// prefix from a private B2 bucket.
+///
+/// The [Authorization] token must have [Capability::ShareFiles].
+///
+/// The returned [DownloadAuthorization] can be passed to
+/// [download_file](crate::file::download_file) (not yet implemented).
+///
+/// See <https://www.backblaze.com/b2/docs/b2_get_download_authorization.html>
+/// for further information.
+///
+/// # Examples
+///
+/// ```no_run
+/// # #[cfg(feature = "with_surf")]
+/// # use b2_client::{
+/// #     client::{HttpClient, SurfClient},
+/// #     account::authorize_account,
+/// #     file::{DownloadAuthorizationRequest, get_download_authorization},
+/// # };
+/// # #[cfg(feature = "with_surf")]
+/// # async fn f() -> anyhow::Result<()> {
+/// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
+///     .await?;
+///
+/// let download_req = DownloadAuthorizationRequest::builder()
+///     .bucket_id("MY BUCKET ID")
+///     .file_name_prefix("my/files/")?
+///     .duration(chrono::Duration::seconds(60))?
+///     .build()?;
+///
+/// let download_auth = get_download_authorization(&mut auth, download_req)
+///     .await?;
+/// # Ok(()) }
+/// ```
+pub async fn get_download_authorization<'a, C, E>(
+    auth: &mut Authorization<C>,
+    download_req: DownloadAuthorizationRequest<'_>
+) -> Result<DownloadAuthorization, Error<E>>
+    where C: HttpClient<Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    require_capability!(auth, Capability::ShareFiles);
+
+    let res = auth.client.post(auth.api_url("b2_get_download_authorization"))
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .with_body_json(serde_json::to_value(download_req)?)
+        .send().await?;
+
+    let auth: B2Result<DownloadAuthorization> = serde_json::from_slice(&res)?;
+    auth.into()
+}
+
 /// An authorization to upload file contents to a B2 file.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -2348,6 +2582,88 @@ mod tests_mocked {
             Error::B2(e) => assert_eq!(e.code(), ErrorCode::BadRequest),
             _ => panic!("Unexpected error type"),
         }
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_get_download_authorization() -> Result<(), anyhow::Error> {
+        // I need two copies of an identical expiration, but it doesn't
+        // implement Clone.
+        let (expires1, expires2) = {
+            use http_types::Trailers;
+
+            let mut header = Trailers::new();
+            header.insert("Expires", "Fri, 21 Jan 2022 14:10:49 GMT");
+
+            let e1 = Expires::from_headers(header.as_ref())
+                .unwrap().unwrap().value().to_string();
+            let e2 = Expires::from_headers(header.as_ref()).unwrap().unwrap();
+
+            (e1, e2)
+        };
+
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/auth_account.yaml",
+            Some(Box::new(move |req| {
+                use surf_vcr::Body;
+
+                if let Body::Str(body) = &mut req.body {
+                    let body_json: Result<serde_json::Value, _> =
+                        serde_json::from_str(body);
+
+                    if let Ok(mut body) = body_json {
+                        body.get_mut("b2Expires")
+                            .map(|v| *v = serde_json::json!(expires1));
+
+                        req.body = Body::Str(body.to_string());
+                    }
+                }
+            })),
+            None
+        ).await?;
+
+        let mut auth = create_test_auth(client, vec![Capability::ShareFiles])
+            .await;
+
+        let req = DownloadAuthorizationRequest::builder()
+            .bucket_id("8d625eb63be2775577c70e1a")
+            .file_name_prefix("files/")?
+            .duration(chrono::Duration::seconds(30))?
+            .content_disposition(
+                ContentDisposition("Attachment; filename=example.html".into())
+            )
+            .expiration(expires2)
+            .cache_control(CacheDirective::MustRevalidate)
+            .build()?;
+
+        let download_auth = get_download_authorization(&mut auth, req).await?;
+        assert_eq!(download_auth.bucket_id(), "8d625eb63be2775577c70e1a");
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_get_download_authorization_with_only_required_data()
+    -> Result<(), anyhow::Error> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/auth_account.yaml",
+            None, None
+        ).await?;
+
+        let mut auth = create_test_auth(client, vec![Capability::ShareFiles])
+            .await;
+
+        let req = DownloadAuthorizationRequest::builder()
+            .bucket_id("8d625eb63be2775577c70e1a")
+            .file_name_prefix("files/")?
+            .duration(chrono::Duration::seconds(30))?
+            .build()?;
+
+        let download_auth = get_download_authorization(&mut auth, req).await?;
+        assert_eq!(download_auth.bucket_id(), "8d625eb63be2775577c70e1a");
 
         Ok(())
     }
