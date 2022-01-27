@@ -753,8 +753,10 @@ struct KeyList {
 ///
 /// The `Authorization` must have [Capability::ListKeys].
 ///
-/// Returns a tuple of the list of keys and the ID of the next key in the list,
-/// if there are keys that have not been returned.
+/// Returns a tuple of the list of keys and the next [KeyListRequest] to obtain
+/// the next set of keys, if there are keys that have not yet been returned. The
+/// new key list request will have the same maximum key limit as the previous
+/// request.
 ///
 /// A single function call can generate multiple Class C transactions, which may
 /// result in charges to your account. See
@@ -781,19 +783,18 @@ struct KeyList {
 ///     .max_keys(500)?
 ///     .build();
 ///
-/// let (keys, _next_bucket) = list_keys(&mut auth, req).await?;
+/// let (keys, _next_req) = list_keys(&mut auth, req).await?;
 ///
 /// for key in keys.iter() {
 ///     // ...
 /// }
 /// # Ok(()) }
 /// ```
-// TODO: Borrow the KeyListRequest to make it easy to quickly call this again?
 // TODO: Create a list_all_keys function?
-pub async fn list_keys<C, E>(
-    auth: &mut Authorization<C>,
-    list_req: KeyListRequest<'_>
-) -> Result<(Vec<Key>, Option<String>), Error<E>>
+pub async fn list_keys<'a, C, E>(
+    auth: &'a mut Authorization<C>,
+    list_req: KeyListRequest<'a>
+) -> Result<(Vec<Key>, Option<KeyListRequest<'a>>), Error<E>>
     where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
@@ -805,11 +806,28 @@ pub async fn list_keys<C, E>(
     let res = auth.client.post(auth.api_url("b2_list_keys"))
         .expect("Invalid URL")
         .with_header("Authorization", &auth.authorization_token)
-        .with_body_json(serde_json::to_value(list_req)?)
+        .with_body_json(serde_json::to_value(list_req.clone())?)
         .send().await?;
 
     let keys: B2Result<KeyList> = serde_json::from_slice(&res)?;
-    keys.map(|k| (k.keys, k.next_application_key_id)).into()
+
+    match keys {
+        B2Result::Ok(keys) => {
+            if let Some(id) = keys.next_application_key_id {
+                Ok((
+                    keys.keys,
+                    Some(KeyListRequest {
+                        account_id: Some(&auth.account_id),
+                        max_key_count: list_req.max_key_count,
+                        start_application_key_id: Some(id),
+                    })
+                ))
+            } else {
+                Ok((keys.keys, None))
+            }
+        },
+        B2Result::Err(e) => Err(e.into())
+    }
 }
 
 
@@ -961,7 +979,7 @@ mod tests {
 
         let (keys, next) = list_keys(&mut auth, req).await?;
         assert_eq!(keys.len(), 1);
-        assert_eq!(next, None);
+        assert!(next.is_none());
 
         Ok(())
     }
