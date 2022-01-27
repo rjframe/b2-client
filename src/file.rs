@@ -504,7 +504,7 @@ impl ByteRange {
     // explicitly choosing one or the other. Name them `new_end_xxx` to be truly
     // clear?
     pub fn new(start: u64, end: u64) -> Result<Self, ValidationError> {
-        if start < end {
+        if start <= end {
             Ok(Self { start, end })
         } else {
             Err(ValidationError::Incompatible(format!(
