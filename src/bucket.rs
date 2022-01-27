@@ -827,7 +827,7 @@ impl From<Period> for chrono::Duration {
 }
 
 /// A file's B2 retention policy.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct FileRetentionPolicy {
     // TODO: mode and period must either both be set or both be (explicitly)
     // null; we can better utilize types (or simply use a constructor) to
@@ -869,7 +869,7 @@ impl BucketEncryptionInfo {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Bucket {
-    account_id: Option<String>,
+    account_id: String,
     pub(crate) bucket_id: String,
     bucket_name: String,
     bucket_type: BucketType,
@@ -880,6 +880,26 @@ pub struct Bucket {
     lifecycle_rules: Vec<LifecycleRule>,
     revision: u16,
     options: Option<Vec<String>>,
+}
+
+impl Bucket {
+    pub fn account_id(&self) -> &str { &self.account_id }
+    pub fn name(&self) -> &str { &self.bucket_name }
+    pub fn bucket_type(&self) -> BucketType { self.bucket_type }
+    pub fn info(&self) -> &serde_json::Value { &self.bucket_info }
+    pub fn cors_rules(&self) -> &[CorsRule] { &self.cors_rules }
+
+    pub fn retention_policy(&self) -> FileRetentionPolicy {
+        self.file_lock_configuration
+    }
+
+    pub fn encryption_info(&self) -> &BucketEncryptionInfo {
+        &self.default_server_side_encryption
+    }
+
+    pub fn lifecycle_rules(&self) -> &[LifecycleRule] { &self.lifecycle_rules }
+    pub fn revision(&self) -> u16 { self.revision }
+    pub fn options(&self) -> Option<&Vec<String>> { self.options.as_ref() }
 }
 
 /// Create a new [Bucket].

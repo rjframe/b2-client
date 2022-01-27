@@ -408,6 +408,24 @@ pub struct FilePart {
     upload_timestamp: i64,
 }
 
+impl FilePart {
+    pub fn file_id(&self) -> &str { &self.file_id }
+    pub fn part_number(&self) -> u16 { self.part_number }
+    pub fn content_length(&self) -> u64 { self.content_length }
+    pub fn sha1_checksum(&self) -> &str { &self.content_sha1 }
+    pub fn md5_checksum(&self) -> Option<&String> { self.content_md5.as_ref() }
+
+    pub fn encryption_settings(&self) -> Option<&ServerSideEncryption> {
+        self.server_side_encryption.as_ref()
+    }
+
+    pub fn upload_timestamp(&self) -> chrono::DateTime<chrono::Utc> {
+        use chrono::{TimeZone as _, Utc};
+
+        Utc.timestamp_millis(self.upload_timestamp)
+    }
+}
+
 /// A large file that was cancelled prior to upload completion.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1695,6 +1713,7 @@ pub async fn get_download_authorization<'a, C, E>(
 
 /// An authorization to upload file contents to a B2 file.
 #[derive(Deserialize)]
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 pub struct UploadPartAuthorization<'a, 'b, C, E>
     where C: HttpClient<Error=Error<E>>,
@@ -1777,6 +1796,7 @@ pub async fn get_upload_part_authorization_by_id<'a, 'b, C, E>(
 
 /// An authorization to upload a file to a B2 bucket.
 #[derive(Deserialize)]
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 pub struct UploadAuthorization<'a, C, E>
     where C: HttpClient<Error=Error<E>>,
@@ -1788,6 +1808,13 @@ pub struct UploadAuthorization<'a, C, E>
     bucket_id: String,
     upload_url: String,
     authorization_token: String,
+}
+
+impl<'a, C, E> UploadAuthorization<'a, C, E>
+    where C: HttpClient<Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    pub fn bucket_id(&self) -> &str { &self.bucket_id }
 }
 
 /// Obtain an authorization to upload files to a bucket.
