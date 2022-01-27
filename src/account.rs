@@ -41,8 +41,8 @@ pub struct Authorization<C>
     download_url: String,
     recommended_part_size: u64,
     absolute_minimum_part_size: u64,
-    // The base URL to use for all API calls using the AWS S3-compatible API.
-    s3_api_url: String,
+    // The base URL to use for all API calls using the AWS S3-compatible API.j
+    _s3_api_url: String,
 }
 
 impl<C> Authorization<C>
@@ -60,7 +60,7 @@ impl<C> Authorization<C>
         download_url: String,
         recommended_part_size: u64,
         absolute_minimum_part_size: u64,
-        s3_api_url: String,
+        _s3_api_url: String,
     ) -> Self {
         Self {
             client,
@@ -71,7 +71,7 @@ impl<C> Authorization<C>
             download_url,
             recommended_part_size,
             absolute_minimum_part_size,
-            s3_api_url,
+            _s3_api_url,
         }
     }
 
@@ -107,12 +107,6 @@ impl<C> Authorization<C>
     pub(crate) fn download_url<S: AsRef<str>>(&self, endpoint: S) -> String {
         format!("{}/b2api/v2/{}", self.download_url, endpoint.as_ref())
     }
-
-    /// Return the API url to the specified S3-compatible service download
-    /// endpoint.
-    pub(crate) fn s3_api_url<S: AsRef<str>>(&self, endpoint: S) -> String {
-        format!("{}/b2api/v2/{}", self.s3_api_url, endpoint.as_ref())
-    }
 }
 
 /// The authorization information received from B2
@@ -129,7 +123,7 @@ struct ProtoAuthorization {
     download_url: String,
     recommended_part_size: u64,
     absolute_minimum_part_size: u64,
-    s3_api_url: String,
+    _s3_api_url: String,
 }
 
 impl ProtoAuthorization {
@@ -143,7 +137,7 @@ impl ProtoAuthorization {
             download_url: self.download_url,
             recommended_part_size: self.recommended_part_size,
             absolute_minimum_part_size: self.absolute_minimum_part_size,
-            s3_api_url: self.s3_api_url,
+            _s3_api_url: self._s3_api_url,
         }
     }
 }
