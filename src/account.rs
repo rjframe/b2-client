@@ -4,7 +4,6 @@
 */
 
 //! Account-related B2 API calls.
-// TODO: Timestamps are likely UTC. Is that documented anywhere?
 
 use std::fmt;
 
@@ -16,7 +15,7 @@ use crate::{
     validate::validated_file_name,
 };
 
-use chrono::{DateTime, Local};
+use chrono::{DateTime, Utc};
 use serde::{Serialize, Deserialize};
 
 
@@ -464,7 +463,7 @@ pub struct Key {
     application_key_id: String,
     capabilities: Vec<Capability>,
     account_id: String,
-    expiration_timestamp: Option<DateTime<Local>>,
+    expiration_timestamp: Option<DateTime<Utc>>,
     bucket_id: Option<String>,
     name_prefix: Option<String>,
     options: Option<Vec<String>>, // Currently unused by B2.
@@ -484,7 +483,7 @@ impl Key {
     pub fn name_prefix(&self) -> Option<&String> { self.name_prefix.as_ref() }
 
     /// If present, the expiration date and time of this key.
-    pub fn expiration(&self) -> Option<DateTime<Local>> {
+    pub fn expiration(&self) -> Option<DateTime<Utc>> {
         self.expiration_timestamp
     }
 
@@ -506,7 +505,7 @@ struct NewlyCreatedKey {
     application_key_id: String,
     capabilities: Vec<Capability>,
     account_id: String,
-    expiration_timestamp: Option<DateTime<Local>>,
+    expiration_timestamp: Option<DateTime<Utc>>,
     bucket_id: Option<String>,
     name_prefix: Option<String>,
     options: Option<Vec<String>>,

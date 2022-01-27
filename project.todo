@@ -9,12 +9,8 @@ Project:
     ☐ If we store Bucket instead of bucket_id in relevant objects, we can better validate access to private buckets without making a request to B2. It potentially requires an extra API call to obtain though.
     ☐ We should likely use a type for FileInfo rather than deal with JSON in the public API
     ☐ Efficient byte management in HttpClients.
-    ✓ Document API differences from upstream and reasons for doing so. @done(2022-01-14 13:37) @project(Project)
     ☐ Make non-mocked tests easily reproducible for others and me in the future - move bucket ID, etc. to environment variables, clean up after tests.
-    ☐ I have DateTime<Local> and DateTime<Utc> objects; check whether they're correct or should be changed
     ☐ Allow uploads via streams/chunked/buffers/local filesystem
-    ✓ Percent-encode X-Bz-File-Name and X-Bz-Info-* headers @done(2022-01-14 14:05) @project(Project)
-    ✓ Use add_opt_header for upload_file @done(2022-01-13 08:10) @project(Project)
     ☐ b2_download_file_by_name allows using a DownloadAuthorization for files with prefixes covered by that auth; we should support that too.
     ☐ Check: did I intentionally keep Request in name KeyListRequest when I removed the others? If so, do I still agree?
 
@@ -47,6 +43,10 @@ API:
 
 ＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿
 Archive:
+    ✓ Document API differences from upstream and reasons for doing so. @done(2022-01-14 13:37) @project(Project)
+    ✓ I have DateTime<Local> and DateTime<Utc> objects; check whether they're correct or should be changed @done(2022-01-27 08:25) @project(Project)
+    ✓ Percent-encode X-Bz-File-Name and X-Bz-Info-* headers @done(2022-01-14 14:05) @project(Project)
+    ✓ Use add_opt_header for upload_file @done(2022-01-13 08:10) @project(Project)
     ✓ Allow (require?) setting user-agent @done(2022-01-13 12:50) @project(Project)
     ✓ serde: skip serializing optional fields when None on pretty much everything. @done(2022-01-14 10:23) @project(Project)
     ✓ create_bucket @done(2021-11-01 09:48) @project(API \ Buckets)
