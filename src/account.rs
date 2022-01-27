@@ -466,7 +466,7 @@ pub struct Key {
     expiration_timestamp: Option<DateTime<Utc>>,
     bucket_id: Option<String>,
     name_prefix: Option<String>,
-    options: Option<Vec<String>>, // Currently unused by B2.
+    // options: Option<Vec<String>>, // Currently unused by B2.
 }
 
 impl Key {
@@ -508,7 +508,7 @@ struct NewlyCreatedKey {
     expiration_timestamp: Option<DateTime<Utc>>,
     bucket_id: Option<String>,
     name_prefix: Option<String>,
-    options: Option<Vec<String>>,
+    // options: Option<Vec<String>>, Currently unused by B2.
 }
 
 impl NewlyCreatedKey {
@@ -523,7 +523,6 @@ impl NewlyCreatedKey {
             expiration_timestamp: self.expiration_timestamp,
             bucket_id: self.bucket_id,
             name_prefix: self.name_prefix,
-            options: self.options,
         };
 
         (secret, key)
