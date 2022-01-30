@@ -279,14 +279,14 @@ pub struct FileRetention {
 /// A file stored in B2 with metadata.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct File {
     account_id: Option<String>,
     action: FileAction,
     bucket_id: String,
-    // TODO: Make this an option? Only relevant when action is "upload", will be
-    // 0 otherwise.
+    // Only relevant when action is "upload", will be 0 otherwise.
     content_length: u64,
-    // Value is "none" for large files. TODO: Replace it with None?
+    // Value is "none" for large files.
     content_sha1: Option<String>, // Max 64 elements
     content_md5: Option<String>, // Max 32 elements
     content_type: Option<String>,
@@ -297,8 +297,7 @@ pub struct File {
     legal_hold: Option<FileLegalHold>,
     server_side_encryption: Option<ServerSideEncryption>,
     // Milliseconds since midnight, 1970-1-1
-    // TODO: value is 0 if action is folder; use Option?
-    // TODO: method to convert to UTC
+    // If action is `Folder`, this will be 0.
     upload_timestamp: i64,
 }
 
@@ -312,14 +311,19 @@ impl File {
     /// The number of bytes stored in the file.
     ///
     /// Only meaningful when the [action](Self::action) is [FileAction::Upload]
-    /// or [FileAction::Copy]; otherwise the value is `0`.
-    pub fn content_length(&self) -> u64 { self.content_length }
+    /// or [FileAction::Copy]; otherwise the value is `None`.
+    pub fn content_length(&self) -> Option<u64> {
+        match self.action {
+            FileAction::Upload | FileAction::Copy => Some(self.content_length),
+            _ => None,
+        }
+    }
 
     /// The SHA-1 checksum of the bytes in the file.
     ///
     /// There is no checksum for large files or when the [action](Self::action)
     /// is [FileAction::Hide] or [FileAction::Folder].
-    pub fn sha1(&self) -> Option<&String> {
+    pub fn sha1_checksum(&self) -> Option<&String> {
         match &self.content_sha1 {
             Some(v) => if v == "none" { None } else { Some(v) }
             None => None,
@@ -330,7 +334,7 @@ impl File {
     ///
     /// There is no checksum for large files or when the [action](Self::action)
     /// is [FileAction::Hide] or [FileAction::Folder].
-    pub fn md5(&self) -> Option<&String> {
+    pub fn md5_checksum(&self) -> Option<&String> {
         self.content_md5.as_ref()
     }
 
@@ -388,10 +392,15 @@ impl File {
     }
 
     /// The date and time at which the file was uploaded.
-    pub fn upload_time(&self) -> chrono::DateTime<chrono::Utc> {
+    ///
+    /// If the [action](Self::action] is `Folder`, returns `None`.
+    pub fn upload_time(&self) -> Option<chrono::DateTime<chrono::Utc>> {
         use chrono::{TimeZone as _, Utc};
 
-        Utc.timestamp_millis(self.upload_timestamp)
+        match self.action {
+            FileAction::Folder => None,
+            _ => Some(Utc.timestamp_millis(self.upload_timestamp)),
+        }
     }
 }
 
