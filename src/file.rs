@@ -1652,6 +1652,7 @@ impl<'a> DownloadAuthorizationRequestBuilder<'a> {
 /// A capability token that authorizes downloading files from a private bucket.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct DownloadAuthorization {
     bucket_id: String,
     file_name_prefix: String,
