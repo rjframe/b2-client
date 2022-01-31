@@ -48,7 +48,7 @@ pub enum ValidationError {
     /// The data is outside its valid range.
     ///
     /// The string is a short description of the failure.
-    OutOfBounds(String), // TODO: I need a better name.
+    OutOfBounds(String),
     /// Two pieces of data are incompatible together.
     ///
     /// The string is a short description of the failure.
