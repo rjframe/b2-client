@@ -826,17 +826,32 @@ impl From<Period> for chrono::Duration {
     }
 }
 
+impl From<chrono::Duration> for Period {
+    fn from(other: chrono::Duration) -> Self {
+        Self {
+            duration: other.num_days() as u32,
+            unit: PeriodUnit::Days,
+        }
+    }
+}
+
 /// A file's B2 retention policy.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct FileRetentionPolicy {
-    // TODO: mode and period must either both be set or both be (explicitly)
-    // null; we can better utilize types (or simply use a constructor) to
-    // enforce that.
+    // `mode` and `period` must either both be set or both be (explicitly) null
+    // in the JSON we send to B2.
     mode: Option<FileRetentionMode>,
     period: Option<Period>,
 }
 
 impl FileRetentionPolicy {
+    pub fn new(mode: FileRetentionMode, duration: chrono::Duration) -> Self {
+        Self {
+            mode: Some(mode),
+            period: Some(duration.into()),
+        }
+    }
+
     pub fn mode(&self) -> Option<FileRetentionMode> { self.mode }
 
     pub fn period(&self) -> Option<chrono::Duration> {
