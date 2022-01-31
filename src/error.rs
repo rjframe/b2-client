@@ -323,44 +323,49 @@ pub enum ErrorCode {
 
     // 503
     ServiceUnavailable,
+
+    /// The B2 service returned an unknown error code.
+    ///
+    /// If you receive this in practice, please file an issue or submit a patch
+    /// to support the error code.
+    Unknown(String),
 }
 
 impl ErrorCode {
-    // TODO: Error type
     /// Convert the error code received from the B2 service to an [ErrorCode].
-    fn from_api_code<S: AsRef<str>>(code: S) -> Result<Self, String> {
+    fn from_api_code<S: AsRef<str>>(code: S) -> Self {
         match code.as_ref() {
-            "bad_bucket_id" => Ok(Self::BadBucketId),
-            "bad_request" => Ok(Self::BadRequest),
-            "duplicate_bucket_name" => Ok(Self::DuplicateBucketName),
-            "file_not_present" => Ok(Self::FileNotPresent),
-            "too_many_buckets" => Ok(Self::TooManyBuckets),
+            "bad_bucket_id" => Self::BadBucketId,
+            "bad_request" => Self::BadRequest,
+            "duplicate_bucket_name" => Self::DuplicateBucketName,
+            "file_not_present" => Self::FileNotPresent,
+            "too_many_buckets" => Self::TooManyBuckets,
 
-            "bad_auth_token" => Ok(Self::BadAuthToken),
-            "expired_auth_token" => Ok(Self::ExpiredAuthToken),
-            "unauthorized" => Ok(Self::Unauthorized),
-            "unsupported" => Ok(Self::Unsupported),
+            "bad_auth_token" => Self::BadAuthToken,
+            "expired_auth_token" => Self::ExpiredAuthToken,
+            "unauthorized" => Self::Unauthorized,
+            "unsupported" => Self::Unsupported,
 
-            "access_denied" => Ok(Self::AccessDenied),
-            "cap_exceeded" => Ok(Self::CapExceeded),
-            "storage_cap_exceeded" => Ok(Self::StorageCapExceeded),
-            "transaction_cap_exceeded" => Ok(Self::TransactionCapExceeded),
+            "access_denied" => Self::AccessDenied,
+            "cap_exceeded" => Self::CapExceeded,
+            "storage_cap_exceeded" => Self::StorageCapExceeded,
+            "transaction_cap_exceeded" => Self::TransactionCapExceeded,
 
-            "not_found" => Ok(Self::NotFound),
+            "not_found" => Self::NotFound,
 
-            "method_not_allowed" => Ok(Self::MethodNotAllowed),
+            "method_not_allowed" => Self::MethodNotAllowed,
 
-            "request_timeout" => Ok(Self::RequestTimeout),
+            "request_timeout" => Self::RequestTimeout,
 
-            "range_not_satisfiable" => Ok(Self::RangeNotSatisfiable),
+            "range_not_satisfiable" => Self::RangeNotSatisfiable,
 
-            "conflict" => Ok(Self::Conflict),
+            "conflict" => Self::Conflict,
 
-            "internal_error" => Ok(Self::InternalError),
+            "internal_error" => Self::InternalError,
 
-            "service_unavailable" => Ok(Self::ServiceUnavailable),
-            // TODO: Use an Unknown(code) variant instead.
-            _ => Err(String::from(code.as_ref())),
+            "service_unavailable" => Self::ServiceUnavailable,
+
+            s => Self::Unknown(s.to_owned()),
         }
     }
 }
@@ -374,7 +379,6 @@ pub struct B2Error {
     /// The HTTP status code accompanying the error.
     status: u16,
     /// A code that identifies the error.
-    // TODO: Store an `ErrorCode` instead?
     #[serde(rename = "code")]
     code_str: String,
     /// A description of what went wrong.
@@ -386,15 +390,7 @@ impl B2Error {
     pub fn http_status(&self) -> u16 { self.status }
 
     pub fn code(&self) -> ErrorCode {
-        match ErrorCode::from_api_code(&self.code_str) {
-            Ok(code) => code,
-            // TODO: I need to avoid the panic. We don't need to halt someone
-            // else's code for this.
-            Err(code) => panic!(
-                "Unknown API code '{}'. Please file an issue on b2-client.",
-                code
-            ),
-        }
+        ErrorCode::from_api_code(&self.code_str)
     }
 }
 
