@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use crate::{
     bucket::LifecycleRule,
-    error::{LifecycleRuleValidationError, ValidationError},
+    error::{BadHeaderName, LifecycleRuleValidationError, ValidationError},
 };
 
 use http_types::{
@@ -28,17 +28,18 @@ use http_types::{
 /// [RFC 7230](https://www.rfc-editor.org/rfc/rfc7230), notably
 /// [Section 3.2.6](https://www.rfc-editor.org/rfc/rfc7230#section-3.2.6). It is
 /// possible that the B2 API is more lenient.
-pub(crate) fn validated_http_header(header: &str)
--> Result<&str, ValidationError> {
+pub(crate) fn validated_http_header(header: &str) -> Result<&str, BadHeaderName>
+{
     let is_valid = |c: char| "!#$%&'*+-.^_`|~".contains(c);
 
     let invalid = header.chars()
         .find(|c| !(c.is_ascii_alphanumeric() || is_valid(*c)));
 
     if let Some(ch) = invalid {
-        Err(ValidationError::BadFormat(
-            format!("Invalid character in header: {}", ch)
-        ))
+        Err(BadHeaderName {
+            header: header.to_owned(),
+            invalid_char: ch,
+        })
     } else {
         Ok(header)
     }

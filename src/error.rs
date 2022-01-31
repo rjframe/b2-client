@@ -71,6 +71,23 @@ impl From<url::ParseError> for ValidationError {
     }
 }
 
+#[derive(Debug)]
+pub struct BadHeaderName {
+    pub header: String,
+    pub invalid_char: char,
+}
+
+impl std::error::Error for BadHeaderName {}
+
+impl fmt::Display for BadHeaderName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Invalid character in header {}: {}",
+            self.header,
+            self.invalid_char
+        )
+    }
+}
+
 /// Error type from failure to validate a set of [LifecycleRule]s.
 #[derive(Debug)]
 pub enum LifecycleRuleValidationError {

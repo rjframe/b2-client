@@ -16,7 +16,12 @@ use std::fmt;
 use crate::{
     prelude::*,
     client::HttpClient,
-    error::{LifecycleRuleValidationError, ValidationError, Error},
+    error::{
+        BadHeaderName,
+        LifecycleRuleValidationError,
+        ValidationError,
+        Error
+    },
     validate::*,
 };
 
@@ -220,7 +225,7 @@ impl CorsRuleBuilder {
     ///
     /// The default is an empty list (no headers are allowed).
     pub fn allowed_headers<H>(mut self, headers: impl Into<Vec<String>>)
-    -> Result<Self, ValidationError> {
+    -> Result<Self, BadHeaderName> {
         let headers = headers.into();
 
         if ! headers.is_empty() {
@@ -247,7 +252,7 @@ impl CorsRuleBuilder {
     ///
     /// By default, no headers are allowed.
     pub fn add_allowed_header(mut self, header: impl Into<String>)
-    -> Result<Self, ValidationError> {
+    -> Result<Self, BadHeaderName> {
         let header = header.into();
         validated_http_header(&header)?;
 
@@ -262,7 +267,7 @@ impl CorsRuleBuilder {
     /// Each entry must be a complete header name. If the list is empty, no
     /// headers will be exposed.
     pub fn exposed_headers(mut self, headers: impl Into<Vec<String>>)
-    -> Result<Self, ValidationError> {
+    -> Result<Self, BadHeaderName> {
         let headers = headers.into();
 
         if ! headers.is_empty() {
@@ -280,7 +285,7 @@ impl CorsRuleBuilder {
     ///
     /// Each entry must be a complete header name.
     pub fn add_exposed_header(mut self, header: impl Into<String>)
-    -> Result<Self, ValidationError> {
+    -> Result<Self, BadHeaderName> {
         let header = header.into();
         validated_http_header(&header)?;
 
