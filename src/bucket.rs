@@ -18,6 +18,8 @@ use crate::{
     client::HttpClient,
     error::{
         BadHeaderName,
+        BucketValidationError,
+        CorsRuleValidationError,
         LifecycleRuleValidationError,
         ValidationError,
         Error
@@ -125,7 +127,7 @@ impl CorsRuleBuilder {
     /// between 6 and 50 characters, inclusive. Names beginning with "b2-" are
     /// reserved.
     pub fn name(mut self, name: impl Into<String>)
-    -> Result<Self, ValidationError> {
+    -> Result<Self, CorsRuleValidationError> {
         let name = validated_cors_rule_name(name)?;
         self.name = Some(name);
         Ok(self)
@@ -620,7 +622,7 @@ impl CreateBucketBuilder {
     /// * must be between 6 and 50 characters inclusive
     /// * must not begin with `b2-`
     pub fn name(mut self, name: impl Into<String>)
-    -> Result<Self, ValidationError> {
+    -> Result<Self, BucketValidationError> {
         let name = validated_bucket_name(name)?;
         self.bucket_name = Some(name);
         Ok(self)
@@ -1034,7 +1036,7 @@ impl ListBucketsBuilder {
     ///
     /// This is mutually exclusive with [Self::bucket_id].
     pub fn bucket_name(mut self, name: impl Into<String>)
-    -> Result<Self, ValidationError> {
+    -> Result<Self, BucketValidationError> {
         let name = validated_bucket_name(name)?;
 
         self.bucket = Some(BucketRef::Name(name));

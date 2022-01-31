@@ -88,6 +88,32 @@ impl fmt::Display for BadHeaderName {
     }
 }
 
+#[derive(Debug)]
+pub enum BucketValidationError {
+    BadNameLength(usize),
+    InvalidChar(char),
+}
+
+impl std::error::Error for BucketValidationError {}
+
+impl fmt::Display for BucketValidationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::BadNameLength(sz) => write!(f,
+                "Name must be between 6 and 50 characters, inclusive. Was {}",
+                sz
+            ),
+            Self::InvalidChar(ch) => write!(f, "Unexpected character: {}", ch),
+        }
+    }
+}
+
+// CORS rule names have the same requirements as bucket names.
+//
+// TODO: Likely need to copy-paste this since the compiler won't reliably use
+// the new name (same for `use as`).
+pub type CorsRuleValidationError = BucketValidationError;
+
 /// Error type from failure to validate a set of [LifecycleRule]s.
 #[derive(Debug)]
 pub enum LifecycleRuleValidationError {

@@ -4,7 +4,13 @@ use std::collections::HashMap;
 
 use crate::{
     bucket::LifecycleRule,
-    error::{BadHeaderName, LifecycleRuleValidationError, ValidationError},
+    error::{
+        BadHeaderName,
+        BucketValidationError,
+        CorsRuleValidationError,
+        LifecycleRuleValidationError,
+        ValidationError
+    },
 };
 
 use http_types::{
@@ -46,23 +52,18 @@ pub(crate) fn validated_http_header(header: &str) -> Result<&str, BadHeaderName>
 }
 
 pub(crate) fn validated_bucket_name(name: impl Into<String>)
--> Result<String, ValidationError> {
+-> Result<String, BucketValidationError> {
     let name = name.into();
 
     if name.len() < 6 || name.len() > 50 {
-        return Err(ValidationError::OutOfBounds(
-            "Bucket name must be be between 6 and 50 characters, inclusive"
-                .into()
-        ));
+        return Err(BucketValidationError::BadNameLength(name.len()));
     }
 
     let invalid_char = |c: &char| !(c.is_ascii_alphanumeric() || *c == '-');
 
     match name.chars().find(invalid_char) {
         None => Ok(name),
-        Some(ch) => Err(
-            ValidationError::BadFormat(format!("Unexpected character: {}", ch))
-        ),
+        Some(ch) => Err(BucketValidationError::InvalidChar(ch)),
     }
 }
 
@@ -91,7 +92,7 @@ pub(crate) fn validated_file_name(name: &str) -> Result<&str, ValidationError> {
 }
 
 pub(crate) fn validated_cors_rule_name(name: impl Into<String>)
--> Result<String, ValidationError> {
+-> Result<String, CorsRuleValidationError> {
     // The rules are the same as for bucket names.
     validated_bucket_name(name)
 }
