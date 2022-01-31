@@ -2518,7 +2518,6 @@ pub async fn upload_file_part<C, E>(
         )).into());
     }
 
-    // TODO: Validate that sha1 is a possible checksum.
     let sha1 = match sha1_checksum {
         Some(ref sha1) => sha1.as_ref(),
         None => "do_not_verify",

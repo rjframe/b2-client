@@ -784,7 +784,6 @@ struct KeyList {
 /// }
 /// # Ok(()) }
 /// ```
-// TODO: Create a list_all_keys function?
 pub async fn list_keys<'a, C, E>(
     auth: &'a mut Authorization<C>,
     list_req: KeyListRequest<'a>
