@@ -157,7 +157,7 @@ use crate::{
         ServerSideEncryption,
     },
     client::{HeaderMap, HttpClient},
-    error::{ValidationError, Error},
+    error::{FileNameValidationError, ValidationError, Error},
     types::ContentDisposition,
     validate::{
         validate_content_disposition,
@@ -614,7 +614,7 @@ impl<'a> CopyFileBuilder<'a> {
 
     /// Set the filename to use for the new file.
     pub fn destination_file_name(mut self, name: &'a str)
-    -> Result<Self, ValidationError> {
+    -> Result<Self, FileNameValidationError> {
         self.file_name = Some(validated_file_name(name)?);
         Ok(self)
     }
@@ -1551,7 +1551,7 @@ impl<'a> DownloadAuthorizationRequestBuilder<'a> {
     /// Use the given file name prefix to determine what files the
     /// [DownloadAuthorization] will allow access to.
     pub fn file_name_prefix(mut self, name: &'a str)
-    -> Result<Self, ValidationError> {
+    -> Result<Self, FileNameValidationError> {
 
         self.file_name_prefix = Some(validated_file_name(name)?);
         Ok(self)
@@ -1928,7 +1928,7 @@ impl<'a> StartLargeFileBuilder<'a> {
     ///
     /// The provided name will be percent-encoded.
     pub fn file_name(mut self, name: impl AsRef<str>)
-    -> Result<Self, ValidationError> {
+    -> Result<Self, FileNameValidationError> {
         let name = validated_file_name(name.as_ref())?;
 
         self.file_name = Some(percent_encode!(name));
@@ -2171,7 +2171,7 @@ impl<'a> UploadFileBuilder<'a> {
     ///
     /// The provided name will be percent-encoded.
     pub fn file_name(mut self, name: impl AsRef<str>)
-    -> Result<Self, ValidationError> {
+    -> Result<Self, FileNameValidationError> {
         let name = validated_file_name(name.as_ref())?;
 
         self.file_name = Some(percent_encode!(name));

@@ -16,14 +16,7 @@ use std::fmt;
 use crate::{
     prelude::*,
     client::HttpClient,
-    error::{
-        BadHeaderName,
-        BucketValidationError,
-        CorsRuleValidationError,
-        LifecycleRuleValidationError,
-        ValidationError,
-        Error
-    },
+    error::*,
     validate::*,
 };
 
@@ -396,7 +389,7 @@ impl std::cmp::Ord for LifecycleRule {
 
 impl LifecycleRule {
     /// Get a builder for a `LifecycleRule`.
-    pub fn builder() -> LifecycleRuleBuilder {
+    pub fn builder<'a>() -> LifecycleRuleBuilder<'a> {
         LifecycleRuleBuilder::default()
     }
 }
@@ -406,20 +399,20 @@ impl LifecycleRule {
 /// See <https://www.backblaze.com/b2/docs/lifecycle_rules.html> for information
 /// on bucket lifecycles.
 #[derive(Default)]
-pub struct LifecycleRuleBuilder {
-    prefix: Option<String>,
+pub struct LifecycleRuleBuilder<'a> {
+    prefix: Option<&'a str>,
     delete_after: Option<u16>,
     hide_after: Option<u16>,
 }
 
-impl LifecycleRuleBuilder {
+impl<'a> LifecycleRuleBuilder<'a> {
     /// The filename prefix to select the files that are subject to the rule.
     ///
     /// A prefix of `""` will apply to all files, allowing the creation of rules
     /// that could delete **all** files.
-    pub fn filename_prefix(mut self, prefix: impl AsRef<str>)
-    -> Result<Self, ValidationError> {
-        self.prefix = Some(validated_file_name(prefix.as_ref())?.to_owned());
+    pub fn filename_prefix(mut self, prefix: &'a str)
+    -> Result<Self, FileNameValidationError> {
+        self.prefix = Some(validated_file_name(prefix)?);
         Ok(self)
     }
 
@@ -497,7 +490,7 @@ impl LifecycleRuleBuilder {
             ))
         } else {
             Ok(LifecycleRule {
-                file_name_prefix: self.prefix.unwrap(),
+                file_name_prefix: self.prefix.unwrap().to_owned(),
                 delete_after: self.delete_after,
                 hide_after: self.hide_after,
             })

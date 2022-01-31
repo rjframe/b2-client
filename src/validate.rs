@@ -4,13 +4,7 @@ use std::collections::HashMap;
 
 use crate::{
     bucket::LifecycleRule,
-    error::{
-        BadHeaderName,
-        BucketValidationError,
-        CorsRuleValidationError,
-        LifecycleRuleValidationError,
-        ValidationError
-    },
+    error::*,
 };
 
 use http_types::{
@@ -71,24 +65,19 @@ pub(crate) fn validated_bucket_name(name: impl Into<String>)
 ///
 /// Note that B2 disallows ASCII control characters, but other control
 /// characters defined by Unicode are allowed.
-pub(crate) fn validated_file_name(name: &str) -> Result<&str, ValidationError> {
+pub(crate) fn validated_file_name(name: &str)
+-> Result<&str, FileNameValidationError> {
     for ch in name.chars() {
         if ch.is_ascii_control() {
-            return Err(ValidationError::BadFormat(format!(
-                "The filename \"{}\" cannot include the character '{}'",
-                name,
-                ch,
-            )));
+            return Err(FileNameValidationError::InvalidChar(ch));
         }
     }
 
-    if name.len() > 1024 {
-        return Err(ValidationError::BadFormat(format!(
-            "The filename cannot be above 1024 bytes, but is {}", name.len()
-        )));
+    if name.len() < 1024 {
+        Ok(name)
+    } else {
+        Err(FileNameValidationError::BadLength(name.len()))
     }
-
-    Ok(name)
 }
 
 pub(crate) fn validated_cors_rule_name(name: impl Into<String>)

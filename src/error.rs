@@ -114,6 +114,25 @@ impl fmt::Display for BucketValidationError {
 // the new name (same for `use as`).
 pub type CorsRuleValidationError = BucketValidationError;
 
+#[derive(Debug)]
+pub enum FileNameValidationError {
+    BadLength(usize),
+    InvalidChar(char),
+}
+
+impl std::error::Error for FileNameValidationError {}
+
+impl fmt::Display for FileNameValidationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::BadLength(sz) => write!(f,
+                "Name must be no more than 1024 bytes. Was {}", sz
+            ),
+            Self::InvalidChar(ch) => write!(f, "Illegal character: {}", ch),
+        }
+    }
+}
+
 /// Error type from failure to validate a set of [LifecycleRule]s.
 #[derive(Debug)]
 pub enum LifecycleRuleValidationError {
