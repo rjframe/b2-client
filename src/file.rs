@@ -393,7 +393,7 @@ impl File {
 
     /// The date and time at which the file was uploaded.
     ///
-    /// If the [action](Self::action] is `Folder`, returns `None`.
+    /// If the [action](Self::action) is `Folder`, returns `None`.
     pub fn upload_time(&self) -> Option<chrono::DateTime<chrono::Utc>> {
         use chrono::{TimeZone as _, Utc};
 

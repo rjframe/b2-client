@@ -10,6 +10,10 @@
 //! * [ValidationError] for data validation errors prior to sending a request to
 //!   the B2 API. This is currently being split into multiple errors as
 //!   appropriate:
+//!     * [BadHeaderName]
+//!     * [BucketValidationError]
+//!     * [CorsRuleValidationError]
+//!     * [FileNameValidationError]
 //!     * [LifecycleRuleValidationError]
 //! * [Error] for errors returned by the Backblaze B2 API or the HTTP client.
 
@@ -71,9 +75,12 @@ impl From<url::ParseError> for ValidationError {
     }
 }
 
+/// Error type with information on invalid HTTP header name.
 #[derive(Debug)]
 pub struct BadHeaderName {
+    /// The name of the bad header.
     pub header: String,
+    /// The illegal character in the header name.
     pub invalid_char: char,
 }
 
@@ -88,9 +95,15 @@ impl fmt::Display for BadHeaderName {
     }
 }
 
+/// Error type for invalid bucket names.
 #[derive(Debug)]
 pub enum BucketValidationError {
+    /// The name of the bucket must be between 8 and 50 characters, inclusive.
+    // TODO: find full B2 requirement - bytes? ASCII-only characters? I think it
+    // will be the latter since only ASCII control characters were explicitly
+    // prohibited.
     BadNameLength(usize),
+    /// Illegal character in filename.
     InvalidChar(char),
 }
 
@@ -108,15 +121,19 @@ impl fmt::Display for BucketValidationError {
     }
 }
 
-// CORS rule names have the same requirements as bucket names.
-//
 // TODO: Likely need to copy-paste this since the compiler won't reliably use
 // the new name (same for `use as`).
+/// Error type for invalid CORS rule names.
+///
+/// The requirements for CORS rules are the same as for bucket names.
 pub type CorsRuleValidationError = BucketValidationError;
 
+/// Error type for bad filenames.
 #[derive(Debug)]
 pub enum FileNameValidationError {
+    /// A filename length cannot exceed 1024 bytes.
     BadLength(usize),
+    /// An invalid character was in the filename string.
     InvalidChar(char),
 }
 
