@@ -182,3 +182,28 @@
       content-type:
         - text/plain
     body: text
+---
+- Request:
+    method: POST
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_get_file_info"
+    headers:
+      authorization:
+        - hidden-authorization-token
+      user-agent:
+        - rust-b2-client/version; surf
+      content-type:
+        - application/json
+    body: "{\"fileId\":\"4_z8d625eb63be2775577c70e1a_f1187926dea44b322_d20211230_m171512_c002_v0001110_t0055\"}"
+- Response:
+    status: 200
+    version: ~
+    headers:
+      date:
+        - "Tue, 01 Feb 2022 18:09:29 GMT"
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      content-type:
+        - application/json;charset=UTF-8
+      content-length:
+        - "746"
+    body: "{\"accountId\":\"hidden-account-id\",\"action\":\"upload\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentLength\":4,\"contentMd5\":\"e2fc714c4727ee9395f324cd2e7f331f\",\"contentSha1\":\"81fe8bfe87576c3ecb22426f8e57847382917acf\",\"contentType\":\"text/plain\",\"fileId\":\"4_z8d625eb63be2775577c70e1a_f1187926dea44b322_d20211230_m171512_c002_v0001110_t0055\",\"fileInfo\":{},\"fileName\":\"test-file-upload.txt\",\"fileRetention\":{\"isClientAuthorizedToRead\":true,\"value\":{\"mode\":null,\"retainUntilTimestamp\":null}},\"legalHold\":{\"isClientAuthorizedToRead\":true,\"value\":null},\"serverSideEncryption\":{\"algorithm\":null,\"mode\":null},\"uploadTimestamp\":1640884512000}"

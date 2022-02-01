@@ -276,7 +276,8 @@ pub struct FileRetention {
     value: FileRetentionSetting,
 }
 
-/// A file stored in B2 with metadata.
+// TODO: Rename to FileMetadata?
+/// Metadata of a file stored in B2.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[allow(dead_code)]
@@ -1484,6 +1485,49 @@ pub async fn finish_large_file_upload_by_id<C, E>(
 
     let file: B2Result<File> = serde_json::from_slice(&res)?;
     file.into()
+}
+
+/// Retrieve metadata about a file stored in B2.
+///
+/// See <https://www.backblaze.com/b2/docs/b2_get_file_info.html> for further
+/// information.
+///
+/// # Errors
+///
+/// This function will return an error if the file ID does not exist or it is
+/// for a large file that has not been finished yet.
+pub async fn get_file_info<C, E>(
+    auth: &mut Authorization<C>,
+    file_id: impl AsRef<str>
+) -> Result<File, Error<E>>
+    where C: HttpClient<Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    use serde_json::json;
+
+    require_capability!(auth, Capability::ReadFiles);
+
+    let res = auth.client.post(auth.api_url("b2_get_file_info"))
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .with_body_json(json!({
+            "fileId": file_id.as_ref(),
+        }))
+        .send().await?;
+
+    let file_info: B2Result<File> = serde_json::from_slice(&res)?;
+    match file_info {
+        B2Result::Ok(mut info) => {
+            if let Some(sha1) = &info.content_sha1 {
+                if sha1 == "none" {
+                    info.content_sha1 = None;
+                }
+            }
+
+            Ok(info)
+        },
+        B2Result::Err(e) => Err(e.into()),
+    }
 }
 
 /// A request to obtain a [DownloadAuthorization].
@@ -3027,6 +3071,31 @@ mod tests_mocked {
         ).await?;
 
         assert_eq!(file.action, FileAction::Upload);
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_get_file_info() -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/file.yaml",
+            None, None
+        ).await?;
+
+        let mut auth = create_test_auth(client, vec![Capability::ReadFiles])
+            .await;
+
+        let file_info = get_file_info(
+            &mut auth,
+            concat!("4_z8d625eb63be2775577c70e1a_f1187926dea44b322_d20211230",
+                "_m171512_c002_v0001110_t0055")
+        ).await?;
+
+        assert_eq!(
+            file_info.content_sha1,
+            Some(String::from("81fe8bfe87576c3ecb22426f8e57847382917acf"))
+        );
 
         Ok(())
     }
