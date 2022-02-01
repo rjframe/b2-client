@@ -289,6 +289,7 @@ pub enum ErrorCode {
     BadRequest,
     DuplicateBucketName,
     FileNotPresent,
+    NoSuchFile,
     TooManyBuckets,
 
     // 401
@@ -339,6 +340,7 @@ impl ErrorCode {
             "bad_request" => Self::BadRequest,
             "duplicate_bucket_name" => Self::DuplicateBucketName,
             "file_not_present" => Self::FileNotPresent,
+            "no_such_file" => Self::NoSuchFile,
             "too_many_buckets" => Self::TooManyBuckets,
 
             "bad_auth_token" => Self::BadAuthToken,

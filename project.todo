@@ -30,7 +30,7 @@ API:
         ✓ get_file_info @done(2022-02-01 13:23) @project(API \ Files)
         ✓ get_upload_part_url @done(2021-12-17 10:21) @project(API \ Files)
         ✓ get_upload_url @done(2021-12-21 11:48) @project(API \ Files)
-        ☐ hide_file
+        ✓ hide_file @done(2022-02-01 14:18) @project(API \ Files)
         ☐ list_file_names
         ☐ list_file_versions
         ☐ list_parts

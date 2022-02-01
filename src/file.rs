@@ -1924,6 +1924,67 @@ pub async fn get_upload_authorization_by_id<'a, 'b, C, E>(
     upload_auth.map(move |mut a| { a.auth = Some(auth); a }).into()
 }
 
+/// Hide a file so that it cannot be downloaded by name.
+///
+/// Previous versions of the file are still stored. See
+/// <https://www.backblaze.com/b2/docs/file_versions.html> for information on
+/// hiding files.
+///
+/// # Notes
+///
+/// Some  of the returned [File] fields are empty, `0`, or meaningless for
+/// hidden files, such as [content_length](File::content_length) and
+/// [sha1_checksum](File::sha1_checksum).
+///
+/// See <https://www.backblaze.com/b2/docs/b2_hide_file.html> for further
+/// information.
+pub async fn hide_file<C, E>(auth: &mut Authorization<C>, file: &File)
+-> Result<File, Error<E>>
+    where C: HttpClient<Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    hide_file_by_name(auth, &file.bucket_id, &file.file_name).await
+}
+
+/// Hide a file so that it cannot be downloaded by name.
+///
+/// Previous versions of the file are still stored. See
+/// <https://www.backblaze.com/b2/docs/file_versions.html> for information on
+/// hiding files.
+///
+/// # Notes
+///
+/// Some  of the returned [File] fields are empty, `0`, or meaningless for
+/// hidden files, such as [content_length](File::content_length) and
+/// [sha1_checksum](File::sha1_checksum).
+///
+/// See <https://www.backblaze.com/b2/docs/b2_hide_file.html> for further
+/// information.
+pub async fn hide_file_by_name<C, E>(
+    auth: &mut Authorization<C>,
+    bucket_id: impl AsRef<str>,
+    file_name: impl AsRef<str>,
+) -> Result<File, Error<E>>
+    where C: HttpClient<Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    use serde_json::json;
+
+    require_capability!(auth, Capability::WriteFiles);
+
+    let res = auth.client.post(auth.api_url("b2_hide_file"))
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .with_body_json(json!({
+            "bucketId": bucket_id.as_ref(),
+            "fileName": file_name.as_ref(),
+        }))
+        .send().await?;
+
+    let file: B2Result<File> = serde_json::from_slice(&res)?;
+    file.into()
+}
+
 /// A request to prepare to upload a large file.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -3096,6 +3157,28 @@ mod tests_mocked {
             file_info.content_sha1,
             Some(String::from("81fe8bfe87576c3ecb22426f8e57847382917acf"))
         );
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_hide_file() -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/file.yaml",
+            None, None
+        ).await?;
+
+        let mut auth = create_test_auth(client, vec![Capability::WriteFiles])
+            .await;
+
+        let file = hide_file_by_name(
+            &mut auth,
+            "8d625eb63be2775577c70e1a",
+            "test-file.txt"
+        ).await?;
+
+        assert_eq!(file.action, FileAction::Hide);
 
         Ok(())
     }
