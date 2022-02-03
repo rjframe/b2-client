@@ -2307,6 +2307,108 @@ pub async fn list_file_versions<'a, C, E>(
     }
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListFileParts<'a> {
+    file_id: &'a str,
+    start_part_number: Option<u16>,
+    max_part_count: Option<u16>,
+}
+
+impl<'a> ListFileParts<'a> {
+    pub fn builder() -> ListFilePartsBuilder<'a> {
+        ListFilePartsBuilder::default()
+    }
+}
+
+#[derive(Default)]
+pub struct ListFilePartsBuilder<'a> {
+    file_id: Option<&'a str>,
+    start_part_number: Option<u16>,
+    max_part_count: Option<u16>,
+}
+
+impl<'a> ListFilePartsBuilder<'a> {
+    /// A [File] returned by [start_large_file].
+    pub fn file(mut self, file: &'a File) -> Self {
+        self.file_id = Some(&file.file_id);
+        self
+    }
+
+    /// The ID of a [File] returned by [start_large_file].
+    pub fn file_id(mut self, id: &'a str) -> Self {
+        self.file_id = Some(id);
+        self
+    }
+
+    /// The first part to return in the listing.
+    pub fn start_part_number(mut self, num: u16) -> Self {
+        self.start_part_number = Some(num);
+        self
+    }
+
+    /// The maximum number of parts to return.
+    ///
+    /// The default is 100. The provided `count` will be clamped to a value
+    /// between 1 and 1,000 inclusive.
+    ///
+    /// If more than 1,000 parts are needed, a new request must be made.
+    pub fn max_part_count(mut self, count: u16) -> Self {
+        use std::cmp::Ord as _;
+
+        self.max_part_count = Some(count.clamp(1, 1_000));
+        self
+    }
+
+    pub fn build(self) -> Result<ListFileParts<'a>, MissingData> {
+        let file_id = self.file_id.ok_or(MissingData::new("file_id"))?;
+
+        Ok(ListFileParts {
+            file_id,
+            start_part_number: self.start_part_number,
+            max_part_count: self.max_part_count,
+        })
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FilePartList {
+    parts: Vec<FilePart>,
+    next_part_number: Option<u16>,
+}
+
+pub async fn list_file_parts<'a, C, E>(
+    auth: &mut Authorization<C>,
+    request: ListFileParts<'a>,
+) -> Result<(Vec<FilePart>, Option<ListFileParts<'a>>), Error<E>>
+    where C: HttpClient<Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    require_capability!(auth, Capability::WriteFiles);
+
+    let res = auth.client.post(auth.api_url("b2_list_parts"))
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .with_body_json(serde_json::to_value(&request)?)
+        .send().await?;
+
+    let parts: B2Result<FilePartList> = serde_json::from_slice(&res)?;
+    match parts {
+        B2Result::Ok(parts) => {
+            if let Some(next_part) = parts.next_part_number {
+                let mut request = request;
+                request.start_part_number = Some(next_part);
+
+                Ok((parts.parts, Some(request)))
+            } else {
+                Ok((parts.parts, None))
+            }
+        },
+        B2Result::Err(e) => Err(e.into()),
+    }
+}
+
 /// A request to prepare to upload a large file.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -3593,6 +3695,77 @@ mod tests_mocked {
 
         assert_eq!(files.len(), 4);
         assert!(next_req.is_none());
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_list_file_parts() -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/large_file.yaml",
+            Some(Box::new(|req| {
+                use surf_vcr::Body;
+
+                if let Body::Str(body) = &mut req.body {
+                    if body.starts_with("aaaaa") {
+                        // We don't need to store 5 MB of nothing for our test.
+                        req.body = Body::Str("aaaaa for 5 MB of data".into());
+                    }
+                }
+            })),
+            None
+        ).await?;
+
+        let mut auth = create_test_auth(client, vec![Capability::WriteFiles])
+            .await;
+
+        // We need a large file that hasn't been finished yet.
+        let file = {
+            let file = StartLargeFile::builder()
+                .bucket_id("8d625eb63be2775577c70e1a")
+                .file_name("unfinished-file.txt")?
+                .content_type("text/plain")
+                .build()?;
+
+            let file = start_large_file(&mut auth, file).await?;
+            let mut upload_auth = get_upload_part_authorization(
+                &mut auth,
+                &file
+            ).await?;
+
+            // All but the last part must be at least 5MB.
+            let data1: Vec<u8> = [b'a'].iter().cycle().take(5*1024*1024)
+                .cloned().collect();
+
+            let _part1 = upload_file_part(
+                &mut upload_auth,
+                1,
+                Some("61b8d6600ac94d912874f569a9341120f680c9f8"),
+                &data1
+            ).await?;
+
+            let _part2 = upload_file_part(
+                &mut upload_auth,
+                2,
+                Some("924f61661a3472da74307a35f2c8d22e07e84a4d"),
+                b"bcd"
+            ).await?;
+
+            file
+        };
+
+        let req = ListFileParts::builder()
+            .file_id(&file.file_id)
+            .max_part_count(5)
+            .build().unwrap();
+
+        let (parts, next_req) = list_file_parts(&mut auth, req).await?;
+
+        assert_eq!(parts.len(), 2);
+        assert!(next_req.is_none());
+
+        let _ = cancel_large_file(&mut auth, file).await?;
 
         Ok(())
     }
