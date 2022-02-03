@@ -32,7 +32,7 @@ API:
         ✓ get_upload_url @done(2021-12-21 11:48) @project(API \ Files)
         ✓ hide_file @done(2022-02-01 14:18) @project(API \ Files)
         ✓ list_file_names @done(2022-02-03 14:24) @project(API \ Files)
-        ☐ list_file_versions
+        ✓ list_file_versions @done(2022-02-03 15:41) @project(API \ Files)
         ☐ list_parts
         ☐ list_unfinished_large_files
         ✓ start_large_file @done(2021-11-16 14:25) @project(API \ Files)

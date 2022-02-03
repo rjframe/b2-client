@@ -157,7 +157,7 @@ use crate::{
         ServerSideEncryption,
     },
     client::{HeaderMap, HttpClient},
-    error::{FileNameValidationError, ValidationError, Error},
+    error::{FileNameValidationError, MissingData, ValidationError, Error},
     types::ContentDisposition,
     validate::{
         validate_content_disposition,
@@ -2076,10 +2076,8 @@ impl<'a> ListFileNamesBuilder<'a> {
     /// Build a [ListFileNames] request.
     ///
     /// Returns an error if the bucket ID has not been set.
-    // TODO: If we don't impl Default we can use a constructor to set the bucket
-    // ID and remove this error possibility.
-    pub fn build(self) -> Result<ListFileNames<'a>, &'static str> {
-        let bucket_id = self.bucket_id.ok_or("Bucket ID is required")?;
+    pub fn build(self) -> Result<ListFileNames<'a>, MissingData> {
+        let bucket_id = self.bucket_id.ok_or(MissingData::new("bucket_id"))?;
 
         Ok(ListFileNames {
             bucket_id,
@@ -2119,6 +2117,181 @@ pub async fn list_file_names<'a, C, E>(
         .send().await?;
 
     let files: B2Result<FileNameList> = serde_json::from_slice(&res)?;
+    match files {
+        B2Result::Ok(files) => {
+            if let Some(next_file) = files.next_file_name {
+                let mut request = request;
+                request.start_file_name = Some(next_file);
+
+                Ok((files.files, Some(request)))
+            } else {
+                Ok((files.files, None))
+            }
+        },
+        B2Result::Err(e) => Err(e.into()),
+    }
+}
+
+/// A request to list the names of files stored in a bucket.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
+pub struct ListFileVersions<'a> {
+    bucket_id: &'a str,
+    start_file_name: Option<String>,
+    start_file_id: Option<String>,
+    max_file_count: Option<u16>,
+    prefix: Option<&'a str>,
+    delimiter: Option<char>,
+}
+
+impl<'a> ListFileVersions<'a> {
+    pub fn builder() -> ListFileVersionsBuilder<'a> {
+        ListFileVersionsBuilder::default()
+    }
+}
+
+/// A builder for a [ListFileVersions] request.
+#[derive(Default)]
+pub struct ListFileVersionsBuilder<'a> {
+    bucket_id: Option<&'a str>,
+    start_file_name: Option<String>,
+    start_file_id: Option<String>,
+    max_file_count: Option<u16>,
+    prefix: Option<&'a str>,
+    delimiter: Option<char>,
+}
+
+impl<'a> ListFileVersionsBuilder<'a> {
+    /// The bucket ID from which to list files.
+    pub fn bucket_id(mut self, id: &'a str) -> Self {
+        self.bucket_id = Some(id);
+        self
+    }
+
+    /// The file name with which to start the listing.
+    ///
+    /// If the file ID is also specified, the name and ID pair is the starting
+    /// point of the listing.
+    pub fn start_file_name(mut self, file_name: impl Into<String>) -> Self {
+        self.start_file_name = Some(file_name.into());
+        self
+    }
+
+    /// The first file ID to return in the listing.
+    ///
+    /// If a file ID is provided, then the corresponding filename is required.
+    pub fn start_file_id(mut self, file_id: impl Into<String>) -> Self {
+        self.start_file_id = Some(file_id.into());
+        self
+    }
+
+    /// The maximum number of files to return.
+    ///
+    /// The default is 100. The provided `count` will be clamped to a value
+    /// between 1 and 10,000 inclusive.
+    ///
+    /// A single transaction has a limit of 1,000 files; values greater than
+    /// 1,000 will incur charges for multiple transactions.
+    ///
+    /// If more than 10,000 files are needed, a new request must be made.
+    pub fn max_file_count(mut self, count: u16) -> Self {
+        use std::cmp::Ord as _;
+
+        self.max_file_count = Some(count.clamp(1, 10_000));
+        self
+    }
+
+    /// Set the filename prefix to filter the file listing.
+    ///
+    /// If not set, all files are matched.
+    ///
+    /// See <https://www.backblaze.com/b2/docs/b2_list_file_names.html> for
+    /// information on file prefixes and delimiters, and their interaction with
+    /// each other.
+    pub fn prefix(mut self, prefix: &'a str)
+    -> Result<Self, FileNameValidationError> {
+        self.prefix = Some(validated_file_name(prefix)?);
+        Ok(self)
+    }
+
+    /// Set the delimiter to use to simulate a hierarchical filesystem.
+    ///
+    /// See <https://www.backblaze.com/b2/docs/b2_list_file_names.html> for
+    /// information on file prefixes and delimiters, and their interaction with
+    /// each other.
+    pub fn delimiter(mut self, delimiter: char)
+    -> Result<Self, FileNameValidationError> {
+        // Because this is for a filename, we're assuming no control characters
+        // are allowed. B2 explicitly forbids ASCII control characters; not sure
+        // of their UTF support...
+        if delimiter.is_ascii_control() {
+            Err(FileNameValidationError::InvalidChar(delimiter))
+        } else {
+            self.delimiter = Some(delimiter);
+            Ok(self)
+        }
+    }
+
+    /// Build a [ListFileVersions] request.
+    ///
+    /// Returns an error if the bucket ID has not been set.
+    pub fn build(self) -> Result<ListFileVersions<'a>, MissingData> {
+        let bucket_id = self.bucket_id.ok_or(MissingData::new("bucket_id"))?;
+
+        if self.start_file_id.is_some() {
+            if self.start_file_name.is_none() {
+                return Err(MissingData::new("start_file_name")
+                    .with_message(concat!(
+                        "If start_file_id is specified, start_file_name is ",
+                        "required"
+                    ))
+                );
+            }
+        }
+
+        Ok(ListFileVersions {
+            bucket_id,
+            start_file_name: self.start_file_name,
+            start_file_id: self.start_file_id,
+            max_file_count: self.max_file_count,
+            prefix: self.prefix,
+            delimiter: self.delimiter,
+        })
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FileVersionList {
+    files: Vec<File>,
+    next_file_name: Option<String>,
+    next_file_id: Option<String>,
+}
+
+/// List all versions of the files contained in a bucket.
+///
+/// Files are listed in alphabetical order by filename, then by upload timestamp
+/// sorted descending.
+///
+/// See <https://www.backblaze.com/b2/docs/b2_list_file_versions.html> for more
+/// information.
+pub async fn list_file_versions<'a, C, E>(
+    auth: &mut Authorization<C>,
+    request: ListFileVersions<'a>,
+) -> Result<(Vec<File>, Option<ListFileVersions<'a>>), Error<E>>
+    where C: HttpClient<Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    require_capability!(auth, Capability::ListFiles);
+
+    let res = auth.client.post(auth.api_url("b2_list_file_versions"))
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .with_body_json(serde_json::to_value(&request)?)
+        .send().await?;
+
+    let files: B2Result<FileVersionList> = serde_json::from_slice(&res)?;
     match files {
         B2Result::Ok(files) => {
             if let Some(next_file) = files.next_file_name {
@@ -3373,6 +3546,52 @@ mod tests_mocked {
         let (files, next_req) = list_file_names(&mut auth, req).await?;
 
         assert_eq!(files.len(), 2);
+        assert!(next_req.is_none());
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_list_file_versions() -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/file.yaml",
+            None,
+            Some(std::boxed::Box::new(move |res| {
+                use surf_vcr::Body;
+
+                if let Body::Str(body) = &mut res.body {
+                    let body_json: Result<serde_json::Value, _> =
+                        serde_json::from_str(body);
+
+                    if let Ok(mut body) = body_json {
+                        if let Some(files) = body.get_mut("files") {
+                            let files = files.as_array_mut().unwrap();
+
+                            for file in files.iter_mut() {
+                                file["accountId"] = serde_json::Value::String(
+                                    "hidden account id".into()
+                                );
+                            }
+                        }
+
+                        res.body = Body::Str(body.to_string());
+                    }
+                }
+            }))
+        ).await?;
+
+        let mut auth = create_test_auth(client, vec![Capability::ListFiles])
+            .await;
+
+        let req = ListFileVersions::builder()
+            .bucket_id("8d625eb63be2775577c70e1a")
+            .max_file_count(5)
+            .build().unwrap();
+
+        let (files, next_req) = list_file_versions(&mut auth, req).await?;
+
+        assert_eq!(files.len(), 4);
         assert!(next_req.is_none());
 
         Ok(())

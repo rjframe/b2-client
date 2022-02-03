@@ -15,6 +15,7 @@
 //!     * [CorsRuleValidationError]
 //!     * [FileNameValidationError]
 //!     * [LifecycleRuleValidationError]
+//!     * [MissingData]
 //! * [Error] for errors returned by the Backblaze B2 API or the HTTP client.
 
 use std::{
@@ -182,6 +183,37 @@ impl fmt::Display for LifecycleRuleValidationError {
     }
 }
 
+#[derive(Debug)]
+pub struct MissingData {
+    pub field: &'static str,
+    msg: Option<String>,
+}
+
+impl MissingData {
+    pub fn new(missing_field: &'static str) -> Self {
+        Self {
+            field: missing_field,
+            msg: None,
+        }
+    }
+
+    pub fn with_message(mut self, message: impl Into<String>) -> Self {
+        self.msg = Some(message.into());
+        self
+    }
+}
+
+impl std::error::Error for MissingData {}
+
+impl fmt::Display for MissingData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.msg {
+            Some(msg) => write!(f, "{}", msg),
+            None => write!(f, "Missing data: {} is required", self.field),
+        }
+    }
+}
+
 /// Errors related to making B2 API calls.
 #[derive(Debug)]
 pub enum Error<E>
@@ -290,6 +322,7 @@ pub enum ErrorCode {
     DuplicateBucketName,
     FileNotPresent,
     InvalidBucketId,
+    InvalidFileId,
     NoSuchFile,
     // The only documented receiving of this isn't possible for us unless B2
     // modifies the range because we clamp the user's value to the valid range.
@@ -345,6 +378,7 @@ impl ErrorCode {
             "duplicate_bucket_name" => Self::DuplicateBucketName,
             "file_not_present" => Self::FileNotPresent,
             "invalid_bucket_id" => Self::InvalidBucketId,
+            "invalid_file_id" => Self::InvalidFileId,
             "no_such_file" => Self::NoSuchFile,
             "out_of_range" => Self::OutOfRange,
             "too_many_buckets" => Self::TooManyBuckets,

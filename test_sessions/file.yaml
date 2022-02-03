@@ -257,3 +257,28 @@
       date:
         - "Thu, 03 Feb 2022 15:21:10 GMT"
     body: "{\"files\":[{\"accountId\":\"hidden account id\",\"action\":\"upload\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentLength\":10,\"contentMd5\":\"3c825ca59d58209eae5924221497780c\",\"contentSha1\":\"5a08924b0ef1cccfb5de1d94e3d75c38dc0d3c79\",\"contentType\":\"text/plain\",\"fileId\":\"4_z8d625eb63be2775577c70e1a_f1052a33c70ab4806_d20211118_m153703_c002_v0001160_t0027\",\"fileInfo\":{\"src_last_modified_millis\":\"1637248673875\"},\"fileName\":\"new-file.txt\",\"fileRetention\":{\"isClientAuthorizedToRead\":true,\"value\":{\"mode\":null,\"retainUntilTimestamp\":null}},\"legalHold\":{\"isClientAuthorizedToRead\":true,\"value\":null},\"serverSideEncryption\":{\"algorithm\":null,\"mode\":null},\"uploadTimestamp\":1637249823000},{\"accountId\":\"hidden account id\",\"action\":\"upload\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentLength\":4,\"contentMd5\":\"e2fc714c4727ee9395f324cd2e7f331f\",\"contentSha1\":\"81fe8bfe87576c3ecb22426f8e57847382917acf\",\"contentType\":\"text/plain\",\"fileId\":\"4_z8d625eb63be2775577c70e1a_f1187926dea44b322_d20211230_m171512_c002_v0001110_t0055\",\"fileInfo\":{},\"fileName\":\"test-file-upload.txt\",\"fileRetention\":{\"isClientAuthorizedToRead\":true,\"value\":{\"mode\":null,\"retainUntilTimestamp\":null}},\"legalHold\":{\"isClientAuthorizedToRead\":true,\"value\":null},\"serverSideEncryption\":{\"algorithm\":null,\"mode\":null},\"uploadTimestamp\":1640884512000}],\"nextFileName\":null}"
+---
+- Request:
+    method: POST
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_list_file_versions"
+    headers:
+      user-agent:
+        - rust-b2-client/version; surf
+      authorization:
+        - hidden-authorization-token
+      content-type:
+        - application/json
+    body: "{\"bucketId\":\"8d625eb63be2775577c70e1a\",\"delimiter\":null,\"maxFileCount\":5,\"prefix\":null,\"startFileId\":null,\"startFileName\":null}"
+- Response:
+    status: 200
+    version: ~
+    headers:
+      content-length:
+        - "3265"
+      content-type:
+        - application/json;charset=UTF-8
+      date:
+        - "Thu, 03 Feb 2022 20:32:18 GMT"
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+    body: "{\"files\":[{\"accountId\":\"hidden account id\",\"action\":\"upload\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentLength\":10,\"contentMd5\":\"3c825ca59d58209eae5924221497780c\",\"contentSha1\":\"5a08924b0ef1cccfb5de1d94e3d75c38dc0d3c79\",\"contentType\":\"text/plain\",\"fileId\":\"4_z8d625eb63be2775577c70e1a_f1052a33c70ab4806_d20211118_m153703_c002_v0001160_t0027\",\"fileInfo\":{\"src_last_modified_millis\":\"1637248673875\"},\"fileName\":\"new-file.txt\",\"fileRetention\":{\"isClientAuthorizedToRead\":true,\"value\":{\"mode\":null,\"retainUntilTimestamp\":null}},\"legalHold\":{\"isClientAuthorizedToRead\":true,\"value\":null},\"serverSideEncryption\":{\"algorithm\":null,\"mode\":null},\"uploadTimestamp\":1637249823000},{\"accountId\":\"hidden account id\",\"action\":\"upload\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentLength\":4,\"contentMd5\":\"e2fc714c4727ee9395f324cd2e7f331f\",\"contentSha1\":\"81fe8bfe87576c3ecb22426f8e57847382917acf\",\"contentType\":\"text/plain\",\"fileId\":\"4_z8d625eb63be2775577c70e1a_f1187926dea44b322_d20211230_m171512_c002_v0001110_t0055\",\"fileInfo\":{},\"fileName\":\"test-file-upload.txt\",\"fileRetention\":{\"isClientAuthorizedToRead\":true,\"value\":{\"mode\":null,\"retainUntilTimestamp\":null}},\"legalHold\":{\"isClientAuthorizedToRead\":true,\"value\":null},\"serverSideEncryption\":{\"algorithm\":null,\"mode\":null},\"uploadTimestamp\":1640884512000},{\"accountId\":\"hidden account id\",\"action\":\"hide\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentLength\":0,\"contentMd5\":\"d41d8cd98f00b204e9800998ecf8427e\",\"contentSha1\":\"da39a3ee5e6b4b0d3255bfef95601890afd80709\",\"contentType\":\"application/x-bz-hide-marker\",\"fileId\":\"4_z8d625eb63be2775577c70e1a_f107f7b2843696d21_d20220201_m191409_c002_v0001094_t0020\",\"fileInfo\":{},\"fileName\":\"test-file.txt\",\"uploadTimestamp\":1643742849000},{\"accountId\":\"hidden account id\",\"action\":\"upload\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentLength\":10,\"contentMd5\":\"3c825ca59d58209eae5924221497780c\",\"contentSha1\":\"5a08924b0ef1cccfb5de1d94e3d75c38dc0d3c79\",\"contentType\":\"text/plain\",\"fileId\":\"4_z8d625eb63be2775577c70e1a_f111954e3108ff3f6_d20211118_m151810_c002_v0001168_t0010\",\"fileInfo\":{\"src_last_modified_millis\":\"1637248673875\"},\"fileName\":\"test-file.txt\",\"fileRetention\":{\"isClientAuthorizedToRead\":true,\"value\":{\"mode\":null,\"retainUntilTimestamp\":null}},\"legalHold\":{\"isClientAuthorizedToRead\":true,\"value\":null},\"serverSideEncryption\":{\"algorithm\":null,\"mode\":null},\"uploadTimestamp\":1637248690000}],\"nextFileId\":null,\"nextFileName\":null}"
