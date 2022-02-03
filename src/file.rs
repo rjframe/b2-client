@@ -1985,6 +1985,155 @@ pub async fn hide_file_by_name<C, E>(
     file.into()
 }
 
+/// A request to list the names of files stored in a bucket.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
+pub struct ListFileNames<'a> {
+    bucket_id: &'a str,
+    start_file_name: Option<String>,
+    max_file_count: Option<u16>,
+    prefix: Option<&'a str>,
+    delimiter: Option<char>,
+}
+
+impl<'a> ListFileNames<'a> {
+    pub fn builder() -> ListFileNamesBuilder<'a> {
+        ListFileNamesBuilder::default()
+    }
+}
+
+/// A builder for a [ListFileNames] request.
+#[derive(Default)]
+pub struct ListFileNamesBuilder<'a> {
+    bucket_id: Option<&'a str>,
+    start_file_name: Option<String>,
+    max_file_count: Option<u16>,
+    prefix: Option<&'a str>,
+    delimiter: Option<char>,
+}
+
+impl<'a> ListFileNamesBuilder<'a> {
+    /// The bucket ID from which to list files.
+    pub fn bucket_id(mut self, id: &'a str) -> Self {
+        self.bucket_id = Some(id);
+        self
+    }
+
+    /// The file name with which to start the listing.
+    pub fn start_file_name(mut self, file_name: impl Into<String>) -> Self {
+        self.start_file_name = Some(file_name.into());
+        self
+    }
+
+    /// The maximum number of files to return.
+    ///
+    /// The default is 100. The provided `count` will be clamped to a value
+    /// between 1 and 10,000 inclusive.
+    ///
+    /// A single transaction has a limit of 1,000 files; values greater than
+    /// 1,000 will incur charges for multiple transactions.
+    ///
+    /// If more than 10,000 files are needed, a new request must be made.
+    pub fn max_file_count(mut self, count: u16) -> Self {
+        use std::cmp::Ord as _;
+
+        self.max_file_count = Some(count.clamp(1, 10_000));
+        self
+    }
+
+    /// Set the filename prefix to filter the file listing.
+    ///
+    /// If not set, all files are matched.
+    ///
+    /// See <https://www.backblaze.com/b2/docs/b2_list_file_names.html> for
+    /// information on file prefixes and delimiters, and their interaction with
+    /// each other.
+    pub fn prefix(mut self, prefix: &'a str)
+    -> Result<Self, FileNameValidationError> {
+        self.prefix = Some(validated_file_name(prefix)?);
+        Ok(self)
+    }
+
+    /// Set the delimiter to use to simulate a hierarchical filesystem.
+    ///
+    /// See <https://www.backblaze.com/b2/docs/b2_list_file_names.html> for
+    /// information on file prefixes and delimiters, and their interaction with
+    /// each other.
+    pub fn delimiter(mut self, delimiter: char)
+    -> Result<Self, FileNameValidationError> {
+        // Because this is for a filename, we're assuming no control characters
+        // are allowed. B2 explicitly forbids ASCII control characters; not sure
+        // of their UTF support...
+        if delimiter.is_ascii_control() {
+            Err(FileNameValidationError::InvalidChar(delimiter))
+        } else {
+            self.delimiter = Some(delimiter);
+            Ok(self)
+        }
+    }
+
+    /// Build a [ListFileNames] request.
+    ///
+    /// Returns an error if the bucket ID has not been set.
+    // TODO: If we don't impl Default we can use a constructor to set the bucket
+    // ID and remove this error possibility.
+    pub fn build(self) -> Result<ListFileNames<'a>, &'static str> {
+        let bucket_id = self.bucket_id.ok_or("Bucket ID is required")?;
+
+        Ok(ListFileNames {
+            bucket_id,
+            start_file_name: self.start_file_name,
+            max_file_count: self.max_file_count,
+            prefix: self.prefix,
+            delimiter: self.delimiter,
+        })
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FileNameList {
+    files: Vec<File>,
+    next_file_name: Option<String>,
+}
+
+/// Get a list of file names in a bucket.
+///
+/// See <https://www.backblaze.com/b2/docs/b2_list_file_names.html> for more
+/// information, including setting filename prefixes for filtering and a
+/// delimiter for working with virtual folders.
+pub async fn list_file_names<'a, C, E>(
+    auth: &mut Authorization<C>,
+    request: ListFileNames<'a>,
+) -> Result<(Vec<File>, Option<ListFileNames<'a>>), Error<E>>
+    where C: HttpClient<Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    require_capability!(auth, Capability::ListFiles);
+
+    let res = auth.client.post(auth.api_url("b2_list_file_names"))
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .with_body_json(serde_json::to_value(&request)?)
+        .send().await?;
+
+    let files: B2Result<FileNameList> = serde_json::from_slice(&res)?;
+    match files {
+        B2Result::Ok(files) => {
+            if let Some(next_file) = files.next_file_name {
+                let mut request = request;
+                request.start_file_name = Some(next_file);
+
+                Ok((files.files, Some(request)))
+            } else {
+                Ok((files.files, None))
+            }
+        },
+        B2Result::Err(e) => Err(e.into()),
+    }
+}
+
 /// A request to prepare to upload a large file.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -3179,6 +3328,52 @@ mod tests_mocked {
         ).await?;
 
         assert_eq!(file.action, FileAction::Hide);
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_list_file_names() -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/file.yaml",
+            None,
+            Some(std::boxed::Box::new(move |res| {
+                use surf_vcr::Body;
+
+                if let Body::Str(body) = &mut res.body {
+                    let body_json: Result<serde_json::Value, _> =
+                        serde_json::from_str(body);
+
+                    if let Ok(mut body) = body_json {
+                        if let Some(files) = body.get_mut("files") {
+                            let files = files.as_array_mut().unwrap();
+
+                            for file in files.iter_mut() {
+                                file["accountId"] = serde_json::Value::String(
+                                    "hidden account id".into()
+                                );
+                            }
+                        }
+
+                        res.body = Body::Str(body.to_string());
+                    }
+                }
+            }))
+        ).await?;
+
+        let mut auth = create_test_auth(client, vec![Capability::ListFiles])
+            .await;
+
+        let req = ListFileNames::builder()
+            .bucket_id("8d625eb63be2775577c70e1a")
+            .max_file_count(5)
+            .build().unwrap();
+
+        let (files, next_req) = list_file_names(&mut auth, req).await?;
+
+        assert_eq!(files.len(), 2);
+        assert!(next_req.is_none());
 
         Ok(())
     }

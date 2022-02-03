@@ -286,10 +286,14 @@ impl<E> From<ValidationError> for Error<E>
 pub enum ErrorCode {
     // 400
     BadBucketId,
-    BadRequest,
+    BadRequest, // Also 503
     DuplicateBucketName,
     FileNotPresent,
+    InvalidBucketId,
     NoSuchFile,
+    // The only documented receiving of this isn't possible for us unless B2
+    // modifies the range because we clamp the user's value to the valid range.
+    OutOfRange,
     TooManyBuckets,
 
     // 401
@@ -340,7 +344,9 @@ impl ErrorCode {
             "bad_request" => Self::BadRequest,
             "duplicate_bucket_name" => Self::DuplicateBucketName,
             "file_not_present" => Self::FileNotPresent,
+            "invalid_bucket_id" => Self::InvalidBucketId,
             "no_such_file" => Self::NoSuchFile,
+            "out_of_range" => Self::OutOfRange,
             "too_many_buckets" => Self::TooManyBuckets,
 
             "bad_auth_token" => Self::BadAuthToken,
