@@ -34,7 +34,7 @@ API:
         ✓ list_file_names @done(2022-02-03 14:24) @project(API \ Files)
         ✓ list_file_versions @done(2022-02-03 15:41) @project(API \ Files)
         ✓ list_parts @done(2022-02-03 17:49) @project(API \ Files)
-        ☐ list_unfinished_large_files
+        ✓ list_unfinished_large_files @done(2022-02-04 12:37) @project(API \ Files)
         ✓ start_large_file @done(2021-11-16 14:25) @project(API \ Files)
         ☐ update_file_legal_hold
         ☐ update_file_retention

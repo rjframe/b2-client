@@ -498,3 +498,28 @@
       date:
         - "Thu, 03 Feb 2022 22:37:07 GMT"
     body: "{\"accountId\":\"hidden-account-id\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"fileId\":\"4_z8d625eb63be2775577c70e1a_f208bc35b0456a1cb_d20220203_m223645_c002_v0001163_t0007\",\"fileName\":\"unfinished-file.txt\"}"
+---
+- Request:
+    method: POST
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_list_unfinished_large_files"
+    headers:
+      user-agent:
+        - rust-b2-client/version; surf
+      content-type:
+        - application/json
+      authorization:
+        - hidden-authorization-token
+    body: "{\"bucketId\":\"8d625eb63be2775577c70e1a\",\"maxFileCount\":null,\"namePrefix\":null,\"startFileId\":null}"
+- Response:
+    status: 200
+    version: ~
+    headers:
+      content-length:
+        - "1648"
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      content-type:
+        - application/json;charset=UTF-8
+      date:
+        - "Fri, 04 Feb 2022 17:23:09 GMT"
+    body: "{\"files\":[{\"accountId\":\"hidden account id\",\"action\":\"start\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentLength\":0,\"contentMd5\":null,\"contentSha1\":\"none\",\"contentType\":\"text/plain\",\"fileId\":\"4_z8d625eb63be2775577c70e1a_f2259d1e31263ab88_d20220203_m223102_c002_v0001164_t0026\",\"fileInfo\":{},\"fileName\":\"unfinished-file.txt\",\"fileRetention\":{\"isClientAuthorizedToRead\":true,\"value\":{\"mode\":null,\"retainUntilTimestamp\":null}},\"legalHold\":{\"isClientAuthorizedToRead\":true,\"value\":null},\"serverSideEncryption\":{\"algorithm\":null,\"mode\":null},\"uploadTimestamp\":1643927462000},{\"accountId\":\"hidden account id\",\"action\":\"start\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"contentLength\":0,\"contentMd5\":null,\"contentSha1\":\"none\",\"contentType\":\"text/plain\",\"fileId\":\"4_z8d625eb63be2775577c70e1a_f20503d82f4c7a386_d20220203_m223245_c002_v0001148_t0056\",\"fileInfo\":{},\"fileName\":\"unfinished-file.txt\",\"fileRetention\":{\"isClientAuthorizedToRead\":true,\"value\":{\"mode\":null,\"retainUntilTimestamp\":null}},\"legalHold\":{\"isClientAuthorizedToRead\":true,\"value\":null},\"serverSideEncryption\":{\"algorithm\":null,\"mode\":null},\"uploadTimestamp\":1643927565000}],\"nextFileId\":null,\"nextFileName\":null}"

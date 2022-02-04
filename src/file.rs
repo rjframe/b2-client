@@ -2409,6 +2409,123 @@ pub async fn list_file_parts<'a, C, E>(
     }
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
+pub struct ListUnfinishedLargeFiles<'a> {
+    bucket_id: &'a str,
+    name_prefix: Option<&'a str>,
+    start_file_id: Option<String>,
+    max_file_count: Option<u16>,
+}
+
+impl<'a> ListUnfinishedLargeFiles<'a> {
+    pub fn builder() -> ListUnfinishedLargeFilesBuilder<'a> {
+        ListUnfinishedLargeFilesBuilder::default()
+    }
+}
+
+#[derive(Default)]
+pub struct ListUnfinishedLargeFilesBuilder<'a> {
+    bucket_id: Option<&'a str>,
+    name_prefix: Option<&'a str>,
+    start_file_id: Option<String>,
+    max_file_count: Option<u16>,
+}
+
+impl<'a> ListUnfinishedLargeFilesBuilder<'a> {
+    /// The bucket ID from which to list files.
+    pub fn bucket_id(mut self, id: &'a str) -> Self {
+        self.bucket_id = Some(id);
+        self
+    }
+
+    /// Set the filename prefix to filter the file listing.
+    ///
+    /// If not set, all files are matched.
+    pub fn prefix(mut self, prefix: &'a str)
+    -> Result<Self, FileNameValidationError> {
+        self.name_prefix = Some(validated_file_name(prefix)?);
+        Ok(self)
+    }
+
+    /// The file ID with which to start the listing.
+    pub fn start_file_id(mut self, file_id: impl Into<String>) -> Self {
+        self.start_file_id = Some(file_id.into());
+        self
+    }
+
+    /// The maximum number of files to return.
+    ///
+    /// The default is 100. The provided `count` will be clamped to a value
+    /// between 1 and 100 inclusive.
+    ///
+    /// If more than 100 files are needed, a new request must be made.
+    pub fn max_file_count(mut self, count: u16) -> Self {
+        use std::cmp::Ord as _;
+
+        self.max_file_count = Some(count.clamp(1, 10_000));
+        self
+    }
+
+    /// Create a [ListUnfinishedLargeFiles] request.
+    pub fn build(self) -> Result<ListUnfinishedLargeFiles<'a>, MissingData> {
+        let bucket_id = self.bucket_id.ok_or(MissingData::new("bucket_id"))?;
+
+        Ok(ListUnfinishedLargeFiles {
+            bucket_id,
+            name_prefix: self.name_prefix,
+            start_file_id: self.start_file_id,
+            max_file_count: self.max_file_count,
+        })
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FileIdList {
+    files: Vec<File>,
+    next_file_id: Option<String>,
+}
+
+/// Get a list of the unfinished large files stored by B2.
+///
+/// If there are more files, returns a [ListUnfinishedLargeFiles] request that
+/// will begin with the next file.
+///
+/// See <https://www.backblaze.com/b2/docs/b2_list_unfinished_large_files.html>
+/// for further information.
+pub async fn list_unfinished_large_files<'a, C, E>(
+    auth: &mut Authorization<C>,
+    request: ListUnfinishedLargeFiles<'a>
+) -> Result<(Vec<File>, Option<ListUnfinishedLargeFiles<'a>>), Error<E>>
+    where C: HttpClient<Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    require_capability!(auth, Capability::ListFiles);
+
+    let res = auth.client.post(auth.api_url("b2_list_unfinished_large_files"))
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .with_body_json(serde_json::to_value(&request)?)
+        .send().await?;
+
+    let files: B2Result<FileIdList> = serde_json::from_slice(&res)?;
+    match files {
+        B2Result::Ok(files) => {
+            if let Some(next_file_id) = files.next_file_id {
+                let mut request = request;
+                request.start_file_id = Some(next_file_id);
+
+                Ok((files.files, Some(request)))
+            } else {
+                Ok((files.files, None))
+            }
+        },
+        B2Result::Err(e) => Err(e.into()),
+    }
+}
+
 /// A request to prepare to upload a large file.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -3766,6 +3883,54 @@ mod tests_mocked {
         assert!(next_req.is_none());
 
         let _ = cancel_large_file(&mut auth, file).await?;
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_list_unfinished_files() -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/large_file.yaml",
+            None,
+            Some(std::boxed::Box::new(move |res| {
+                use surf_vcr::Body;
+
+                if let Body::Str(body) = &mut res.body {
+                    let body_json: Result<serde_json::Value, _> =
+                        serde_json::from_str(body);
+
+                    if let Ok(mut body) = body_json {
+                        if let Some(files) = body.get_mut("files") {
+                            let files = files.as_array_mut().unwrap();
+
+                            for file in files.iter_mut() {
+                                file["accountId"] = serde_json::Value::String(
+                                    "hidden account id".into()
+                                );
+                            }
+                        }
+
+                        res.body = Body::Str(body.to_string());
+                    }
+                }
+            }))
+        ).await?;
+
+        let mut auth = create_test_auth(client, vec![Capability::ListFiles])
+            .await;
+
+        let list_files = ListUnfinishedLargeFiles::builder()
+            .bucket_id("8d625eb63be2775577c70e1a")
+            .build()?;
+
+        let (files, next_req) = list_unfinished_large_files(
+            &mut auth,
+            list_files
+        ).await?;
+
+        assert_eq!(files.len(), 2);
+        assert!(next_req.is_none());
 
         Ok(())
     }
