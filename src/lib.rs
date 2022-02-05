@@ -189,6 +189,8 @@ pub(crate) mod test_utils {
 
     fn hide_response_account_id(mut json: serde_json::Value)
     -> serde_json::Value {
+        #![allow(clippy::option_map_unit_fn)]
+
         if let Some(buckets) = json.get_mut("buckets")
             .and_then(|b| b.as_array_mut())
         {

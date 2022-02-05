@@ -2209,7 +2209,9 @@ impl<'a> ListFileNamesBuilder<'a> {
     ///
     /// Returns an error if the bucket ID has not been set.
     pub fn build(self) -> Result<ListFileNames<'a>, MissingData> {
-        let bucket_id = self.bucket_id.ok_or(MissingData::new("bucket_id"))?;
+        let bucket_id = self.bucket_id.ok_or_else(||
+            MissingData::new("bucket_id")
+        )?;
 
         Ok(ListFileNames {
             bucket_id,
@@ -2233,6 +2235,7 @@ struct FileNameList {
 /// See <https://www.backblaze.com/b2/docs/b2_list_file_names.html> for more
 /// information, including setting filename prefixes for filtering and a
 /// delimiter for working with virtual folders.
+#[allow(clippy::needless_lifetimes)] // False positive.
 pub async fn list_file_names<'a, C, E>(
     auth: &mut Authorization<C>,
     request: ListFileNames<'a>,
@@ -2369,17 +2372,16 @@ impl<'a> ListFileVersionsBuilder<'a> {
     ///
     /// Returns an error if the bucket ID has not been set.
     pub fn build(self) -> Result<ListFileVersions<'a>, MissingData> {
-        let bucket_id = self.bucket_id.ok_or(MissingData::new("bucket_id"))?;
+        let bucket_id = self.bucket_id.ok_or_else(||
+            MissingData::new("bucket_id")
+        )?;
 
-        if self.start_file_id.is_some() {
-            if self.start_file_name.is_none() {
-                return Err(MissingData::new("start_file_name")
-                    .with_message(concat!(
-                        "If start_file_id is specified, start_file_name is ",
-                        "required"
-                    ))
-                );
-            }
+        if self.start_file_id.is_some() && self.start_file_name.is_none() {
+            return Err(MissingData::new("start_file_name")
+                .with_message(
+                    "If start_file_id is specified, start_file_name is required"
+                )
+            );
         }
 
         Ok(ListFileVersions {
@@ -2408,6 +2410,7 @@ struct FileVersionList {
 ///
 /// See <https://www.backblaze.com/b2/docs/b2_list_file_versions.html> for more
 /// information.
+#[allow(clippy::needless_lifetimes)] // False positive.
 pub async fn list_file_versions<'a, C, E>(
     auth: &mut Authorization<C>,
     request: ListFileVersions<'a>,
@@ -2493,7 +2496,9 @@ impl<'a> ListFilePartsBuilder<'a> {
     }
 
     pub fn build(self) -> Result<ListFileParts<'a>, MissingData> {
-        let file_id = self.file_id.ok_or(MissingData::new("file_id"))?;
+        let file_id = self.file_id.ok_or_else(||
+            MissingData::new("file_id")
+        )?;
 
         Ok(ListFileParts {
             file_id,
@@ -2510,6 +2515,8 @@ struct FilePartList {
     next_part_number: Option<u16>,
 }
 
+/// List the parts of a large file that has not yet been completed.
+#[allow(clippy::needless_lifetimes)] // False positive.
 pub async fn list_file_parts<'a, C, E>(
     auth: &mut Authorization<C>,
     request: ListFileParts<'a>,
@@ -2602,7 +2609,9 @@ impl<'a> ListUnfinishedLargeFilesBuilder<'a> {
 
     /// Create a [ListUnfinishedLargeFiles] request.
     pub fn build(self) -> Result<ListUnfinishedLargeFiles<'a>, MissingData> {
-        let bucket_id = self.bucket_id.ok_or(MissingData::new("bucket_id"))?;
+        let bucket_id = self.bucket_id.ok_or_else(||
+            MissingData::new("bucket_id")
+        )?;
 
         Ok(ListUnfinishedLargeFiles {
             bucket_id,
@@ -2627,6 +2636,7 @@ struct FileIdList {
 ///
 /// See <https://www.backblaze.com/b2/docs/b2_list_unfinished_large_files.html>
 /// for further information.
+#[allow(clippy::needless_lifetimes)] // False positive.
 pub async fn list_unfinished_large_files<'a, C, E>(
     auth: &mut Authorization<C>,
     request: ListUnfinishedLargeFiles<'a>
@@ -2967,9 +2977,15 @@ impl<'a> UpdateFileLegalHoldBuilder<'a> {
     /// Returns an error if any of the file name, file ID, or legal hold status
     /// are not specified.
     pub fn build(self) -> Result<UpdateFileLegalHold<'a>, MissingData> {
-        let file_name = self.file_name.ok_or(MissingData::new("file_name"))?;
-        let file_id = self.file_id.ok_or(MissingData::new("file_id"))?;
-        let legal_hold = self.legal_hold.ok_or(MissingData::new("legal_hold"))?;
+        let file_name = self.file_name.ok_or_else(||
+            MissingData::new("file_name")
+        )?;
+        let file_id = self.file_id.ok_or_else(||
+            MissingData::new("file_id")
+        )?;
+        let legal_hold = self.legal_hold.ok_or_else(||
+            MissingData::new("legal_hold")
+        )?;
 
         Ok(UpdateFileLegalHold {
             file_name,
@@ -2982,9 +2998,9 @@ impl<'a> UpdateFileLegalHoldBuilder<'a> {
 // TODO: B2 returns the same data we sent it. Not sure there's a reason to do
 // the same - change or continue returning ()?
 /// Enable or disable a legal hold on a file.
-pub async fn update_file_legal_hold<'a, C, E>(
+pub async fn update_file_legal_hold<C, E>(
     auth: &mut Authorization<C>,
-    file_update: UpdateFileLegalHold<'a>
+    file_update: UpdateFileLegalHold<'_>
 ) -> Result<(), Error<E>>
     where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
@@ -3048,7 +3064,7 @@ impl<'a> UpdateFileRetentionBuilder<'a> {
     ///
     /// The file name is also required.
     pub fn file_id(mut self, file_id: &'a str) -> Self {
-        self.file_id = Some(&file_id);
+        self.file_id = Some(file_id);
         self
     }
 
@@ -3073,10 +3089,15 @@ impl<'a> UpdateFileRetentionBuilder<'a> {
 
     /// Create an [UpdateFileRetention] request.
     pub fn build(self) -> Result<UpdateFileRetention<'a>, MissingData> {
-        let file_name = self.file_name.ok_or(MissingData::new("file_name"))?;
-        let file_id = self.file_id.ok_or(MissingData::new("file_id"))?;
-        let file_retention = self.file_retention
-            .ok_or(MissingData::new("file_retention"))?;
+        let file_name = self.file_name.ok_or_else(||
+            MissingData::new("file_name")
+        )?;
+        let file_id = self.file_id.ok_or_else(||
+            MissingData::new("file_id")
+        )?;
+        let file_retention = self.file_retention.ok_or_else(||
+            MissingData::new("file_retention")
+        )?;
 
         Ok(UpdateFileRetention {
             file_name,
@@ -3102,9 +3123,9 @@ impl<'a> UpdateFileRetentionBuilder<'a> {
 /// cannot be removed or shortened, but their retention dates can be extended.
 ///
 /// The bucket containing the file must have File Lock enabled.
-pub async fn update_file_retention<'a, C, E>(
+pub async fn update_file_retention<C, E>(
     auth: &mut Authorization<C>,
-    retention_update: UpdateFileRetention<'a>,
+    retention_update: UpdateFileRetention<'_>,
 ) -> Result<(), Error<E>>
     where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
@@ -3644,6 +3665,7 @@ mod tests_mocked {
 
     #[async_std::test]
     async fn test_get_download_authorization() -> Result<(), anyhow::Error> {
+
         // I need two copies of an identical expiration, but it doesn't
         // implement Clone.
         let (expires1, expires2) = {
@@ -3662,6 +3684,7 @@ mod tests_mocked {
         let client = create_test_client(
             VcrMode::Replay,
             "test_sessions/auth_account.yaml",
+            #[allow(clippy::option_map_unit_fn)]
             Some(Box::new(move |req| {
                 use surf_vcr::Body;
 
