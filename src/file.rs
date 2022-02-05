@@ -2868,6 +2868,7 @@ impl<'a> UpdateFileLegalHoldBuilder<'a> {
 
 // TODO: B2 returns the same data we sent it. Not sure there's a reason to do
 // the same - change or continue returning ()?
+/// Enable or disable a legal hold on a file.
 pub async fn update_file_legal_hold<'a, C, E>(
     auth: &mut Authorization<C>,
     file_update: UpdateFileLegalHold<'a>
@@ -2887,6 +2888,7 @@ pub async fn update_file_legal_hold<'a, C, E>(
     res.map(|_| ()).into()
 }
 
+/// A request to update file retention settings on a file.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateFileRetention<'a> {
@@ -2903,6 +2905,7 @@ impl<'a> UpdateFileRetention<'a> {
     }
 }
 
+/// A builder for an [UpdateFileRetention] request.
 #[derive(Default)]
 pub struct UpdateFileRetentionBuilder<'a> {
     file_name: Option<&'a str>,
@@ -2912,33 +2915,50 @@ pub struct UpdateFileRetentionBuilder<'a> {
 }
 
 impl<'a> UpdateFileRetentionBuilder<'a> {
+    /// The file to update.
     pub fn file(mut self, file: &'a File) -> Self {
         self.file_name = Some(&file.file_name);
         self.file_id = Some(&file.file_id);
         self
     }
 
+    /// The name of the file to update.
+    ///
+    /// The file ID is also required.
     pub fn file_name(mut self, file_name: &'a str)
     -> Result<Self, FileNameValidationError> {
         self.file_name = Some(validated_file_name(file_name)?);
         Ok(self)
     }
 
+    /// The ID of the file to update.
+    ///
+    /// The file name is also required.
     pub fn file_id(mut self, file_id: &'a str) -> Self {
         self.file_id = Some(&file_id);
         self
     }
 
+    /// The new file retention settings for the file.
+    ///
+    /// See
+    /// <https://www.backblaze.com/b2/docs/file_lock.html#b2_api_file_lock_parameters>
+    /// for more information.
     pub fn file_retention(mut self, retention: FileRetentionSetting) -> Self {
         self.file_retention = Some(retention);
         self
     }
 
-    pub fn bypass_governance(mut self, bypass: BypassGovernance) -> Self {
-        self.bypass_governance = Some(bypass);
+    /// Bypass governance rules to allow deleting or shortening an existing
+    /// governance-mode retention setting.
+    ///
+    /// The authorization must include [Capability::BypassGovernance].
+    pub fn bypass_governance(mut self) -> Self {
+        self.bypass_governance = Some(BypassGovernance::Yes);
         self
     }
 
+    /// Create an [UpdateFileRetention] request.
     pub fn build(self) -> Result<UpdateFileRetention<'a>, MissingData> {
         let file_name = self.file_name.ok_or(MissingData::new("file_name"))?;
         let file_id = self.file_id.ok_or(MissingData::new("file_id"))?;
@@ -2956,6 +2976,19 @@ impl<'a> UpdateFileRetentionBuilder<'a> {
 
 // TODO: B2 returns the same data we sent it. Not sure there's a reason to do
 // the same - change or continue returning ()?
+/// Modify the file lock retention settings for a file.
+///
+/// Any attempt to delete or modify a locked file during the retention period
+/// will fail.
+///
+/// The retention settings for files locked with [FileRetentionMode::Governance]
+/// can be deleted or shortened only by accounts with
+/// [Capability::BypassGovernance].
+///
+/// The retention settings for files locked with [FileRetentionMode::Compliance]
+/// cannot be removed or shortened, but their retention dates can be extended.
+///
+/// The bucket containing the file must have File Lock enabled.
 pub async fn update_file_retention<'a, C, E>(
     auth: &mut Authorization<C>,
     retention_update: UpdateFileRetention<'a>,
@@ -2964,6 +2997,10 @@ pub async fn update_file_retention<'a, C, E>(
           E: fmt::Debug + fmt::Display,
 {
     require_capability!(auth, Capability::WriteFileRetentions);
+    if matches!(retention_update.bypass_governance, Some(BypassGovernance::Yes))
+    {
+        require_capability!(auth, Capability::BypassGovernance);
+    }
 
     let res = auth.client.post(auth.api_url("b2_update_file_retention"))
         .expect("Invalid URL")
