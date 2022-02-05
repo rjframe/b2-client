@@ -11,7 +11,7 @@ Project:
     ☐ Efficient byte management in HttpClients.
     ☐ Make non-mocked tests easily reproducible for others and me in the future - move bucket ID, etc. to environment variables, clean up after tests.
     ☐ Allow uploads via streams/chunked/buffers/local filesystem
-    ☐ b2_download_file_by_name allows using a DownloadAuthorization for files with prefixes covered by that auth; we should support that too.
+    ✓ b2_download_file_by_name allows using a DownloadAuthorization for files with prefixes covered by that auth; we should support that too. @done(2022-02-05 18:34) @project(Project)
     ☐ Check: did I intentionally keep Request in name KeyListRequest when I removed the others? If so, do I still agree?
 
 ＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿

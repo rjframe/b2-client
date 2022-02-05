@@ -386,3 +386,63 @@
       content-length:
         - "228"
     body: "{\"fileId\":\"4_zcd120e962b02c7a577e70e1a_f100e7b2902e23bf1_d20220205_m134630_c002_v0001141_t0007\",\"fileName\":\"test-file.txt\",\"fileRetention\":{\"mode\":\"governance\",\"retainUntilTimestamp\":32503680000000}}"
+---
+- Request:
+    method: POST
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_get_download_authorization"
+    headers:
+      content-type:
+        - application/json
+      authorization:
+        - hidden-authorization-token
+      user-agent:
+        - rust-b2-client/version; surf
+    body: "{\"bucketId\":\"8d625eb63be2775577c70e1a\",\"fileNamePrefix\":\"test\",\"validDurationInSeconds\":30000}"
+- Response:
+    status: 200
+    version: ~
+    headers:
+      date:
+        - "Sat, 05 Feb 2022 23:18:21 GMT"
+      content-length:
+        - "212"
+      content-type:
+        - application/json;charset=UTF-8
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+    body: "{\"authorizationToken\":\"hidden-authorization-token\",\"bucketId\":\"8d625eb63be2775577c70e1a\",\"fileNamePrefix\":\"test\"}"
+---
+- Request:
+    method: GET
+    url: "https://f002.backblazeb2.com/file/testing-b2-client/test-file.txt?"
+    headers:
+      user-agent:
+        - rust-b2-client/version; surf
+      authorization:
+        - Basic hidden-account-id
+      content-type:
+        - application/json
+    body: "{\"bucketId\":\"8d625eb63be2775577c70e1a\",\"fileNamePrefix\":\"test\",\"validDurationInSeconds\":30000}"
+- Response:
+    status: 200
+    version: ~
+    headers:
+      date:
+        - "Sat, 05 Feb 2022 23:18:21 GMT"
+      x-bz-content-sha1:
+        - 5a08924b0ef1cccfb5de1d94e3d75c38dc0d3c79
+      x-bz-info-src_last_modified_millis:
+        - "1637248673875"
+      x-bz-upload-timestamp:
+        - "1637248690000"
+      accept-ranges:
+        - bytes
+      x-bz-file-name:
+        - test-file.txt
+      content-length:
+        - "10"
+      content-type:
+        - text/plain
+      x-bz-file-id:
+        - 4_z8d625eb63be2775577c70e1a_f111954e3108ff3f6_d20211118_m151810_c002_v0001168_t0010
+    body: "Some text\n"

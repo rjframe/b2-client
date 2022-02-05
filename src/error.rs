@@ -237,6 +237,8 @@ pub enum Error<E>
     Unauthorized(crate::account::Capability),
     /// An error validating data prior to making a Backblaze B2 API call.
     Validation(ValidationError),
+    /// Attempted to send an request with incompatible data fields.
+    BadRequest,
     /// Attempted to send a non-existent request.
     NoRequest,
 }
@@ -258,6 +260,8 @@ impl<E> fmt::Display for Error<E>
             Self::Format(e) => e.fmt(f),
             Self::Unauthorized(c) => write!(f, "Missing capability: {:?}", c),
             Self::Validation(e) => e.fmt(f),
+            // TODO: This is never a helpful message.
+            Self::BadRequest => write!(f, "That request is not valid"),
             Self::NoRequest => write!(f, "No request was created"),
         }
     }

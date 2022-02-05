@@ -29,7 +29,7 @@ pub use hyper_client::HyperClient;
 /// A trait that wraps an HTTP client to send HTTP requests.
 #[async_trait::async_trait]
 pub trait HttpClient
-    where Self: Sized,
+    where Self: Clone + Sized,
 {
     /// The HTTP client's Error type.
     type Error;
@@ -99,7 +99,7 @@ mod surf_client {
         Url,
     };
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     pub struct SurfClient {
         client: surf::Client,
         req: Option<Request>,
@@ -108,7 +108,7 @@ mod surf_client {
     }
 
     // Body type for sending; TODO rename to avoid ambiguity?
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     enum Body {
         Json(serde_json::Value),
         // TODO: I'd rather store a reference, but doing so spams lifetimes all
@@ -291,7 +291,7 @@ mod hyper_client {
     use url::Url;
 
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     pub struct HyperClient {
         client: hyper::Client<HttpsConnector<HttpConnector>>,
         method: Option<Method>,
@@ -301,7 +301,7 @@ mod hyper_client {
         user_agent: String,
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     enum Body {
         Json(serde_json::Value),
         Bytes(hyper::body::Bytes),

@@ -36,9 +36,9 @@ pub struct Authorization<C>
     pub(crate) authorization_token: String,
     allowed: Capabilities,
     // The base URL for all API calls except uploading or downloading files.
-    api_url: String,
+    pub(crate) api_url: String,
     // The base URL to use for downloading files.
-    download_url: String,
+    pub(crate) download_url: String,
     recommended_part_size: u64,
     absolute_minimum_part_size: u64,
     // The base URL to use for all API calls using the AWS S3-compatible API.j

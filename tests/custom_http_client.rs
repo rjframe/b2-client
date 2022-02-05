@@ -9,7 +9,7 @@ use b2_client::{
     error::{ValidationError, Error},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct FakeClient;
 
 #[derive(Debug, Eq, PartialEq)]

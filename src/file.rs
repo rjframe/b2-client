@@ -1049,7 +1049,7 @@ pub async fn download_file_headers_by_id<C, E>(
 }
 
 // TODO: Implement download_file_headers_by_name
-
+#[derive(Debug)]
 enum FileHandle<'a> {
     Id(&'a str),
     Name((String, &'a str)), // (Percent-encoded file name, bucket name)
@@ -1067,7 +1067,7 @@ enum FileHandle<'a> {
 /// See <https://www.backblaze.com/b2/docs/b2_download_file_by_id.html> for
 /// information on downloading files, including the list of headers that may be
 /// returned.
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DownloadFile<'a> {
     #[serde(skip_serializing)]
@@ -1132,10 +1132,16 @@ impl<'a> DownloadFile<'a> {
     /// A file in a public bucket does not require an authorization token to
     /// access, making this link suitable for distribution (e.g., embedding in a
     /// web page).
-    pub fn public_url<C, E>(&self, auth: &Authorization<C>) -> String
-        where C: HttpClient<Error=Error<E>>,
+    ///
+    /// You must provide an [Authorization] or [DownloadAuthorization] that has
+    /// access to the file.
+    pub fn public_url<'b, C, D, E>(&self, auth: D) -> String
+        where C: HttpClient<Error=Error<E>> + 'b,
+              D: Into<&'b DownloadAuth<'b, C>>,
               E: fmt::Debug + fmt::Display,
     {
+        let auth = auth.into();
+
         match &self.file {
             FileHandle::Id(id) => format!(
                 "{}?fileId={}",
@@ -1289,19 +1295,85 @@ impl<'a> DownloadFileBuilder<'a> {
     }
 }
 
+/// Allow downloading files via an `Authorization` or `DownloadAuthorization`.
+///
+/// You do not need to use this type explicitly.
+pub enum DownloadAuth<'a, C>
+    where C: HttpClient
+{
+    Auth(&'a mut Authorization<C>),
+    Download(&'a mut DownloadAuthorization<C>),
+}
+
+impl<'a, C> DownloadAuth<'a, C>
+    where C: HttpClient,
+{
+    fn download_get_url(&self) -> &str {
+        match self {
+            Self::Auth(auth) => auth.download_get_url(),
+            Self::Download(auth) => &auth.download_url,
+        }
+    }
+
+    fn download_url(&self, endpoint: impl AsRef<str>) -> String {
+        match self {
+            Self::Auth(auth) => auth.download_url(endpoint),
+            Self::Download(auth) =>
+                format!("{}/b2api/v2/{}", auth.download_url, endpoint.as_ref())
+        }
+    }
+
+    fn authorization_token(&self) -> &str {
+        match self {
+            Self::Auth(auth) => &auth.authorization_token,
+            Self::Download(auth) => &auth.authorization_token,
+        }
+    }
+
+    fn has_capability(&self, cap: Capability) -> bool {
+        match self {
+            Self::Auth(auth) => auth.has_capability(cap),
+            _ => true,
+        }
+    }
+}
+
+impl<'a, C> From<&'a mut Authorization<C>> for DownloadAuth<'a, C>
+    where C: HttpClient,
+{
+    fn from(auth: &'a mut Authorization<C>) -> Self {
+        Self::Auth(auth)
+    }
+}
+
+impl<'a, C> From<&'a mut DownloadAuthorization<C>> for DownloadAuth<'a, C>
+    where C: HttpClient,
+{
+    fn from(auth: &'a mut DownloadAuthorization<C>) -> Self {
+        Self::Download(auth)
+    }
+}
+
 /// Download a file from the B2 service.
-pub async fn download_file<C, E>(
-    auth: &mut Authorization<C>,
+///
+/// If downloading a file by name, you may provide a mutable reference to either
+/// an [Authorization] or a [DownloadAuthorization]. Downloading files by ID
+/// requires an `Authorization`.
+pub async fn download_file<'a, C, E>(
+    auth: impl Into<DownloadAuth<'a, C>>,
     file: DownloadFile<'_>
 ) -> Result<(Vec<u8>, HeaderMap), Error<E>>
-    where C: HttpClient<Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>> + 'a,
           E: fmt::Debug + fmt::Display,
 {
-    // Due to the nature of the respective API calls, it's better to separate
-    // each into its own (private) function. This function hides the complexity
-    // and differences in our public API.
     match file.file {
-        FileHandle::Id(_) => download_file_by_id(auth, file).await,
+        FileHandle::Id(_) => {
+            match auth.into() {
+                DownloadAuth::Auth(auth) => download_file_by_id(auth, file)
+                    .await,
+                _ => Err(Error::BadRequest),
+            }
+        },
         FileHandle::Name(_) => download_file_by_name(auth, file).await
     }
 }
@@ -1363,14 +1435,16 @@ async fn download_file_by_id<C, E>(
     }
 }
 
-async fn download_file_by_name<C, E>(
-    auth: &mut Authorization<C>,
+async fn download_file_by_name<'a, C, E>(
+    auth: impl Into<DownloadAuth<'a, C>>,
     file: DownloadFile<'_>
 ) -> Result<(Vec<u8>, HeaderMap), Error<E>>
-    where C: HttpClient<Error=Error<E>>,
+    where C: HttpClient<Error=Error<E>> + 'a,
           E: fmt::Debug + fmt::Display,
 {
     use crate::error::B2Error;
+
+    let mut auth = auth.into();
 
     // TODO: This is probably only required for private buckets; public buckets
     // don't require an authorization token, but the docs read as if this is
@@ -1379,7 +1453,7 @@ async fn download_file_by_name<C, E>(
     require_capability!(auth, Capability::ReadFiles);
     assert!(matches!(file.file, FileHandle::Name(_)));
 
-    let mut url = file.public_url(auth);
+    let mut url = file.public_url(&auth).to_owned();
 
     add_opt_param!(url, "b2ContentDisposition", file.b2_content_disposition);
     add_opt_param!(url, "b2ContentLanguage", file.b2_content_language);
@@ -1403,9 +1477,16 @@ async fn download_file_by_name<C, E>(
         );
     }
 
-    let mut req = auth.client.get(url)
+    let auth_token = auth.authorization_token().to_owned();
+
+    let client = match auth {
+        DownloadAuth::Auth(ref mut auth) => &mut auth.client,
+        DownloadAuth::Download(ref mut auth) => &mut auth.client,
+    };
+
+    let mut req = client.get(url)
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token);
+        .with_header("Authorization", &auth_token);
 
     add_opt_header!(req, file.range, "Range", range, &range.to_string());
 
@@ -1713,21 +1794,50 @@ impl<'a> DownloadAuthorizationRequestBuilder<'a> {
 }
 
 /// A capability token that authorizes downloading files from a private bucket.
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug)]
 #[allow(dead_code)]
-pub struct DownloadAuthorization {
+pub struct DownloadAuthorization<C>
+    where C: HttpClient,
+{
+    client: C,
+    api_url: String,
+    download_url: String,
+
     bucket_id: String,
     file_name_prefix: String,
     authorization_token: String,
 }
 
-impl DownloadAuthorization {
+impl<C> DownloadAuthorization<C>
+    where C: HttpClient + Clone,
+{
     /// Get the ID of the bucket this `DownloadAuthorization` can access.
     pub fn bucket_id(&self) -> &str { &self.bucket_id }
     /// The file prefix that determines what files in the bucket are accessible
     /// via this `DownloadAuthorization`.
     pub fn file_name_prefix(&self) -> &str { &self.file_name_prefix }
+
+    fn from_proto(
+        proto: ProtoDownloadAuthorization,
+        auth: &Authorization<C>,
+    ) -> Self {
+        Self {
+            client: auth.client.clone(),
+            api_url: auth.api_url.clone(),
+            download_url: auth.download_url.clone(),
+            bucket_id: proto.bucket_id,
+            file_name_prefix: proto.file_name_prefix,
+            authorization_token: proto.authorization_token,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProtoDownloadAuthorization {
+    bucket_id: String,
+    file_name_prefix: String,
+    authorization_token: String,
 }
 
 /// Generate a download authorization token to download files with a specific
@@ -1736,7 +1846,8 @@ impl DownloadAuthorization {
 /// The [Authorization] token must have [Capability::ShareFiles].
 ///
 /// The returned [DownloadAuthorization] can be passed to
-/// [download_file](crate::file::download_file) (not yet implemented).
+/// [download_file](crate::file::download_file) in place of an [Authorization]
+/// when downloading files by name.
 ///
 /// See <https://www.backblaze.com/b2/docs/b2_get_download_authorization.html>
 /// for further information.
@@ -1768,7 +1879,7 @@ impl DownloadAuthorization {
 pub async fn get_download_authorization<'a, C, E>(
     auth: &mut Authorization<C>,
     download_req: DownloadAuthorizationRequest<'_>
-) -> Result<DownloadAuthorization, Error<E>>
+) -> Result<DownloadAuthorization<C>, Error<E>>
     where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
@@ -1780,8 +1891,10 @@ pub async fn get_download_authorization<'a, C, E>(
         .with_body_json(serde_json::to_value(download_req)?)
         .send().await?;
 
-    let auth: B2Result<DownloadAuthorization> = serde_json::from_slice(&res)?;
-    auth.into()
+    let proto_auth: B2Result<ProtoDownloadAuthorization> =
+        serde_json::from_slice(&res)?;
+
+    proto_auth.map(|a| DownloadAuthorization::from_proto(a, auth)).into()
 }
 
 /// An authorization to upload file contents to a B2 file.
@@ -3802,6 +3915,39 @@ mod tests_mocked {
         let req = DownloadFile::with_name("test-file.txt", "testing-b2-client");
 
         let (file, _headers) = download_file(&mut auth, req).await?;
+        assert_eq!(file, b"Some text\n");
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn download_file_by_name_via_download_authorization_success()
+    -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/file.yaml",
+            None, None
+        ).await?;
+
+        let mut auth = create_test_auth(
+            client,
+            vec![Capability::ReadFiles, Capability::ShareFiles]
+        ).await;
+
+        let req = DownloadAuthorizationRequest::builder()
+            .bucket_id("8d625eb63be2775577c70e1a")
+            .file_name_prefix("test")?
+            .duration(chrono::Duration::seconds(30))?
+            .build()?;
+
+        let mut download_auth = get_download_authorization(
+            &mut auth,
+            req
+        ).await?;
+
+        let req = DownloadFile::with_name("test-file.txt", "testing-b2-client");
+
+        let (file, _headers) = download_file(&mut download_auth, req).await?;
         assert_eq!(file, b"Some text\n");
 
         Ok(())
