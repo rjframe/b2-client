@@ -220,7 +220,7 @@ macro_rules! percent_encode {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(rename = "camelCase")]
+#[serde(rename_all = "lowercase")]
 enum LegalHoldValue {
     On,
     Off,
@@ -2751,6 +2751,123 @@ pub async fn start_large_file<'a, C, E>(
     file.into()
 }
 
+/// A request to enable or disable a legal hold on a specific file.
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateFileLegalHold<'a> {
+    file_name: &'a str,
+    file_id: &'a str,
+    legal_hold: LegalHoldValue,
+}
+
+impl<'a> UpdateFileLegalHold<'a> {
+    /// Create a request to enable a legal hold for the specified file.
+    pub fn enable_for(file: &'a File) -> Self {
+        Self {
+            file_name: &file.file_name,
+            file_id: &file.file_id,
+            legal_hold: LegalHoldValue::On,
+        }
+    }
+
+    /// Create a request to disable a legal hold for the specified file.
+    pub fn disable_for(file: &'a File) -> Self {
+        Self {
+            file_name: &file.file_name,
+            file_id: &file.file_id,
+            legal_hold: LegalHoldValue::Off,
+        }
+    }
+
+    /// Use a builder to create a legal hold update request.
+    pub fn builder() -> UpdateFileLegalHoldBuilder<'a> {
+        UpdateFileLegalHoldBuilder::default()
+    }
+}
+
+/// A builder for an [UpdateFileLegalHold] request.
+#[derive(Default)]
+pub struct UpdateFileLegalHoldBuilder<'a> {
+    file_name: Option<&'a str>,
+    file_id: Option<&'a str>,
+    legal_hold: Option<LegalHoldValue>,
+}
+
+impl<'a> UpdateFileLegalHoldBuilder<'a> {
+    /// Update the legal hold status for the specified file.
+    pub fn file(mut self, file: &'a File) -> Self {
+        self.file_name = Some(&file.file_name);
+        self.file_id = Some(&file.file_id);
+        self
+    }
+
+    /// Update the legal hold status for a file with the specified name.
+    ///
+    /// Setting the [file_id](Self::file_id) is also required.
+    pub fn file_name(mut self, file_name: &'a str)
+    -> Result<Self, FileNameValidationError> {
+        self.file_name = Some(validated_file_name(file_name)?);
+        Ok(self)
+    }
+
+    /// Update the legal hold status for a file with the specified ID.
+    ///
+    /// Setting the [file_name](Self::file_name) is also required.
+    pub fn file_id(mut self, file_id: &'a str) -> Self {
+        self.file_id = Some(file_id);
+        self
+    }
+
+    /// Enable a legal hold.
+    pub fn with_legal_hold(mut self) -> Self {
+        self.legal_hold = Some(LegalHoldValue::On);
+        self
+    }
+
+    /// Disable a legal hold.
+    pub fn without_legal_hold(mut self) -> Self {
+        self.legal_hold = Some(LegalHoldValue::Off);
+        self
+    }
+
+    /// Build an [UpdateFileLegalHold] request.
+    ///
+    /// Returns an error if any of the file name, file ID, or legal hold status
+    /// are not specified.
+    pub fn build(self) -> Result<UpdateFileLegalHold<'a>, MissingData> {
+        let file_name = self.file_name.ok_or(MissingData::new("file_name"))?;
+        let file_id = self.file_id.ok_or(MissingData::new("file_id"))?;
+        let legal_hold = self.legal_hold.ok_or(MissingData::new("legal_hold"))?;
+
+        Ok(UpdateFileLegalHold {
+            file_name,
+            file_id,
+            legal_hold,
+        })
+    }
+}
+
+// TODO: B2 returns the same data we sent it. Not sure there's a reason to do
+// the same - change or continue returning ()?
+pub async fn update_file_legal_hold<'a, C, E>(
+    auth: &mut Authorization<C>,
+    file_update: UpdateFileLegalHold<'a>
+) -> Result<(), Error<E>>
+    where C: HttpClient<Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    require_capability!(auth, Capability::WriteFileLegalHolds);
+
+    let res = auth.client.post(auth.api_url("b2_update_file_legal_hold"))
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .with_body_json(serde_json::to_value(file_update)?)
+        .send().await?;
+
+    let res: B2Result<UpdateFileLegalHold> = serde_json::from_slice(&res)?;
+    res.map(|_| ()).into()
+}
+
 /// A request to upload a file to B2.
 ///
 /// Use [UploadFileBuilder] to create an `UploadFile`.
@@ -3931,6 +4048,58 @@ mod tests_mocked {
 
         assert_eq!(files.len(), 2);
         assert!(next_req.is_none());
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_update_legal_hold() -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/file.yaml",
+            None, None
+        ).await?;
+
+        let mut auth = create_test_auth(
+            client,
+            vec![Capability::WriteFileLegalHolds]
+        ).await;
+
+        let update = UpdateFileLegalHold::builder()
+            .file_name("test-file.txt")?
+            .file_id(concat!("4_zcd120e962b02c7a577e70e1a_f100e7b2902e23bf1",
+                    "_d20220205_m134630_c002_v0001141_t0007"))
+            .with_legal_hold()
+            .build()?;
+
+        update_file_legal_hold(&mut auth, update).await?;
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_update_legal_hold_fails_when_not_allowed_by_bucket()
+    -> anyhow::Result<()> {
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/file.yaml",
+            None, None
+        ).await?;
+
+        let mut auth = create_test_auth(
+            client,
+            vec![Capability::WriteFileLegalHolds]
+        ).await;
+
+        let update = UpdateFileLegalHold::builder()
+            .file_name("test-file.txt")?
+            .file_id(concat!("4_z8d625eb63be2775577c70e1a_f107f7b2843696d21",
+                "_d20220201_m191409_c002_v0001094_t0020"))
+            .with_legal_hold()
+            .build()?;
+
+        let res = update_file_legal_hold(&mut auth, update).await;
+        assert!(res.is_err());
 
         Ok(())
     }

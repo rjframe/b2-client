@@ -319,6 +319,7 @@ pub enum ErrorCode {
     // 400
     BadBucketId,
     BadRequest, // Also 503
+    BucketMissingFileLock,
     DuplicateBucketName,
     FileNotPresent,
     InvalidBucketId,
@@ -375,6 +376,7 @@ impl ErrorCode {
         match code.as_ref() {
             "bad_bucket_id" => Self::BadBucketId,
             "bad_request" => Self::BadRequest,
+            "bucket_missing_file_lock" => Self::BucketMissingFileLock,
             "duplicate_bucket_name" => Self::DuplicateBucketName,
             "file_not_present" => Self::FileNotPresent,
             "invalid_bucket_id" => Self::InvalidBucketId,
