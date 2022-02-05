@@ -259,12 +259,29 @@ pub enum FileAction {
     Folder,
 }
 
+// TODO: I may want to rename this to FileRetention since it's one of
+// update_file_retention's parameters.
 // This is different than but very similar to bucket::FileRetentionPolicy.
-#[derive(Debug, Deserialize)]
-struct FileRetentionSetting {
+/// Sets the file retention mode and date/time during which the retention rule
+/// applies.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct FileRetentionSetting {
     mode: Option<FileRetentionMode>,
     #[serde(rename = "retainUntilTimestamp")]
     retain_until: Option<i64>,
+}
+
+impl FileRetentionSetting {
+    pub fn new(
+        mode: FileRetentionMode,
+        retain_until: chrono::DateTime<chrono::Utc>
+    ) -> Self {
+        // TODO: Validate that the time is in the future.
+        Self {
+            mode: Some(mode),
+            retain_until: Some(retain_until.timestamp_millis()),
+        }
+    }
 }
 
 // This is different than but very similar to bucket::FileLockConfiguration.
@@ -958,6 +975,8 @@ pub async fn copy_file_part<C, E>(
 /// on a [File].
 ///
 /// Bypassing governance rules requires [Capability::BypassGovernance].
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum BypassGovernance { Yes, No }
 
 /// Delete a version of a file.
@@ -2868,6 +2887,94 @@ pub async fn update_file_legal_hold<'a, C, E>(
     res.map(|_| ()).into()
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateFileRetention<'a> {
+    file_name: &'a str,
+    file_id: &'a str,
+    file_retention: FileRetentionSetting,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bypass_governance: Option<BypassGovernance>,
+}
+
+impl<'a> UpdateFileRetention<'a> {
+    pub fn builder() -> UpdateFileRetentionBuilder<'a> {
+        UpdateFileRetentionBuilder::default()
+    }
+}
+
+#[derive(Default)]
+pub struct UpdateFileRetentionBuilder<'a> {
+    file_name: Option<&'a str>,
+    file_id: Option<&'a str>,
+    file_retention: Option<FileRetentionSetting>,
+    bypass_governance: Option<BypassGovernance>,
+}
+
+impl<'a> UpdateFileRetentionBuilder<'a> {
+    pub fn file(mut self, file: &'a File) -> Self {
+        self.file_name = Some(&file.file_name);
+        self.file_id = Some(&file.file_id);
+        self
+    }
+
+    pub fn file_name(mut self, file_name: &'a str)
+    -> Result<Self, FileNameValidationError> {
+        self.file_name = Some(validated_file_name(file_name)?);
+        Ok(self)
+    }
+
+    pub fn file_id(mut self, file_id: &'a str) -> Self {
+        self.file_id = Some(&file_id);
+        self
+    }
+
+    pub fn file_retention(mut self, retention: FileRetentionSetting) -> Self {
+        self.file_retention = Some(retention);
+        self
+    }
+
+    pub fn bypass_governance(mut self, bypass: BypassGovernance) -> Self {
+        self.bypass_governance = Some(bypass);
+        self
+    }
+
+    pub fn build(self) -> Result<UpdateFileRetention<'a>, MissingData> {
+        let file_name = self.file_name.ok_or(MissingData::new("file_name"))?;
+        let file_id = self.file_id.ok_or(MissingData::new("file_id"))?;
+        let file_retention = self.file_retention
+            .ok_or(MissingData::new("file_retention"))?;
+
+        Ok(UpdateFileRetention {
+            file_name,
+            file_id,
+            file_retention,
+            bypass_governance: self.bypass_governance,
+        })
+    }
+}
+
+// TODO: B2 returns the same data we sent it. Not sure there's a reason to do
+// the same - change or continue returning ()?
+pub async fn update_file_retention<'a, C, E>(
+    auth: &mut Authorization<C>,
+    retention_update: UpdateFileRetention<'a>,
+) -> Result<(), Error<E>>
+    where C: HttpClient<Error=Error<E>>,
+          E: fmt::Debug + fmt::Display,
+{
+    require_capability!(auth, Capability::WriteFileRetentions);
+
+    let res = auth.client.post(auth.api_url("b2_update_file_retention"))
+        .expect("Invalid URL")
+        .with_header("Authorization", &auth.authorization_token)
+        .with_body_json(serde_json::to_value(retention_update)?)
+        .send().await?;
+
+    let res: B2Result<UpdateFileRetention> = serde_json::from_slice(&res)?;
+    res.map(|_| ()).into()
+}
+
 /// A request to upload a file to B2.
 ///
 /// Use [UploadFileBuilder] to create an `UploadFile`.
@@ -4099,6 +4206,73 @@ mod tests_mocked {
             .build()?;
 
         let res = update_file_legal_hold(&mut auth, update).await;
+        assert!(res.is_err());
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_update_file_retention_settings()
+    -> anyhow::Result<()> {
+        use chrono::{Utc, TimeZone as _};
+
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/file.yaml",
+            None, None
+        ).await?;
+
+        let mut auth = create_test_auth(
+            client,
+            vec![Capability::WriteFileRetentions]
+        ).await;
+
+        let retain_until = Utc.ymd(3000, 1, 1).and_hms(0, 0, 0);
+
+        let update = UpdateFileRetention::builder()
+            .file_name("test-file.txt")?
+            .file_id(concat!("4_zcd120e962b02c7a577e70e1a_f100e7b2902e23bf1",
+                "_d20220205_m134630_c002_v0001141_t0007"))
+            .file_retention(FileRetentionSetting::new(
+                FileRetentionMode::Governance,
+                retain_until
+            ))
+            .build()?;
+
+        update_file_retention(&mut auth, update).await?;
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_update_file_retention_settings_fails_when_bucket_disallows()
+    -> anyhow::Result<()> {
+        use chrono::{Utc, TimeZone as _};
+
+        let client = create_test_client(
+            VcrMode::Replay,
+            "test_sessions/file.yaml",
+            None, None
+        ).await?;
+
+        let mut auth = create_test_auth(
+            client,
+            vec![Capability::WriteFileRetentions]
+        ).await;
+
+        let retain_until = Utc.ymd(3000, 1, 1).and_hms(0, 0, 0);
+
+        let update = UpdateFileRetention::builder()
+            .file_name("test-file.txt")?
+            .file_id(concat!("4_z8d625eb63be2775577c70e1a_f107f7b2843696d21",
+                "_d20220201_m191409_c002_v0001094_t0020"))
+            .file_retention(FileRetentionSetting::new(
+                FileRetentionMode::Governance,
+                retain_until
+            ))
+            .build()?;
+
+        let res = update_file_retention(&mut auth, update).await;
         assert!(res.is_err());
 
         Ok(())

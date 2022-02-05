@@ -334,3 +334,55 @@
       date:
         - "Sat, 05 Feb 2022 13:49:24 GMT"
     body: "{\"fileId\":\"4_zcd120e962b02c7a577e70e1a_f100e7b2902e23bf1_d20220205_m134630_c002_v0001141_t0007\",\"fileName\":\"test-file.txt\",\"legalHold\":\"on\"}"
+---
+- Request:
+    method: POST
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_update_file_retention"
+    headers:
+      content-type:
+        - application/json
+      authorization:
+        - hidden-authorization-token
+      user-agent:
+        - rust-b2-client/version; surf
+    body: "{\"fileId\":\"4_z8d625eb63be2775577c70e1a_f107f7b2843696d21_d20220201_m191409_c002_v0001094_t0020\",\"fileName\":\"test-file.txt\",\"fileRetention\":{\"mode\":\"governance\",\"retainUntilTimestamp\":32503680000}}"
+- Response:
+    status: 400
+    version: ~
+    headers:
+      date:
+        - "Sat, 05 Feb 2022 15:33:46 GMT"
+      connection:
+        - close
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      content-type:
+        - application/json;charset=utf-8
+      content-length:
+        - "109"
+    body: "{\"code\":\"bucket_missing_file_lock\",\"message\":\"The bucket is not file lock enabled\",\"status\":400}"
+---
+- Request:
+    method: POST
+    url: "https://api002.backblazeb2.com/b2api/v2/b2_update_file_retention"
+    headers:
+      content-type:
+        - application/json
+      authorization:
+        - hidden-authorization-token
+      user-agent:
+        - rust-b2-client/version; surf
+    body: "{\"fileId\":\"4_zcd120e962b02c7a577e70e1a_f100e7b2902e23bf1_d20220205_m134630_c002_v0001141_t0007\",\"fileName\":\"test-file.txt\",\"fileRetention\":{\"mode\":\"governance\",\"retainUntilTimestamp\":32503680000000}}"
+- Response:
+    status: 200
+    version: ~
+    headers:
+      content-type:
+        - application/json;charset=UTF-8
+      date:
+        - "Sat, 05 Feb 2022 15:44:28 GMT"
+      cache-control:
+        - "max-age=0, no-cache, no-store"
+      content-length:
+        - "228"
+    body: "{\"fileId\":\"4_zcd120e962b02c7a577e70e1a_f100e7b2902e23bf1_d20220205_m134630_c002_v0001141_t0007\",\"fileName\":\"test-file.txt\",\"fileRetention\":{\"mode\":\"governance\",\"retainUntilTimestamp\":32503680000000}}"

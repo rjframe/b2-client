@@ -797,6 +797,7 @@ pub struct FileLockConfiguration {
 
 /// The B2 mode of a file's retention policy.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum FileRetentionMode {
     Governance,
     Compliance,

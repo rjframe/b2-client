@@ -52,17 +52,14 @@ All source code is licensed under the terms of the
 
 ### Installation
 
-The first tagged release will come after the full API is supported. To use this
-library now, you'll need to clone the git repository and add it as a path-based
-dependency.
+The full B2 API is supported. I have a few tasks to complete prior to listing
+this on the Cargo registry, so for now you need to clone the git repository and
+add it as a path-based dependency.
 
 ```toml
 [dependencies]
 b2-client = { path = "../b2-client" }
 ```
-
-If you need something that's not yet implemented, send a patch or an issue and
-I'll prioritize it.
 
 To use a pre-packaged HTTP client, choose the backend via the relevant feature.
 Supported features are
