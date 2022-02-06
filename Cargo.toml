@@ -2,7 +2,7 @@
 name = "b2-client"
 description = "HTTP client-agnostic Backblaze B2 client library"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 # TODO: TLS support for all clients.
 # TODO: Add awc?
@@ -14,26 +14,30 @@ with_hyper = [ "hyper", "hyper-tls", "tokio", "http" ]
 with_isahc = [ "isahc" ]
 
 [dependencies]
-surf = { version = "2.3.1", optional = true }
-async-std = { version = "1.10.0", optional = true }
+surf = { version = "2.3.1", optional = true , features = [
+    "curl-client",
+], default-features = false }
+async-std = { version = "1.10.0", optional = true, features = [
+    "std"
+], default-features = false }
 
 # TODO: Can I remove runtime?
 hyper = { version = "0.14.13", optional = true, features = [
     "client",
     "http1",
     "runtime",
-] }
+], default-features = false }
 hyper-tls = { version = "0.5.0", optional = true }
-# TODO: Figure out what features I actually need.
 tokio = { version = "1.12.0", optional = true, features = [ "fs", "io-util" ] }
-http = { version = "0.2.5", optional = true }
+http = { version = "0.2.5", optional = true, default-features = false }
 
-isahc = { version = "1.5.0", optional = true }
+isahc = { version = "1.5.0", optional = true, features = [
+], default-features = false }
 
 async-trait = "0.1.51"
 # TODO: Replace with std::time if feasible.
 chrono = { version = "0.4.19", features = [ "serde" ] }
-http-types = "2.12.0"
+http-types = { version = "2.12.0", default-features = false }
 serde = { version = "1.0.130", features = [ "derive" ] }
 serde_json = "1.0.68"
 base64 = "0.13.0"
