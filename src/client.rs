@@ -74,6 +74,15 @@ pub trait HttpClient
 // TODO: Use http_types::{HeaderName, HeaderValue} instead of Strings?
 pub type HeaderMap = HashMap<String, String>;
 
+macro_rules! default_user_agent {
+    ($client:literal) => {
+        format!("rust-b2-client/{}; {}",
+            option_env!("CARGO_PKG_VERSION").unwrap_or("unknown"),
+            $client
+        )
+    };
+}
+
 #[cfg(feature = "with_surf")]
 mod surf_client {
     use std::path::PathBuf;
@@ -170,15 +179,11 @@ mod surf_client {
 
         /// Create a new `SurfClient`.
         fn new() -> Self {
-            let user_agent = format!("rust-b2-client/{}; surf",
-                option_env!("CARGO_PKG_VERSION").unwrap_or("unknown")
-            );
-
             Self {
                 client: surf::Client::new(),
                 req: None,
                 body: None,
-                user_agent,
+                user_agent: default_user_agent!("surf"),
             }
         }
 
@@ -410,17 +415,13 @@ mod hyper_client {
             let client = hyper::Client::builder()
                 .build::<_, hyper::Body>(https);
 
-            let user_agent = format!("rust-b2-client/{}; hyper",
-                option_env!("CARGO_PKG_VERSION").unwrap_or("unknown")
-            );
-
             Self {
                 client,
                 method: None,
                 url: String::default(),
                 headers: vec![],
                 body: None,
-                user_agent,
+                user_agent: default_user_agent!("hyper"),
             }
         }
 
