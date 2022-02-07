@@ -37,29 +37,14 @@ pub trait HttpClient
     /// Create a new `HttpClient`.
     fn new() -> Self;
 
-    /// Create an HTTP `CONNECT` request to the specified URL.
-    fn connect(&mut self, url: impl AsRef<str>)
-    -> Result<&mut Self, ValidationError>;
-    /// Create an HTTP `DELETE` request to the specified URL.
-    fn delete(&mut self, url: impl AsRef<str>)
-    -> Result<&mut Self, ValidationError>;
     /// Create an HTTP `GET` request to the specified URL.
     fn get(&mut self, url: impl AsRef<str>)
     -> Result<&mut Self, ValidationError>;
     /// Create an HTTP `HEAD` request to the specified URL.
     fn head(&mut self, url: impl AsRef<str>)
     -> Result<&mut Self, ValidationError>;
-    /// Create an HTTP `PATCH` request to the specified URL.
-    fn patch(&mut self, url: impl AsRef<str>)
-    -> Result<&mut Self, ValidationError>;
     /// Create an HTTP `POST` request to the specified URL.
     fn post(&mut self, url: impl AsRef<str>)
-    -> Result<&mut Self, ValidationError>;
-    /// Create an HTTP `PUT` request to the specified URL.
-    fn put(&mut self, url: impl AsRef<str>)
-    -> Result<&mut Self, ValidationError>;
-    /// Create an HTTP `TRACE` request to the specified URL.
-    fn trace(&mut self, url: impl AsRef<str>)
     -> Result<&mut Self, ValidationError>;
 
     /// Add a header to the request.
@@ -197,14 +182,9 @@ mod surf_client {
             }
         }
 
-        gen_method_func!(connect, Connect);
-        gen_method_func!(delete, Delete);
         gen_method_func!(get, Get);
         gen_method_func!(head, Head);
-        gen_method_func!(patch, Patch);
         gen_method_func!(post, Post);
-        gen_method_func!(put, Put);
-        gen_method_func!(trace, Trace);
 
         fn with_header<S: AsRef<str>>(&mut self, name: S, value: S)
         -> &mut Self {
@@ -444,14 +424,9 @@ mod hyper_client {
             }
         }
 
-        gen_method_func!(connect, CONNECT);
-        gen_method_func!(delete, DELETE);
         gen_method_func!(get, GET);
         gen_method_func!(head, HEAD);
-        gen_method_func!(patch, PATCH);
         gen_method_func!(post, POST);
-        gen_method_func!(put, PUT);
-        gen_method_func!(trace, TRACE);
 
         /// Add a header to the request.
         fn with_header<S: AsRef<str>>(&mut self, name: S, value: S)

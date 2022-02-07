@@ -38,14 +38,9 @@ impl HttpClient for FakeClient {
 
     fn new() -> Self { FakeClient }
 
-    gen_send_func!(connect);
-    gen_send_func!(delete);
     gen_send_func!(get);
     gen_send_func!(head);
-    gen_send_func!(patch);
     gen_send_func!(post);
-    gen_send_func!(put);
-    gen_send_func!(trace);
 
     fn with_header<S: AsRef<str>>(&mut self, _name: S, _value: S) -> &mut Self {
         self
