@@ -9,27 +9,33 @@ tasks:
       curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain none -y
   - install-stable: |
       $HOME/.cargo/bin/rustup toolchain install stable --allow-downgrade --profile minimal --component clippy
-  - build-stable: |
+  - test-stable-surf: |
+      cd $HOME/b2-client
+      $HOME/.cargo/bin/cargo +stable test --features=with_surf
+  - build-stable-hyper: |
       cd $HOME/b2-client
       $HOME/.cargo/bin/cargo +stable build --features=with_hyper
-  - test-stable: |
+  - build-stable-isahc: |
       cd $HOME/b2-client
-      $HOME/.cargo/bin/cargo +stable test --features=with_hyper
-  - test-stable-no-default-features: |
+      $HOME/.cargo/bin/cargo +stable build --features=with_isahc
+  - build-stable-no-features: |
       cd $HOME/b2-client
-      $HOME/.cargo/bin/cargo +stable test --no-default-features
+      $HOME/.cargo/bin/cargo +stable build
   - clippy-stable: |
       cd $HOME/b2-client
-      $HOME/.cargo/bin/cargo +stable clippy --features=with_hyper
+      $HOME/.cargo/bin/cargo +stable clippy --features=with_surf
   - install-nightly: |
       cd $HOME/b2-client
       $HOME/.cargo/bin/rustup toolchain install nightly --allow-downgrade --profile minimal
-  - build-nightly: |
+  - test-nightly-surf: |
+      cd $HOME/b2-client
+      $HOME/.cargo/bin/cargo +nightly test --features=with_surf
+  - build-nightly-hyper: |
       cd $HOME/b2-client
       $HOME/.cargo/bin/cargo +nightly build --features=with_hyper
-  - test-nightly: |
+  - build-nightly-isahc: |
       cd $HOME/b2-client
-      $HOME/.cargo/bin/cargo +nightly test --features=with_hyper
-  - test-nightly-no-default-features: |
+      $HOME/.cargo/bin/cargo +nightly build --features=with_isahc
+  - build-nightly-no-features: |
       cd $HOME/b2-client
-      $HOME/.cargo/bin/cargo +nightly test --no-default-features
+      $HOME/.cargo/bin/cargo +nightly build
