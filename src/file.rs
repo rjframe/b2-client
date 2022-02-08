@@ -1261,8 +1261,8 @@ impl<'a> DownloadFileBuilder<'a> {
     ///
     /// If including this header will exceed the 7,000 byte header limit (2,048
     /// bytes if using server-side encryption), the request will be rejected.
-    pub fn content_type(mut self, content_type: Mime) -> Self {
-        self.content_type = Some(content_type.to_string());
+    pub fn content_type(mut self, content_type: impl Into<Mime>) -> Self {
+        self.content_type = Some(content_type.into().to_string());
         self
     }
 
@@ -1758,8 +1758,8 @@ impl<'a> DownloadAuthorizationRequestBuilder<'a> {
     }
 
     /// If specified, download requests must have this content type.
-    pub fn content_type(mut self, content_type: Mime) -> Self {
-        self.b2_content_type = Some(content_type.to_string());
+    pub fn content_type(mut self, content_type: impl Into<Mime>) -> Self {
+        self.b2_content_type = Some(content_type.into().to_string());
         self
     }
 
@@ -3230,8 +3230,8 @@ impl<'a> UploadFileBuilder<'a> {
     ///
     /// B2-recognized content-types can be viewed
     /// [here](https://www.backblaze.com/b2/docs/content-types.html)
-    pub fn content_type(mut self, content_type: Mime) -> Self {
-        self.content_type = Some(content_type.to_string());
+    pub fn content_type(mut self, content_type: impl Into<Mime>) -> Self {
+        self.content_type = Some(content_type.into().to_string());
         self
     }
 
