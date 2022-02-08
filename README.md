@@ -44,8 +44,11 @@ account. You will want to mock the B2 servers in your code's tests.
 
 ## License
 
-All source code is licensed under the terms of the
+All library source code is licensed under the terms of the
 [MPL 2.0 license](LICENSE.txt).
+
+The source code of examples is licensed under the terms of the
+[MIT license](examples/LICENSE.txt).
 
 
 ## Getting Started
@@ -99,6 +102,10 @@ their pre-recorded sessions if the environment variables are set.
 * Error handling is bifurcated a bit; for example, uploading a file without the
   `WriteFiles` capability will return `Error::Unauthorized`, but uploading to a
   private bucket without the `ReadFiles` capabillity returns `Error::B2Error`.
+
+  This is due to the fact that we can validate authorization to write prior to
+  making the API call, but cannot pre-validate the authorization to read. This
+  is solveable; it just requires determining the best method to merge them.
 * Small design inconsistencies, some private data should be public, etc.
 
 
@@ -122,5 +129,5 @@ a draft PR.
 
 ## Related Projects
 
-* [backblaze-b2](https://crates.io/crates/backblaze-b2): Built on Hyper
-* [raze](https://crates.io/crates/raze): Built on reqwest
+* [backblaze-b2](https://crates.io/crates/backblaze-b2): Uses Hyper
+* [raze](https://crates.io/crates/raze): Uses reqwest
