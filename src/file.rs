@@ -1048,7 +1048,6 @@ pub async fn download_file_headers_by_id<C, E>(
     Ok(res.1)
 }
 
-// TODO: Implement download_file_headers_by_name
 #[derive(Debug)]
 enum FileHandle<'a> {
     Id(&'a str),
