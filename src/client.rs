@@ -25,6 +25,8 @@ pub use surf_client::SurfClient;
 #[cfg(feature = "with_hyper")]
 pub use hyper_client::HyperClient;
 
+#[cfg(feature = "with_isahc")]
+pub use isahc_client::IsahcClient;
 
 /// A trait that wraps an HTTP client to send HTTP requests.
 #[async_trait::async_trait]
@@ -35,7 +37,7 @@ pub trait HttpClient
     type Error;
 
     /// Create a new `HttpClient`.
-    fn new() -> Self;
+    fn new() -> Self; // TODO: Requre a Default impl instead.
 
     /// Create an HTTP `GET` request to the specified URL.
     fn get(&mut self, url: impl AsRef<str>)
@@ -493,10 +495,210 @@ mod hyper_client {
     }
 }
 
-// TODO: Implement for isahc
 #[cfg(feature = "with_isahc")]
 mod isahc_client {
-}
+    use super::*;
+    use isahc::http::{
+        header::{HeaderName, HeaderValue},
+        method::Method,
+        request::Builder as RequestBuilder,
+    };
 
-//#[cfg(feature = "with_isahc")]
-//pub use isahc_client::IsahcRequest;
+    #[derive(Debug)]
+    enum Body {
+        Bytes(Vec<u8>),
+        Json(serde_json::Value),
+        File(PathBuf),
+    }
+
+    #[derive(Debug)]
+    pub struct IsahcClient {
+        client: isahc::HttpClient,
+        req: Option<RequestBuilder>,
+        user_agent: String,
+        body: Option<Body>,
+        headers: Vec<(HeaderName, HeaderValue)>,
+    }
+
+    impl Clone for IsahcClient {
+        /// Clone an `IsahcClient` object.
+        ///
+        /// The client itself and the user-agent string are cloned. The current
+        /// request is not.
+        fn clone(&self) -> Self {
+            Self {
+                client: self.client.clone(),
+                req: None,
+                user_agent: self.user_agent.clone(),
+                body: None,
+                headers: Vec::new(),
+            }
+        }
+    }
+
+    impl IsahcClient {
+        async fn send_impl(&mut self, keep_headers: bool)
+        -> Result<(
+            Vec<u8>, Option<HeaderMap>),
+            <Self as super::HttpClient>::Error
+        > {
+            use futures_lite::AsyncReadExt as _;
+
+            if let Some(mut req) = self.req.take() {
+                for (name, value) in &self.headers {
+                    req = req.header(name, value);
+                }
+
+                req = req.header("User-Agent", &self.user_agent);
+
+                let body = if let Some(body) = self.body.take() {
+                    match body {
+                        Body::Bytes(bytes) => Some(bytes),
+                        Body::Json(json) => Some(serde_json::to_vec(&json)?),
+                        Body::File(path) => {
+                            // TODO: Use async_std?
+                            use std::{fs::File, io::Read as _};
+
+                            let mut file = File::open(path)?;
+                            let mut buf: Vec<u8> = vec![];
+                            file.read_to_end(&mut buf)?;
+
+                            Some(buf)
+                        },
+                    }
+                } else {
+                    None
+                };
+
+                let (mut parts, body) = match body {
+                    Some(body) => self.client.send_async(req.body(body)?)
+                        .await?.into_parts(),
+                    None => self.client.send_async(
+                        req.body(isahc::AsyncBody::empty())?
+                    ).await?.into_parts(),
+                };
+
+                let headers = if keep_headers {
+                    let mut headers = HeaderMap::new();
+
+                    headers.extend(
+                        parts.headers.drain()
+                        .filter(|(k, _)| k.is_some())
+                        .map(|(k, v)|
+                            // TODO: Ensure that all possible header values from
+                            // B2 are required to be valid strings on their
+                            // side.
+                            (
+                                k.unwrap().to_string(),
+                                v.to_str().unwrap().to_owned()
+                            )
+                        )
+                    );
+
+                    Some(headers)
+                } else {
+                    None
+                };
+
+                let mut buf = Vec::new();
+                body.bytes().read_to_end(&mut buf).await?;
+
+                // self.req and self.body had their values reset already; we
+                // only need to clear the list of headers and we're ready for
+                // the next request.
+                self.headers.clear();
+
+                Ok((buf, headers))
+            } else {
+                Err(Error::NoRequest)
+            }
+        }
+    }
+
+    macro_rules! gen_method_func {
+        ($func:ident, $method:ident) => {
+            fn $func(&mut self, url: impl AsRef<str>)
+            -> Result<&mut Self, ValidationError> {
+                self.req = Some(
+                    RequestBuilder::new()
+                        .method(Method::$method)
+                        .uri(url.as_ref())
+                );
+
+                Ok(self)
+            }
+        };
+    }
+
+    #[async_trait::async_trait]
+    impl HttpClient for IsahcClient
+        where Self: Clone + Sized,
+    {
+        type Error = Error<isahc::Error>;
+
+        /// Create a new `HttpClient`.
+        fn new() -> Self {
+            Self {
+                client: isahc::HttpClient::new().unwrap(),
+                req: None,
+                user_agent: default_user_agent!("isahc"),
+                body: None,
+                headers: Vec::new(),
+            }
+        }
+
+        gen_method_func!(get, GET);
+        gen_method_func!(head, HEAD);
+        gen_method_func!(post, POST);
+
+        fn with_header<S: AsRef<str>>(&mut self, name: S, value: S)
+        -> &mut Self {
+            use std::str::FromStr as _;
+
+            let name = HeaderName::from_str(name.as_ref()).unwrap();
+            let value = HeaderValue::from_str(value.as_ref()).unwrap();
+
+            self.headers.push((name, value));
+            self
+        }
+
+        fn with_body(&mut self, data: impl Into<Vec<u8>>) -> &mut Self {
+            self.body = Some(Body::Bytes(data.into()));
+            self
+        }
+
+        fn with_body_json(&mut self, body: serde_json::Value) -> &mut Self {
+            self.body = Some(Body::Json(body));
+            self
+        }
+
+        fn read_body_from_file(&mut self, path: impl Into<PathBuf>)
+        -> &mut Self {
+            self.body = Some(Body::File(path.into()));
+            self
+        }
+
+        fn user_agent(&mut self, user_agent_string: impl Into<String>)
+        -> Result<&mut Self, ValidationError> {
+            let user_agent = user_agent_string.into();
+
+            if ! user_agent.is_empty() {
+                self.user_agent = user_agent;
+                Ok(self)
+            } else {
+                Err(ValidationError::MissingData(
+                    "User-Agent is required".into()
+                ))
+            }
+        }
+
+        async fn send(&mut self) -> Result<Vec<u8>, Self::Error> {
+            self.send_impl(false).await.map(|v| v.0)
+        }
+
+        async fn send_keep_headers(&mut self)
+        -> Result<(Vec<u8>, HeaderMap), Self::Error> {
+            self.send_impl(true).await.map(|v| (v.0, v.1.unwrap()))
+        }
+    }
+}

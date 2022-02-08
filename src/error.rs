@@ -305,6 +305,20 @@ impl From<hyper::Error> for Error<hyper::Error> {
     }
 }
 
+#[cfg(feature = "with_isahc")]
+impl From<isahc::Error> for Error<isahc::Error> {
+    fn from(e: isahc::Error) -> Self {
+        Self::Client(e)
+    }
+}
+
+#[cfg(feature = "with_isahc")]
+impl From<isahc::http::Error> for Error<isahc::Error> {
+    fn from(e: isahc::http::Error) -> Self {
+        Self::Client(e.into())
+    }
+}
+
 impl<E> From<ValidationError> for Error<E>
     where E: fmt::Debug + fmt::Display,
 {

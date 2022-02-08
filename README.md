@@ -4,7 +4,7 @@ B2-client provides a Rust API to Backblaze B2 services, backed by any HTTP
 client.
 
 Support for [Hyper](https://crates.io/crates/hyper),
-[Isahc](https://crates.io/crates/isahc) (soon), and
+[Isahc](https://crates.io/crates/isahc), and
 [Surf](https://crates.io/crates/surf) are implemented out of the box.
 
 The official repository for B2-client is on SourceHut at
@@ -64,24 +64,23 @@ b2-client = { path = "../b2-client" }
 To use a pre-packaged HTTP client, choose the backend via the relevant feature.
 Supported features are
 
-* `with_surf`
 * `with_hyper`
+* `with_surf`
+* `with_isahc`
 
 This list will eventually use the lower-level client libraries instead (e.g., h1
-and h2 instead of hyper).
+instead of hyper).
 
-Surf is currently selected by default. To use a different backend, supply the
-`--no-default-features` flag as well as the feature for the backend you desire.
-
-To use your own HTTP backend, implement the `HttpClient` trait and build with
-the `--no-default-features` flag.
+There is no default client, so you must choose one of the above features or a
+custom HTTP client. To use your own HTTP backend, simply implement the
+`HttpClient` trait.
 
 
 ### Testing
 
-Run `cargo test` to run all tests (with default features); the `surf` backend is
-used to test fake (pre-recorded) responses against the B2 API, so no tests are
-making real API calls.
+API calls are faked via pre-recorded sessions using the surf backend, so to run
+all tests run them with `--features=with_surf`. No test runs agains the live B2
+service by default.
 
 To run a test against the live B2 API, set the environment variables
 `B2_CLIENT_TEST_KEY` and `B2_CLIENT_TEST_KEY_ID` to a key/id pair capable of
@@ -91,8 +90,8 @@ buckets), don't run a test against the live API unless you know what it's doing,
 especially if you have production keys or buckets on your account.
 
 A few tests will need minor modifications or setup to run against the B2 API
-(e.g., deleting a bucket), and a few tests will not pass their pre-recorded
-sessions with the environment variables set.
+(e.g., deleting a bucket, changing the bucket ID), and a few tests will not pass
+their pre-recorded sessions if the environment variables are set.
 
 
 ### Known Issues

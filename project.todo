@@ -1,5 +1,6 @@
 Project:
-    ☐ Support Isahc
+    ☐ Determine what tasks must be accomplished prior to 0.1.0
+    ✓ Support Isahc @done(2022-02-08 10:42) @project(Project)
     ☐ Work with B2 metadata headers
     ☐ Default clients: use low-level libraries (h1, h2, etc.) rather than the libraries built on top of them.
     ☐ Check derived traits on objects - ensure consistency.
@@ -13,6 +14,7 @@ Project:
     ☐ Allow uploads via streams/chunked/buffers/local filesystem
     ✓ b2_download_file_by_name allows using a DownloadAuthorization for files with prefixes covered by that auth; we should support that too. @done(2022-02-05 18:34) @project(Project)
     ☐ Check: did I intentionally keep Request in name KeyListRequest when I removed the others? If so, do I still agree?
+    ☐ Add examples (MIT-licensed) using different client backends.
 
 ＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿
 Archive:
