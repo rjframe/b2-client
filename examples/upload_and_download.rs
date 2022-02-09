@@ -3,40 +3,12 @@ use std::env;
 use anyhow::anyhow;
 use b2_client::{self as b2, client, HttpClient};
 
+
 fn usage() -> String{
     concat!("Usage: upload_and_download <bucket ID>\n\n",
         "Expects environment variables `B2_CLIENT_KEY` and `B2_CLIENT_KEY_ID`",
         " to be defined.").into()
 }
-
-
-fn main() -> anyhow::Result<()> { main_runner() }
-
-#[cfg(feature = "with_surf")]
-fn main_runner() -> anyhow::Result<()> { async_std::task::block_on(do_main()) }
-
-#[cfg(feature = "with_hyper")]
-fn main_runner() -> anyhow::Result<()> {
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(do_main())
-}
-
-#[cfg(feature = "with_isahc")]
-fn main_runner() -> anyhow::Result<()> { async_std::task::block_on(do_main()) }
-
-
-#[cfg(feature = "with_surf")]
-pub fn client() -> client::SurfClient { client::SurfClient::new() }
-
-#[cfg(feature = "with_hyper")]
-pub fn client() -> client::HyperClient { client::HyperClient::new() }
-
-#[cfg(feature = "with_isahc")]
-pub fn client() -> client::IsahcClient { client::IsahcClient::new() }
-
 
 async fn do_main() -> anyhow::Result<()> {
     let bucket_id = {
@@ -50,11 +22,7 @@ async fn do_main() -> anyhow::Result<()> {
         let key = env::var("B2_CLIENT_KEY").ok();
         let key_id = env::var("B2_CLIENT_KEY_ID").ok();
 
-        if key.is_none() || key_id.is_none() {
-            return Err(anyhow!(concat!("B2 key and ID expected in ",
-                "environment variables `B2_CLIENT_KEY` and ",
-                "`B2_CLIENT_KEY_ID`")));
-        }
+        if key.is_none() || key_id.is_none() { return Err(anyhow!(usage())); }
 
         (key.unwrap(), key_id.unwrap())
     };
@@ -88,3 +56,84 @@ async fn do_main() -> anyhow::Result<()> {
     println!("\nUpload and download is complete.");
     Ok(())
 }
+
+
+fn main() -> anyhow::Result<()> { main_runner() }
+
+#[cfg(any(feature = "with_surf", feature = "with_isahc"))]
+fn main_runner() -> anyhow::Result<()> { async_std::task::block_on(do_main()) }
+
+#[cfg(feature = "with_hyper")]
+fn main_runner() -> anyhow::Result<()> {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(do_main())
+}
+
+#[cfg(feature = "with_surf")]
+pub fn client() -> client::SurfClient { client::SurfClient::new() }
+
+#[cfg(feature = "with_hyper")]
+pub fn client() -> client::HyperClient { client::HyperClient::new() }
+
+#[cfg(feature = "with_isahc")]
+pub fn client() -> client::IsahcClient { client::IsahcClient::new() }
+
+
+// Allow us to build when running `cargo test` on the main project without
+// features. You can ignore this.
+#[cfg(not(any(feature="with_hyper", feature="with_surf",
+    feature="with_isahc")))]
+mod empty {
+    pub fn main_runner() -> anyhow::Result<()> {
+        Err(anyhow::anyhow!(
+            "You must compile this example with an HTTP client"
+        ))
+    }
+
+    pub fn client() -> NoClient { NoClient }
+
+    #[derive(Default, Clone)]
+    pub struct NoClient;
+
+    #[async_trait::async_trait]
+    impl b2_client::HttpClient for NoClient {
+        type Error = b2_client::Error<&'static str>;
+
+        /// Create a new `HttpClient`.
+        fn new() -> Self { Self }
+
+        fn get(&mut self, url: impl AsRef<str>)
+        -> Result<&mut Self, b2_client::error::ValidationError> { Ok(self) }
+        fn head(&mut self, url: impl AsRef<str>)
+        -> Result<&mut Self, b2_client::error::ValidationError> { Ok(self) }
+        fn post(&mut self, url: impl AsRef<str>)
+        -> Result<&mut Self, b2_client::error::ValidationError> { Ok(self) }
+
+        fn with_header<S: AsRef<str>>(&mut self, name: S, value: S)
+        -> &mut Self { self }
+        fn with_body(&mut self, data: impl Into<Vec<u8>>)
+        -> &mut Self { self }
+        fn with_body_json(&mut self, body: serde_json::Value)
+        -> &mut Self { self }
+        fn read_body_from_file(&mut self, path: impl Into<std::path::PathBuf>)
+        -> &mut Self { self }
+
+        fn user_agent(&mut self, user_agent_string: impl Into<String>)
+        -> Result<&mut Self, b2_client::error::ValidationError> { Ok(self) }
+
+        async fn send(&mut self) -> Result<Vec<u8>, Self::Error> {
+            Err(b2_client::Error::Client(""))
+        }
+
+        async fn send_keep_headers(&mut self)
+        -> Result<(Vec<u8>, b2_client::client::HeaderMap), Self::Error> {
+            Err(b2_client::Error::Client(""))
+        }
+    }
+}
+#[cfg(not(any(feature="with_hyper", feature="with_surf",
+    feature="with_isahc")))]
+pub use empty::*;
