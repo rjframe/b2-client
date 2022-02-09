@@ -9,7 +9,7 @@ use b2_client::{
     error::{ValidationError, Error},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 struct FakeClient;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -35,8 +35,6 @@ macro_rules! gen_send_func {
 #[async_trait::async_trait]
 impl HttpClient for FakeClient {
     type Error = Error<FakeError>;
-
-    fn new() -> Self { FakeClient }
 
     gen_send_func!(get);
     gen_send_func!(head);

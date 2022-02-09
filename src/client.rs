@@ -31,13 +31,10 @@ pub use isahc_client::IsahcClient;
 /// A trait that wraps an HTTP client to send HTTP requests.
 #[async_trait::async_trait]
 pub trait HttpClient
-    where Self: Clone + Sized,
+    where Self: Default + Clone + Sized,
 {
     /// The HTTP client's Error type.
     type Error;
-
-    /// Create a new `HttpClient`.
-    fn new() -> Self; // TODO: Requre a Default impl instead.
 
     /// Create an HTTP `GET` request to the specified URL.
     fn get(&mut self, url: impl AsRef<str>)
@@ -101,6 +98,18 @@ mod surf_client {
         req: Option<Request>,
         body: Option<Body>,
         user_agent: String,
+    }
+
+    impl Default for SurfClient {
+        /// Create a new `SurfClient`.
+        fn default() -> Self {
+            Self {
+                client: surf::Client::new(),
+                req: None,
+                body: None,
+                user_agent: default_user_agent!("surf"),
+            }
+        }
     }
 
     // Body type for sending; TODO rename to avoid ambiguity?
@@ -178,16 +187,6 @@ mod surf_client {
     impl HttpClient for SurfClient {
         /// Errors that can be returned by a `SurfClient`.
         type Error = Error<surf::Error>;
-
-        /// Create a new `SurfClient`.
-        fn new() -> Self {
-            Self {
-                client: surf::Client::new(),
-                req: None,
-                body: None,
-                user_agent: default_user_agent!("surf"),
-            }
-        }
 
         gen_method_func!(get, Get);
         gen_method_func!(head, Head);
@@ -286,6 +285,24 @@ mod hyper_client {
         headers: Vec<(HeaderName, HeaderValue)>,
         body: Option<Body>,
         user_agent: String,
+    }
+
+    impl Default for HyperClient {
+        /// Create a new `HttpClient`.
+        fn default() -> Self {
+            let https = HttpsConnector::new();
+            let client = hyper::Client::builder()
+                .build::<_, hyper::Body>(https);
+
+            Self {
+                client,
+                method: None,
+                url: String::default(),
+                headers: vec![],
+                body: None,
+                user_agent: default_user_agent!("hyper"),
+            }
+        }
     }
 
     #[derive(Debug, Clone)]
@@ -411,22 +428,6 @@ mod hyper_client {
     impl HttpClient for HyperClient {
         type Error = Error<hyper::Error>;
 
-        /// Create a new `HttpClient`.
-        fn new() -> Self {
-            let https = HttpsConnector::new();
-            let client = hyper::Client::builder()
-                .build::<_, hyper::Body>(https);
-
-            Self {
-                client,
-                method: None,
-                url: String::default(),
-                headers: vec![],
-                body: None,
-                user_agent: default_user_agent!("hyper"),
-            }
-        }
-
         gen_method_func!(get, GET);
         gen_method_func!(head, HEAD);
         gen_method_func!(post, POST);
@@ -518,6 +519,19 @@ mod isahc_client {
         user_agent: String,
         body: Option<Body>,
         headers: Vec<(HeaderName, HeaderValue)>,
+    }
+
+    impl Default for IsahcClient {
+        /// Create a new `HttpClient`.
+        fn default() -> Self {
+            Self {
+                client: isahc::HttpClient::new().unwrap(),
+                req: None,
+                user_agent: default_user_agent!("isahc"),
+                body: None,
+                headers: Vec::new(),
+            }
+        }
     }
 
     impl Clone for IsahcClient {
@@ -635,17 +649,6 @@ mod isahc_client {
         where Self: Clone + Sized,
     {
         type Error = Error<isahc::Error>;
-
-        /// Create a new `HttpClient`.
-        fn new() -> Self {
-            Self {
-                client: isahc::HttpClient::new().unwrap(),
-                req: None,
-                user_agent: default_user_agent!("isahc"),
-                body: None,
-                headers: Vec::new(),
-            }
-        }
 
         gen_method_func!(get, GET);
         gen_method_func!(head, HEAD);

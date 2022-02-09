@@ -1,7 +1,7 @@
 use std::env;
 
 use anyhow::anyhow;
-use b2_client::{self as b2, client, HttpClient};
+use b2_client::{self as b2, client};
 
 
 fn usage() -> String{
@@ -73,13 +73,13 @@ fn main_runner() -> anyhow::Result<()> {
 }
 
 #[cfg(feature = "with_surf")]
-pub fn client() -> client::SurfClient { client::SurfClient::new() }
+pub fn client() -> client::SurfClient { client::SurfClient::default() }
 
 #[cfg(feature = "with_hyper")]
-pub fn client() -> client::HyperClient { client::HyperClient::new() }
+pub fn client() -> client::HyperClient { client::HyperClient::default() }
 
 #[cfg(feature = "with_isahc")]
-pub fn client() -> client::IsahcClient { client::IsahcClient::new() }
+pub fn client() -> client::IsahcClient { client::IsahcClient::default() }
 
 
 // Allow us to build when running `cargo test` on the main project without
@@ -101,9 +101,6 @@ mod empty {
     #[async_trait::async_trait]
     impl b2_client::HttpClient for NoClient {
         type Error = b2_client::Error<&'static str>;
-
-        /// Create a new `HttpClient`.
-        fn new() -> Self { Self }
 
         fn get(&mut self, url: impl AsRef<str>)
         -> Result<&mut Self, b2_client::error::ValidationError> { Ok(self) }

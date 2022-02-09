@@ -63,7 +63,7 @@
 //!     let key = env::var("B2_KEY").ok().unwrap();
 //!     let key_id = env::var("B2_KEY_ID").ok().unwrap();
 //!
-//!     let client = b2::client::SurfClient::new();
+//!     let client = b2::client::SurfClient::default();
 //!     let mut auth = b2::authorize_account(client, &key, &key_id).await?;
 //!
 //!     let mut upload_auth = b2::get_upload_authorization(&mut auth, &bucket)
@@ -95,7 +95,7 @@
 //!     let key = env::var("B2_KEY").ok().unwrap();
 //!     let key_id = env::var("B2_KEY_ID").ok().unwrap();
 //!
-//!     let client = b2::client::SurfClient::new();
+//!     let client = b2::client::SurfClient::default();
 //!     let mut auth = b2::authorize_account(client, &key, &key_id).await?;
 //!
 //!     let file = b2::StartLargeFile::builder()
@@ -1862,8 +1862,11 @@ struct ProtoDownloadAuthorization {
 /// # };
 /// # #[cfg(feature = "with_surf")]
 /// # async fn f() -> anyhow::Result<()> {
-/// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
-///     .await?;
+/// let mut auth = authorize_account(
+///     SurfClient::default(),
+///     "MY KEY ID",
+///     "MY KEY"
+/// ).await?;
 ///
 /// let download_req = DownloadAuthorizationRequest::builder()
 ///     .bucket_id("MY BUCKET ID")

@@ -181,7 +181,7 @@ pub(crate) mod test_utils {
         let surf = surf::Client::new()
             .with(vcr);
 
-        let client = SurfClient::new()
+        let client = SurfClient::default()
             .with_client(surf);
 
         Ok(client)

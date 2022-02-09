@@ -11,7 +11,7 @@ Project:
             ☐ file::FileRetentionSetting::new() -> ensure time is in the future
             ☐ Document file::StartLargeFileBuilder::content_disposition()
             ☐ Support custom headers in file::UploadFile
-            ☐ Replace client::HttpClient::new() with required Default implementation
+            ✓ Replace client::HttpClient::new() with required Default implementation @done(2022-02-09 10:56) @project(Project \ Pre-0.1.0 \ In-source TODOs)
             ☐ client::HttpClient::with_header() needs to return error type
             ☐ Document CORS rule requirements for bucket::CorsRuleBuilder
             ☐ Either separate all errors that use error::ValidationError::BadRequest or improve its message

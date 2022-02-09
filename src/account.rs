@@ -237,8 +237,11 @@ pub enum Capability {
 /// # };
 /// # #[cfg(feature = "with_surf")]
 /// # async fn f() -> anyhow::Result<()> {
-/// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
-///     .await?;
+/// let mut auth = authorize_account(
+///     SurfClient::default(),
+///     "MY KEY ID",
+///     "MY KEY"
+/// ).await?;
 ///
 /// let removed_key = delete_key_by_id(&mut auth, "OTHER KEY ID").await?;
 /// # Ok(()) }
@@ -541,8 +544,11 @@ impl NewlyCreatedKey {
 /// # };
 /// # #[cfg(feature = "with_surf")]
 /// # async fn f() -> anyhow::Result<()> {
-/// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
-///     .await?;
+/// let mut auth = authorize_account(
+///     SurfClient::default(),
+///     "MY KEY ID",
+///     "MY KEY"
+/// ).await?;
 ///
 /// let create_key_request = CreateKey::builder()
 ///     .name("my-key")?
@@ -591,8 +597,11 @@ pub async fn create_key<C, E>(
 /// # };
 /// # #[cfg(feature = "with_surf")]
 /// # async fn f() -> anyhow::Result<()> {
-/// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
-///     .await?;
+/// let mut auth = authorize_account(
+///     SurfClient::default(),
+///     "MY KEY ID",
+///     "MY KEY"
+/// ).await?;
 ///
 /// let create_key_request = CreateKey::builder()
 ///     .name("my-key")?
@@ -629,8 +638,11 @@ pub async fn delete_key<C, E>(auth: &mut Authorization<C>, key: Key)
 /// # };
 /// # #[cfg(feature = "with_surf")]
 /// # async fn f() -> anyhow::Result<()> {
-/// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
-///     .await?;
+/// let mut auth = authorize_account(
+///     SurfClient::default(),
+///     "MY KEY ID",
+///     "MY KEY"
+/// ).await?;
 ///
 /// let removed_key = delete_key_by_id(&mut auth, "OTHER KEY ID").await?;
 /// # Ok(()) }
@@ -770,8 +782,11 @@ struct KeyList {
 /// # };
 /// # #[cfg(feature = "with_surf")]
 /// # async fn f() -> anyhow::Result<()> {
-/// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
-///     .await?;
+/// let mut auth = authorize_account(
+///     SurfClient::default(),
+///     "MY KEY ID",
+///     "MY KEY"
+/// ).await?;
 ///
 /// let req = ListKeys::builder()
 ///     .max_keys(500)?
