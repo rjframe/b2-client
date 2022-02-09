@@ -76,6 +76,27 @@ impl From<url::ParseError> for ValidationError {
     }
 }
 
+/// Generic invalid data error.
+#[derive(Debug)]
+pub struct BadData<T>
+    where T: std::fmt::Debug + std::fmt::Display,
+{
+    pub value: T,
+    pub(crate) msg: String,
+}
+
+impl<T> std::error::Error for BadData<T>
+    where T: std::fmt::Debug + std::fmt::Display,
+{}
+
+impl<T> fmt::Display for BadData<T>
+    where T: std::fmt::Debug + std::fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.msg)
+    }
+}
+
 /// Error type with information on invalid HTTP header name.
 #[derive(Debug)]
 pub struct BadHeaderName {

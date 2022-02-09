@@ -8,7 +8,7 @@ Project:
         ☐ Fix all warnings, including clippy
 
         In-source TODOs:
-            ☐ file::FileRetentionSetting::new() -> ensure time is in the future
+            ✓ file::FileRetentionSetting::new() -> ensure time is in the future @done(2022-02-09 11:18) @project(Project \ Pre-0.1.0 \ In-source TODOs)
             ☐ Document file::StartLargeFileBuilder::content_disposition()
             ☐ Support custom headers in file::UploadFile
             ✓ Replace client::HttpClient::new() with required Default implementation @done(2022-02-09 10:56) @project(Project \ Pre-0.1.0 \ In-source TODOs)

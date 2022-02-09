@@ -157,7 +157,7 @@ use crate::{
         ServerSideEncryption,
     },
     client::{HeaderMap, HttpClient},
-    error::{FileNameValidationError, MissingData, ValidationError, Error},
+    error::*,
     types::ContentDisposition,
     validate::{
         validate_content_disposition,
@@ -275,11 +275,17 @@ impl FileRetentionSetting {
     pub fn new(
         mode: FileRetentionMode,
         retain_until: chrono::DateTime<chrono::Utc>
-    ) -> Self {
-        // TODO: Validate that the time is in the future.
-        Self {
-            mode: Some(mode),
-            retain_until: Some(retain_until.timestamp_millis()),
+    ) -> Result<Self, BadData<chrono::DateTime<chrono::Utc>>> {
+        if retain_until > chrono::Utc::now() {
+            Ok(Self {
+                mode: Some(mode),
+                retain_until: Some(retain_until.timestamp_millis()),
+            })
+        } else {
+            Err(BadData {
+                value: retain_until,
+                msg: "retain_until must be in the future".into(),
+            })
         }
     }
 }
@@ -1384,8 +1390,6 @@ async fn download_file_by_id<C, E>(
     where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
-    use crate::error::B2Error;
-
     // TODO: This is probably only required for private buckets; public buckets
     // don't require an authorization token, but the docs read as if this is
     // necessary if provided. Need to test, and if necessary allow downloading
@@ -1441,8 +1445,6 @@ async fn download_file_by_name<'a, C, E>(
     where C: HttpClient<Error=Error<E>> + 'a,
           E: fmt::Debug + fmt::Display,
 {
-    use crate::error::B2Error;
-
     let mut auth = auth.into();
 
     // TODO: This is probably only required for private buckets; public buckets
@@ -4444,7 +4446,7 @@ mod tests_mocked {
             .file_retention(FileRetentionSetting::new(
                 FileRetentionMode::Governance,
                 retain_until
-            ))
+            )?)
             .build()?;
 
         update_file_retention(&mut auth, update).await?;
@@ -4477,7 +4479,7 @@ mod tests_mocked {
             .file_retention(FileRetentionSetting::new(
                 FileRetentionMode::Governance,
                 retain_until
-            ))
+            )?)
             .build()?;
 
         let res = update_file_retention(&mut auth, update).await;
