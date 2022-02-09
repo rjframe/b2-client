@@ -2,8 +2,8 @@ Project:
     Pre-0.1.0:
         ✓ Determine what tasks must be accomplished prior to 0.1.0 @done(2022-02-08 11:49) @project(Project \ Pre-0.1.0)
         ☐ Work with B2 metadata headers
-        ☐ Bucket's fields need to be publicly accessible
-        ☐ Check: did I intentionally keep Request in name KeyListRequest when I removed the others? If so, do I still agree?
+        ✓ Bucket's fields need to be publicly accessible @done(2022-02-09 09:36) @project(Project \ Pre-0.1.0)
+        ✓ Check: did I intentionally keep Request in name KeyListRequest when I removed the others? If so, do I still agree? @done(2022-02-09 10:24) @project(Project \ Pre-0.1.0)
         ☐ Move project.todo items to web tracker
         ☐ Fix all warnings, including clippy
 

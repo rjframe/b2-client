@@ -656,11 +656,11 @@ pub async fn delete_key_by_id<C, E, S: AsRef<str>>(
 
 /// A request to obtain a list of keys associated with an account.
 ///
-/// Use [KeyListRequestBuilder] to create a `KeyListRequest`, then pass it to
+/// Use [ListKeysBuilder] to create a `ListKeys`, then pass it to
 /// [list_keys] to obtain the list of keys.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct KeyListRequest<'a> {
+pub struct ListKeys<'a> {
     // account_id is provided by an Authorization.
     account_id: Option<&'a str>,
     max_key_count: u16,
@@ -668,32 +668,32 @@ pub struct KeyListRequest<'a> {
     start_application_key_id: Option<String>,
 }
 
-impl<'a> KeyListRequest<'a> {
-    pub fn builder() -> KeyListRequestBuilder {
-        KeyListRequestBuilder::default()
+impl<'a> ListKeys<'a> {
+    pub fn builder() -> ListKeysBuilder {
+        ListKeysBuilder::default()
     }
 }
 
-impl<'a> Default for KeyListRequest<'a> {
+impl<'a> Default for ListKeys<'a> {
     fn default() -> Self {
-        KeyListRequestBuilder::default().build()
+        ListKeysBuilder::default().build()
     }
 }
 
-/// A builder to create a [KeyListRequest] object.
+/// A builder to create a [ListKeys] object.
 ///
-/// After creating the `KeyListRequest`, pass it to [list_keys] to obtain the
+/// After creating the `ListKeys`, pass it to [list_keys] to obtain the
 /// list.
 ///
 /// See <https://www.backblaze.com/b2/docs/b2_list_keys.html> for further
 /// information.
 #[derive(Debug)]
-pub struct KeyListRequestBuilder {
+pub struct ListKeysBuilder {
     max_keys: u16,
     start_key_id: Option<String>,
 }
 
-impl Default for KeyListRequestBuilder {
+impl Default for ListKeysBuilder {
     fn default() -> Self {
         Self {
             max_keys: 100,
@@ -702,7 +702,7 @@ impl Default for KeyListRequestBuilder {
     }
 }
 
-impl KeyListRequestBuilder {
+impl ListKeysBuilder {
     /// Set the maximum number of keys to return in a single call to
     /// [list_keys].
     ///
@@ -725,9 +725,9 @@ impl KeyListRequestBuilder {
         Ok(self)
     }
 
-    /// Create a [KeyListRequest].
-    pub fn build<'a>(self) -> KeyListRequest<'a> {
-        KeyListRequest {
+    /// Create a [ListKeys].
+    pub fn build<'a>(self) -> ListKeys<'a> {
+        ListKeys {
             account_id: None,
             max_key_count: self.max_keys,
             start_application_key_id: self.start_key_id,
@@ -747,7 +747,7 @@ struct KeyList {
 ///
 /// The `Authorization` must have [Capability::ListKeys].
 ///
-/// Returns a tuple of the list of keys and the next [KeyListRequest] to obtain
+/// Returns a tuple of the list of keys and the next [ListKeys] to obtain
 /// the next set of keys, if there are keys that have not yet been returned. The
 /// new key list request will have the same maximum key limit as the previous
 /// request.
@@ -765,7 +765,7 @@ struct KeyList {
 /// #     client::{HttpClient, SurfClient},
 /// #     account::{
 /// #         authorize_account, list_keys,
-/// #         Capability, KeyListRequest,
+/// #         Capability, ListKeys,
 /// #     },
 /// # };
 /// # #[cfg(feature = "with_surf")]
@@ -773,7 +773,7 @@ struct KeyList {
 /// let mut auth = authorize_account(SurfClient::new(), "MY KEY ID", "MY KEY")
 ///     .await?;
 ///
-/// let req = KeyListRequest::builder()
+/// let req = ListKeys::builder()
 ///     .max_keys(500)?
 ///     .build();
 ///
@@ -786,8 +786,8 @@ struct KeyList {
 /// ```
 pub async fn list_keys<'a, C, E>(
     auth: &'a mut Authorization<C>,
-    list_req: KeyListRequest<'a>
-) -> Result<(Vec<Key>, Option<KeyListRequest<'a>>), Error<E>>
+    list_req: ListKeys<'a>
+) -> Result<(Vec<Key>, Option<ListKeys<'a>>), Error<E>>
     where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
@@ -809,7 +809,7 @@ pub async fn list_keys<'a, C, E>(
             if let Some(id) = keys.next_application_key_id {
                 Ok((
                     keys.keys,
-                    Some(KeyListRequest {
+                    Some(ListKeys {
                         account_id: Some(&auth.account_id),
                         max_key_count: list_req.max_key_count,
                         start_application_key_id: Some(id),
@@ -968,7 +968,7 @@ mod tests {
         let mut auth = create_test_auth(client, vec![Capability::ListKeys])
             .await;
 
-        let req = KeyListRequest::default();
+        let req = ListKeys::default();
 
         let (keys, next) = list_keys(&mut auth, req).await?;
         assert_eq!(keys.len(), 1);
