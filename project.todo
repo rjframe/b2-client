@@ -1,17 +1,21 @@
 Project:
     Pre-0.1.0:
         ✓ Determine what tasks must be accomplished prior to 0.1.0 @done(2022-02-08 11:49) @project(Project \ Pre-0.1.0)
-        ☐ Work with B2 metadata headers
+        ✓ Work with B2 metadata headers @done(2022-02-10 12:38) @project(Project \ Pre-0.1.0)
         ✓ Bucket's fields need to be publicly accessible @done(2022-02-09 09:36) @project(Project \ Pre-0.1.0)
         ✓ Check: did I intentionally keep Request in name KeyListRequest when I removed the others? If so, do I still agree? @done(2022-02-09 10:24) @project(Project \ Pre-0.1.0)
         ☐ Move project.todo items to web tracker
         ☐ Fix all warnings, including clippy
+        ☐ Review, update README, etc. as needed
+        ☐ Review generated documentation
+        ☐ Ensure file_info validation includes X-Bz-Info- prefix.
 
         In-source TODOs:
             ✓ file::FileRetentionSetting::new() -> ensure time is in the future @done(2022-02-09 11:18) @project(Project \ Pre-0.1.0 \ In-source TODOs)
             ☐ Document file::StartLargeFileBuilder::content_disposition()
-            ☐ Support custom headers in file::UploadFile
+            ✓ Support custom headers in file::UploadFile @done(2022-02-10 12:38) @project(Project \ Pre-0.1.0 \ In-source TODOs)
             ✓ Replace client::HttpClient::new() with required Default implementation @done(2022-02-09 10:56) @project(Project \ Pre-0.1.0 \ In-source TODOs)
+            ☐ Support encryption headers in file::upload_file_part()
             ☐ client::HttpClient::with_header() needs to return error type
             ☐ Document CORS rule requirements for bucket::CorsRuleBuilder
             ☐ Either separate all errors that use error::ValidationError::BadRequest or improve its message

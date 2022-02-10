@@ -161,6 +161,7 @@ use crate::{
     types::ContentDisposition,
     validate::{
         validate_content_disposition,
+        validate_file_metadata_size,
         validated_file_info,
         validated_file_name,
     },
@@ -175,38 +176,12 @@ pub use http_types::{
 use serde::{Serialize, Deserialize};
 
 
-// Shortcut to add a header to a request if `$obj` is not `None`.
-macro_rules! add_opt_header {
-    ($req:ident, $obj:expr, $name:expr) => {
-        if let Some(o) = $obj {
-            $req = $req.with_header($name, o)
+// Add a standard header to a serde_json::Map.
+macro_rules! add_file_info {
+    ($map:ident, $name:literal, $value:expr) => {
+        if let Some(v) = $value {
+            $map.insert($name.into(), serde_json::Value::from(v));
         }
-    };
-    // `unwrapped` and `conv` provide the ability to convert the type if
-    // necessary; e.g., to call to_string() on the unwrapped value.
-    ($req:ident, $obj:expr, $name:expr, $unwrapped:ident, $conv:expr) => {
-        if let Some($unwrapped) = $obj {
-            $req = $req.with_header($name, $conv)
-        }
-    };
-}
-
-// Add a query parameter to a URL string if `obj` is not `None`.
-macro_rules! add_opt_param {
-    ($str:ident, $name:literal, $obj:expr) => {
-        if let Some(s) = $obj {
-            add_param!($str, $name, &s);
-        }
-    };
-}
-
-// Add a query parameter to a URL string.
-macro_rules! add_param {
-    ($str:ident, $name:literal, $obj:expr) => {
-        $str.push_str($name);
-        $str.push('=');
-        $str.push_str($obj);
-        $str.push('&'); // The trailing & will be ignored, so this is fine.
     };
 }
 
@@ -610,6 +585,15 @@ pub struct CopyFileBuilder<'a> {
     legal_hold: Option<LegalHoldValue>,
     source_encryption: Option<ServerSideEncryption>,
     dest_encryption: Option<ServerSideEncryption>,
+
+    // To merge into file_info on build if metadata_directive is Replace:
+    last_modified: Option<i64>,
+    sha1_checksum: Option<&'a str>,
+    content_disposition: Option<String>,
+    content_language: Option<String>,
+    expires: Option<String>,
+    cache_control: Option<String>,
+    content_encoding: Option<String>,
 }
 
 impl<'a> CopyFileBuilder<'a> {
@@ -677,6 +661,21 @@ impl<'a> CopyFileBuilder<'a> {
     /// The file information can only be set if
     /// [metadata_directive](Self::metadata_directive) is
     /// [MetadataDirective::Replace].
+    ///
+    /// For the following headers, use their corresponding methods instead of
+    /// setting the values here:
+    ///
+    /// * X-Bz-Info-src_last_modified_millis:
+    ///   [last_modified](Self::last_modified)
+    /// * X-Bz-Info-large_file_sha1: [sha1_checksum](Self::sha1_checksum)
+    /// * Content-Disposition: [content_disposition](Self::content_disposition)
+    /// * Content-Language: [content_language](Self::content_language)
+    /// * Expires: [expiration](Self::expiration)
+    /// * Cache-Control: [cache_control](Self::cache_control)
+    /// * Content-Encoding: [content_encoding](Self::content_encoding)
+    ///
+    /// If any of the above are set here and via their methods, the value from
+    /// the method will override the value specified here.
     pub fn file_info(mut self, info: serde_json::Value)
     -> Result<Self, ValidationError> {
         self.file_info = Some(validated_file_info(info)?);
@@ -724,6 +723,77 @@ impl<'a> CopyFileBuilder<'a> {
         self
     }
 
+    /// The time of the file's last modification.
+    pub fn last_modified(mut self, time: chrono::DateTime<chrono::Utc>) -> Self
+    {
+        self.last_modified = Some(time.timestamp_millis());
+        self
+    }
+
+    /// The SHA1 checksum of the file's contents.
+    ///
+    /// B2 will use this to verify the accuracy of the file upload, and it will
+    /// be returned in the header `X-Bz-Content-Sha1` when downloading the file.
+    pub fn sha1_checksum(mut self, checksum: &'a str) -> Self {
+        self.sha1_checksum = Some(checksum);
+        self
+    }
+
+    /// The value to use for the `Content-Disposition` header when downloading
+    /// the file.
+    ///
+    /// Note that the download request can override this value.
+    pub fn content_disposition(mut self, disposition: ContentDisposition)
+    -> Result<Self, ValidationError> {
+        validate_content_disposition(&disposition.0, false)?;
+
+        self.content_disposition = Some(percent_encode!(disposition.0));
+        Ok(self)
+    }
+
+    /// The value to use for the `Content-Language` header when downloading the
+    /// file.
+    ///
+    /// Note that the download request can override this value.
+    pub fn content_language(mut self, language: impl Into<String>) -> Self {
+        // TODO: validate content_language
+        self.content_language = Some(percent_encode!(language.into()));
+        self
+    }
+
+    /// The value to use for the `Expires` header when the file is downloaded.
+    ///
+    /// Note that the download request can override this value.
+    pub fn expiration(mut self, expiration: Expires) -> Self {
+        let expires = percent_encode!(expiration.value().to_string());
+
+        self.expires = Some(expires);
+        self
+    }
+
+    /// The value to use for the `Cache-Control` header when the file is
+    /// downloaded.
+    ///
+    /// This would override the value set at the bucket level, and can be
+    /// overriden by a download request.
+    pub fn cache_control(mut self, directive: CacheDirective) -> Self {
+        use http_types::headers::HeaderValue;
+
+        let cc = percent_encode!(HeaderValue::from(directive).to_string());
+        self.cache_control = Some(cc);
+        self
+    }
+
+    /// The value to use for the `Content-Encoding` header when the file is
+    /// downloaded.
+    ///
+    /// Note that this can be overriden by a download request.
+    pub fn content_encoding(mut self, encoding: ContentEncoding) -> Self {
+        let encoding = percent_encode!(format!("{}", encoding.encoding()));
+        self.content_encoding = Some(encoding);
+        self
+    }
+
     /// Create a [CopyFile] object.
     ///
     /// # Returns
@@ -766,6 +836,32 @@ impl<'a> CopyFileBuilder<'a> {
             }
         }
 
+        let file_info = if let Some(mut file_info) = self.file_info {
+            let info_map = file_info.as_object_mut()
+                .expect("file_info is not a JSON object");
+
+            add_file_info!(info_map, "src_last_modified_millis",
+                self.last_modified.map(|v| v.to_string()));
+            add_file_info!(info_map, "large_file_sha1", self.sha1_checksum);
+            add_file_info!(info_map, "b2-content-disposition",
+                self.content_disposition);
+            add_file_info!(info_map, "b2-content-language",
+                self.content_language);
+            add_file_info!(info_map, "b2-expires", self.expires);
+            add_file_info!(info_map, "b2-content-encoding",
+                self.content_encoding);
+
+            Some(file_info)
+        } else {
+            None
+        };
+
+        validate_file_metadata_size(
+            file_name,
+            file_info.as_ref(),
+            self.dest_encryption.as_ref()
+        )?;
+
         Ok(CopyFile {
             source_file_id,
             destination_bucket_id: self.destination_bucket_id,
@@ -773,7 +869,7 @@ impl<'a> CopyFileBuilder<'a> {
             range: self.range,
             metadata_directive,
             content_type: self.content_type,
-            file_info: self.file_info,
+            file_info,
             file_retention: self.file_retention,
             legal_hold: self.legal_hold,
             source_encryption: self.source_encryption,
@@ -1409,7 +1505,9 @@ async fn download_file_by_id<C, E>(
         .with_header("Authorization", &auth.authorization_token)
         .with_body_json(file_req);
 
-    add_opt_header!(req, file.range, "Range", range, &range.to_string());
+    if let Some(range) = file.range {
+        req = req.with_header("Range", &range.to_string());
+    }
 
     if let Some(ServerSideEncryption::SelfManaged(enc)) = file.encryption {
         req = req
@@ -1456,6 +1554,23 @@ async fn download_file_by_name<'a, C, E>(
 
     let mut url = file.public_url(&auth).to_owned();
 
+    macro_rules! add_param {
+        ($str:ident, $name:literal, $obj:expr) => {
+            $str.push_str($name);
+            $str.push('=');
+            $str.push_str($obj);
+            $str.push('&'); // The trailing & will be ignored, so this is fine.
+        };
+    }
+
+    macro_rules! add_opt_param {
+        ($str:ident, $name:literal, $obj:expr) => {
+            if let Some(s) = $obj {
+                add_param!($str, $name, &s);
+            }
+        };
+    }
+
     add_opt_param!(url, "b2ContentDisposition", file.b2_content_disposition);
     add_opt_param!(url, "b2ContentLanguage", file.b2_content_language);
     add_opt_param!(url, "b2Expires", file.b2_expires);
@@ -1489,7 +1604,9 @@ async fn download_file_by_name<'a, C, E>(
         .expect("Invalid URL")
         .with_header("Authorization", &auth_token);
 
-    add_opt_header!(req, file.range, "Range", range, &range.to_string());
+    if let Some(range) = file.range {
+        req = req.with_header("Range", &range.to_string())
+    }
 
     let (body, headers) = req.send_keep_headers().await?;
 
@@ -2705,10 +2822,17 @@ pub struct StartLargeFileBuilder<'a> {
     file_retention: Option<FileRetentionPolicy>,
     legal_hold: Option<LegalHoldValue>,
     server_side_encryption: Option<ServerSideEncryption>,
+
+    // To merge into file_info on build:
+    last_modified: Option<i64>,
+    sha1_checksum: Option<&'a str>,
+    content_disposition: Option<String>,
+    content_language: Option<String>,
+    expires: Option<String>,
+    cache_control: Option<String>,
+    content_encoding: Option<String>,
 }
 
-// TODO: Many questions and TODOs also apply to other file creation objects
-// (e.g., CopyFileBuilder).
 impl<'a> StartLargeFileBuilder<'a> {
     /// Specify the bucket in which to store the new file.
     pub fn bucket_id(mut self, id: &'a str) -> Self {
@@ -2738,9 +2862,22 @@ impl<'a> StartLargeFileBuilder<'a> {
         self
     }
 
-    // TODO: document data sharing - B2 uses more than just content-disposition
-    // here
-    /// Set file metadata.
+    /// Set file metadata to be returned in headers when downloading the file.
+    ///
+    /// For the following headers, use their corresponding methods instead of
+    /// setting the values here:
+    ///
+    /// * X-Bz-Info-src_last_modified_millis:
+    ///   [last_modified](Self::last_modified)
+    /// * X-Bz-Info-large_file_sha1: [sha1_checksum](Self::sha1_checksum)
+    /// * Content-Disposition: [content_disposition](Self::content_disposition)
+    /// * Content-Language: [content_language](Self::content_language)
+    /// * Expires: [expiration](Self::expiration)
+    /// * Cache-Control: [cache_control](Self::cache_control)
+    /// * Content-Encoding: [content_encoding](Self::content_encoding)
+    ///
+    /// If any of the above are set here and via their methods, the value from
+    /// the method will override the value specified here.
     pub fn file_info(mut self, info: serde_json::Value)
     -> Result<Self, ValidationError> {
         self.file_info = Some(validated_file_info(info)?);
@@ -2772,14 +2909,78 @@ impl<'a> StartLargeFileBuilder<'a> {
         self
     }
 
-    // TODO: sha1, last modified, content-disposition TODO: content-disposition,
-    // content-language, expires, cache-control, content-encoding (see fileInfo
-    // docs)
-    // Store separately and merge into file_info in build()?
+    /// The time of the file's last modification.
+    pub fn last_modified(mut self, time: chrono::DateTime<chrono::Utc>) -> Self
+    {
+        self.last_modified = Some(time.timestamp_millis());
+        self
+    }
+
+    /// The SHA1 checksum of the file's contents.
+    ///
+    /// B2 will use this to verify the accuracy of the file upload, and it will
+    /// be returned in the header `X-Bz-Content-Sha1` when downloading the file.
+    pub fn sha1_checksum(mut self, checksum: &'a str) -> Self {
+        self.sha1_checksum = Some(checksum);
+        self
+    }
+
+    /// The value to use for the `Content-Disposition` header when downloading
+    /// the file.
+    ///
+    /// Note that the download request can override this value.
+    pub fn content_disposition(mut self, disposition: ContentDisposition)
+    -> Result<Self, ValidationError> {
+        validate_content_disposition(&disposition.0, false)?;
+
+        self.content_disposition = Some(percent_encode!(disposition.0));
+        Ok(self)
+    }
+
+    /// The value to use for the `Content-Language` header when downloading the
+    /// file.
+    ///
+    /// Note that the download request can override this value.
+    pub fn content_language(mut self, language: impl Into<String>) -> Self {
+        // TODO: validate content_language
+        self.content_language = Some(percent_encode!(language.into()));
+        self
+    }
+
+    /// The value to use for the `Expires` header when the file is downloaded.
+    ///
+    /// Note that the download request can override this value.
+    pub fn expiration(mut self, expiration: Expires) -> Self {
+        let expires = percent_encode!(expiration.value().to_string());
+
+        self.expires = Some(expires);
+        self
+    }
+
+    /// The value to use for the `Cache-Control` header when the file is
+    /// downloaded.
+    ///
+    /// This would override the value set at the bucket level, and can be
+    /// overriden by a download request.
+    pub fn cache_control(mut self, directive: CacheDirective) -> Self {
+        use http_types::headers::HeaderValue;
+
+        let cc = percent_encode!(HeaderValue::from(directive).to_string());
+        self.cache_control = Some(cc);
+        self
+    }
+
+    /// The value to use for the `Content-Encoding` header when the file is
+    /// downloaded.
+    ///
+    /// Note that this can be overriden by a download request.
+    pub fn content_encoding(mut self, encoding: ContentEncoding) -> Self {
+        let encoding = percent_encode!(format!("{}", encoding.encoding()));
+        self.content_encoding = Some(encoding);
+        self
+    }
 
     pub fn build(self) -> Result<StartLargeFile<'a>, ValidationError> {
-        self.validate_size()?;
-
         let bucket_id = self.bucket_id.ok_or_else(||
             ValidationError::MissingData(
                 "The bucket ID in which to store the file must be present"
@@ -2796,53 +2997,41 @@ impl<'a> StartLargeFileBuilder<'a> {
         let content_type = self.content_type
             .unwrap_or_else(|| "b2/x-auto".into());
 
+        let file_info = if let Some(mut file_info) = self.file_info {
+            let info_map = file_info.as_object_mut()
+                .expect("file_info is not a JSON object");
+
+            add_file_info!(info_map, "src_last_modified_millis",
+                self.last_modified.map(|v| v.to_string()));
+            add_file_info!(info_map, "large_file_sha1", self.sha1_checksum);
+            add_file_info!(info_map, "b2-content-disposition",
+                self.content_disposition);
+            add_file_info!(info_map, "b2-content-language",
+                self.content_language);
+            add_file_info!(info_map, "b2-expires", self.expires);
+            add_file_info!(info_map, "b2-content-encoding",
+                self.content_encoding);
+
+            Some(file_info)
+        } else {
+            None
+        };
+
+        validate_file_metadata_size(
+            &file_name,
+            file_info.as_ref(),
+            self.server_side_encryption.as_ref()
+        )?;
+
         Ok(StartLargeFile {
             bucket_id,
             file_name,
             content_type,
-            file_info: self.file_info,
+            file_info,
             file_retention: self.file_retention,
             legal_hold: self.legal_hold,
             server_side_encryption: self.server_side_encryption,
         })
-    }
-
-    fn validate_size(&self) -> Result<(), ValidationError> {
-        let limit = {
-            let enc = self.server_side_encryption.as_ref()
-                .unwrap_or(&ServerSideEncryption::NoEncryption);
-
-            if matches!(enc, ServerSideEncryption::NoEncryption) {
-                7000
-            } else {
-                2048
-            }
-        };
-
-        // Only the keys and values count against the max limit, so we need to
-        // add them up rather than convert the entire Value to a string and
-        // check its length.
-        let info_len = self.file_info.as_ref()
-            .map(|v| v.as_object())
-            .flatten()
-            .map(|obj| obj.iter()
-                .fold(0, |acc, (k, v)| acc + k.len() + v.to_string().len())
-            )
-            .unwrap_or(0);
-
-        let name_len = self.file_name
-            .as_ref()
-            .map(|v| v.to_string().len())
-            .unwrap_or(0);
-
-        if info_len + name_len <= limit {
-            Ok(())
-        } else {
-            Err(ValidationError::OutOfBounds(format!(
-                "file_name and file_info lengths must not exceed {} bytes",
-                limit
-            )))
-        }
     }
 }
 
@@ -3157,16 +3346,7 @@ pub struct UploadFile<'a> {
     file_name: String,
     content_type: String,
     sha1_checksum: &'a str,
-    last_modified: Option<i64>,
-
-    // These go in custom headers (file_info)
-    content_disposition: Option<String>,
-    content_language: Option<String>,
-    expires: Option<String>,
-    cache_control: Option<String>,
-    content_encoding: Option<String>,
-    custom_headers: Option<(String, String)>, // TODO: type
-
+    file_info: Option<serde_json::Value>,
     legal_hold: Option<LegalHoldValue>,
     file_retention: Option<(FileRetentionMode, i64)>,
     encryption: Option<ServerSideEncryption>,
@@ -3196,14 +3376,14 @@ pub struct UploadFileBuilder<'a> {
     content_type: Option<String>,
     sha1_checksum: Option<&'a str>,
     last_modified: Option<i64>,
+    file_info: Option<serde_json::Value>,
 
-    // These go in custom headers (file_info). Merge in builder?
+    // To merge into file_info on build.
     content_disposition: Option<String>,
     content_language: Option<String>,
     expires: Option<String>,
     cache_control: Option<String>,
     content_encoding: Option<String>,
-    custom_headers: Option<(String, String)>, // TODO: type
 
     legal_hold: Option<LegalHoldValue>,
     file_retention_mode: Option<FileRetentionMode>,
@@ -3310,7 +3490,27 @@ impl<'a> UploadFileBuilder<'a> {
         self
     }
 
-    // TODO: Custom headers
+    /// Set user-specified file metadata.
+    ///
+    /// For the following headers, use their corresponding methods instead of
+    /// setting the values here:
+    ///
+    /// * X-Bz-Info-src_last_modified_millis:
+    ///   [last_modified](Self::last_modified)
+    /// * X-Bz-Info-large_file_sha1: [sha1_checksum](Self::sha1_checksum)
+    /// * Content-Disposition: [content_disposition](Self::content_disposition)
+    /// * Content-Language: [content_language](Self::content_language)
+    /// * Expires: [expiration](Self::expiration)
+    /// * Cache-Control: [cache_control](Self::cache_control)
+    /// * Content-Encoding: [content_encoding](Self::content_encoding)
+    ///
+    /// If any of the above are set here and via their methods, the value from
+    /// the method will override the value specified here.
+    pub fn file_info(mut self, info: serde_json::Value)
+    -> Result<Self, ValidationError> {
+        self.file_info = Some(validated_file_info(info)?);
+        Ok(self)
+    }
 
     /// Set a legal hold on the file.
     pub fn with_legal_hold(mut self) -> Self {
@@ -3369,6 +3569,31 @@ impl<'a> UploadFileBuilder<'a> {
             ));
         }
 
+        let file_info = if let Some(mut file_info) = self.file_info {
+            let info_map = file_info.as_object_mut()
+                .expect("file_info is not a JSON object");
+
+            add_file_info!(info_map, "X-Bz-info-src_last_modified_millis",
+                self.last_modified.map(|v| v.to_string()));
+            add_file_info!(info_map, "X-Bz-info-b2-content-disposition",
+                self.content_disposition);
+            add_file_info!(info_map, "X-Bz-info-b2-content-language",
+                self.content_language);
+            add_file_info!(info_map, "X-Bz-info-b2-expires", self.expires);
+            add_file_info!(info_map, "X-Bz-info-b2-content-encoding",
+                self.content_encoding);
+
+            Some(file_info)
+        } else {
+            None
+        };
+
+        validate_file_metadata_size(
+            &file_name,
+            file_info.as_ref(),
+            self.encryption.as_ref()
+        )?;
+
         let file_retention = self.file_retention_mode
             .zip(self.file_retention_time);
 
@@ -3376,13 +3601,7 @@ impl<'a> UploadFileBuilder<'a> {
             file_name,
             content_type,
             sha1_checksum,
-            last_modified: self.last_modified,
-            content_disposition: self.content_disposition,
-            content_language: self.content_language,
-            expires: self.expires,
-            cache_control: self.cache_control,
-            content_encoding: self.content_encoding,
-            custom_headers: self.custom_headers,
+            file_info,
             legal_hold: self.legal_hold,
             file_retention,
             encryption: self.encryption,
@@ -3423,57 +3642,33 @@ pub async fn upload_file<C, E>(
         .with_header("Content-Length", &data.len().to_string())
         .with_header("X-Bz-Content-Sha1", upload.sha1_checksum);
 
-    add_opt_header!(
-        req,
-        upload.last_modified,
-        "X-Bz-Info-src_last_modified_millis",
-        val,
-        &val.to_string()
-    );
+    if let Some(mut file_info) = upload.file_info {
+        let info_map = file_info.as_object_mut()
+            .expect("file_info is not a JSON object");
 
-    add_opt_header!(
-        req,
-        upload.content_disposition,
-        "X-Bz-Info-b2-content-disposition",
-        val,
-        &val
-    );
+        macro_rules! add_metadata_header {
+            ($header_name:literal) => {
+                if let Some(val) = info_map.remove($header_name) {
+                    req = req.with_header($header_name, val.as_str().unwrap())
+                }
+            };
+        }
 
-    add_opt_header!(
-        req,
-        upload.content_language,
-        "X-Bz-Info-b2-content-language",
-        val,
-        &val
-    );
+        add_metadata_header!("X-Bz-Info-src_last_modified_millis");
+        add_metadata_header!("X-Bz-Info-b2-content-disposition");
+        add_metadata_header!("X-Bz-Info-b2-content-language");
+        add_metadata_header!("X-Bz-Info-b2-expires");
+        add_metadata_header!("X-Bz-Info-b2-cache-control");
+        add_metadata_header!("X-Bz-Info-content-encoding");
 
-    add_opt_header!(req, upload.expires, "X-Bz-Info-b2-expires", val, &val);
+        for (key, val) in info_map.into_iter() {
+            req = req.with_header(key, &val.to_string());
+        }
+    }
 
-    add_opt_header!(
-        req,
-        upload.cache_control,
-        "X-Bz-Info-b2-cache-control",
-        val,
-        &val
-    );
-
-    add_opt_header!(
-        req,
-        upload.content_encoding,
-        "X-Bz-Info-b2-content-encoding",
-        val,
-        &val
-    );
-
-    // TODO: custom headers
-
-    add_opt_header!(
-        req,
-        upload.legal_hold,
-        "X-Bz-File-Legal-Hold",
-        val,
-        &val.to_string()
-    );
+    if let Some(legal_hold) = upload.legal_hold {
+        req = req.with_header("X-Bz-File-Legal-Hold", &legal_hold.to_string());
+    }
 
     if let Some((mode, timestamp)) = upload.file_retention {
         req = req

@@ -8,7 +8,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    bucket::LifecycleRule,
+    bucket::{LifecycleRule, ServerSideEncryption},
     error::*,
 };
 
@@ -91,10 +91,45 @@ pub(crate) fn validated_cors_rule_name(name: impl Into<String>)
     validated_bucket_name(name)
 }
 
+/// Ensure that file metadata fits within the B2 length requirements.
+pub(crate) fn validate_file_metadata_size(
+    file_name: &str,
+    file_info: Option<&serde_json::Value>,
+    enc: Option<&ServerSideEncryption>
+) -> Result<(), ValidationError> {
+    let limit = match enc {
+        Some(&ServerSideEncryption::NoEncryption) => 7000,
+        _ => 2048,
+    };
+
+    // Only the keys and values count against the max limit, so we need to
+    // add them up rather than convert the entire Value to a string and
+    // check its length.
+    let info_len = file_info
+        .map(|v| v.as_object())
+        .flatten()
+        .map(|obj| obj.iter()
+            .fold(0, |acc, (k, v)| acc + k.len() + v.to_string().len())
+        )
+        .unwrap_or(0);
+
+    let name_len = file_name.len();
+
+    if info_len + name_len <= limit {
+        Ok(())
+    } else {
+        Err(ValidationError::OutOfBounds(format!(
+            "file_name and file_info lengths must not exceed {} bytes",
+            limit
+        )))
+    }
+}
+
 /// Ensure the keys and values of file metadata is correct.
 ///
 /// We do not check the byte length limit since the limit applies to both the
-/// file info and the name.
+/// file info and the name. Use [validate_file_metadata_size] to check the
+/// length limit.
 pub(crate) fn validated_file_info(info: serde_json::Value)
 -> Result<serde_json::Value, ValidationError> {
     let obj = info.as_object()
