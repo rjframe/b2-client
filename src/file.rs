@@ -3431,7 +3431,7 @@ impl<'a> UploadFileBuilder<'a> {
     /// The time of the file's last modification.
     pub fn last_modified(mut self, time: chrono::DateTime<chrono::Utc>) -> Self
     {
-        self.last_modified = Some(time.timestamp());
+        self.last_modified = Some(time.timestamp_millis());
         self
     }
 
@@ -3539,7 +3539,7 @@ impl<'a> UploadFileBuilder<'a> {
     /// [Capability::WriteFileRetentions].
     pub fn retain_until(mut self, time: chrono::DateTime<chrono::Utc>)
     -> Self {
-        self.file_retention_time = Some(time.timestamp());
+        self.file_retention_time = Some(time.timestamp_millis());
         self
     }
 
