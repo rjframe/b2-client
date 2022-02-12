@@ -305,7 +305,6 @@ impl CorsRuleBuilder {
         Ok(self)
     }
 
-    // TODO: Doc requirements.
     /// Create a [CorsRule] object.
     pub fn build(self) -> Result<CorsRule, ValidationError> {
         let cors_rule_name = self.name.ok_or_else(||

@@ -2928,6 +2928,8 @@ impl<'a> StartLargeFileBuilder<'a> {
     /// The value to use for the `Content-Disposition` header when downloading
     /// the file.
     ///
+    /// Parameter continuations are not supported.
+    ///
     /// Note that the download request can override this value.
     pub fn content_disposition(mut self, disposition: ContentDisposition)
     -> Result<Self, ValidationError> {
