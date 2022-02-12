@@ -260,7 +260,7 @@ pub async fn authorize_account<C, E>(mut client: C, key_id: &str, key: &str)
     let req = client.get(
         format!("{}b2_authorize_account", B2_AUTH_URL)
     ).expect("Invalid URL")
-        .with_header("Authorization", &auth);
+        .with_header("Authorization", &auth).unwrap();
 
     let res = req.send().await?;
 
@@ -572,7 +572,7 @@ pub async fn create_key<C, E>(
 
     let res = auth.client.post(auth.api_url("b2_create_key"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(serde_json::to_value(new_key_info)?)
         .send().await?;
 
@@ -658,8 +658,10 @@ pub async fn delete_key_by_id<C, E, S: AsRef<str>>(
 
     let res = auth.client.post(auth.api_url("b2_delete_key"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
-        .with_body_json(serde_json::json!({"applicationKeyId": key_id.as_ref()}))
+        .with_header("Authorization", &auth.authorization_token).unwrap()
+        .with_body_json(serde_json::json!(
+            {"applicationKeyId": key_id.as_ref()}
+        ))
         .send().await?;
 
     let key: B2Result<Key> = serde_json::from_slice(&res)?;
@@ -813,7 +815,7 @@ pub async fn list_keys<'a, C, E>(
 
     let res = auth.client.post(auth.api_url("b2_list_keys"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(serde_json::to_value(list_req.clone())?)
         .send().await?;
 

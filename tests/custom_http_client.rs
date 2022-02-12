@@ -40,8 +40,9 @@ impl HttpClient for FakeClient {
     gen_send_func!(head);
     gen_send_func!(post);
 
-    fn with_header<S: AsRef<str>>(&mut self, _name: S, _value: S) -> &mut Self {
-        self
+    fn with_header<S: AsRef<str>>(&mut self, _name: S, _value: S)
+    -> Result<&mut Self, ValidationError> {
+        Ok(self)
     }
 
     fn with_body(&mut self, _body: impl Into<Vec<u8>>) -> &mut Self { self }

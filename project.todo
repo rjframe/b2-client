@@ -16,7 +16,7 @@ Project:
             ✓ Support custom headers in file::UploadFile @done(2022-02-10 12:38) @project(Project \ Pre-0.1.0 \ In-source TODOs)
             ✓ Replace client::HttpClient::new() with required Default implementation @done(2022-02-09 10:56) @project(Project \ Pre-0.1.0 \ In-source TODOs)
             ☐ Support encryption headers in file::upload_file_part()
-            ☐ client::HttpClient::with_header() needs to return error type
+            ✓ client::HttpClient::with_header() needs to return error type @done(2022-02-12 14:56) @project(Project \ Pre-0.1.0 \ In-source TODOs)
             ☐ Document CORS rule requirements for bucket::CorsRuleBuilder
             ☐ Either separate all errors that use error::ValidationError::BadRequest or improve its message
 

@@ -76,6 +76,41 @@ impl From<url::ParseError> for ValidationError {
     }
 }
 
+#[cfg(feature = "with_surf")]
+impl From<http_types::Error> for ValidationError {
+    fn from(e: http_types::Error) -> Self {
+        Self::BadFormat(format!("{}", e))
+    }
+}
+
+#[cfg(feature = "with_hyper")]
+impl From<hyper::header::InvalidHeaderName> for ValidationError {
+    fn from(e: hyper::header::InvalidHeaderName) -> Self {
+        Self::BadFormat(format!("{}", e))
+    }
+}
+
+#[cfg(feature = "with_hyper")]
+impl From<hyper::header::InvalidHeaderValue> for ValidationError {
+    fn from(e: hyper::header::InvalidHeaderValue) -> Self {
+        Self::BadFormat(format!("{}", e))
+    }
+}
+
+#[cfg(feature = "with_isahc")]
+impl From<isahc::http::header::InvalidHeaderName> for ValidationError {
+    fn from(e: isahc::http::header::InvalidHeaderName) -> Self {
+        Self::BadFormat(format!("{}", e))
+    }
+}
+
+#[cfg(feature = "with_isahc")]
+impl From<isahc::http::header::InvalidHeaderValue> for ValidationError {
+    fn from(e: isahc::http::header::InvalidHeaderValue) -> Self {
+        Self::BadFormat(format!("{}", e))
+    }
+}
+
 /// Generic invalid data error.
 #[derive(Debug)]
 pub struct BadData<T>

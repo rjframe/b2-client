@@ -939,7 +939,7 @@ pub async fn create_bucket<C, E>(
 
     let res = auth.client.post(auth.api_url("b2_create_bucket"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(serde_json::to_value(new_bucket_info)?)
         .send().await?;
 
@@ -964,7 +964,7 @@ pub async fn delete_bucket<C, E>(
 
     let res = auth.client.post(auth.api_url("b2_delete_bucket"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(serde_json::json!({
             "accountId": &auth.account_id,
             "bucketId": bucket_id.as_ref(),
@@ -1103,7 +1103,7 @@ pub async fn list_buckets<C, E>(
 
     let res = auth.client.post(auth.api_url("b2_list_buckets"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(serde_json::to_value(list_info)?)
         .send().await?;
 
@@ -1289,7 +1289,7 @@ pub async fn update_bucket<C, E>(
 
     let res = auth.client.post(auth.api_url("b2_update_bucket"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(serde_json::to_value(bucket_info)?)
         .send().await?;
 

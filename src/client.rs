@@ -49,7 +49,8 @@ pub trait HttpClient
     /// Add a header to the request.
     ///
     /// To add a `User-Agent` header, call [user_agent](Self::user_agent).
-    fn with_header<S: AsRef<str>>(&mut self, name: S, value: S) -> &mut Self;
+    fn with_header<S: AsRef<str>>(&mut self, name: S, value: S)
+    -> Result<&mut Self, ValidationError>;
     /// Use the provided bytes as the request body.
     fn with_body(&mut self, data: impl Into<Vec<u8>>) -> &mut Self;
     /// Use the given [serde_json::Value] as the request's body.
@@ -193,11 +194,18 @@ mod surf_client {
         gen_method_func!(post, Post);
 
         fn with_header<S: AsRef<str>>(&mut self, name: S, value: S)
-        -> &mut Self {
+        -> Result<&mut Self, ValidationError> {
+            use std::str::FromStr as _;
+            use http_types::headers::{HeaderName, HeaderValue};
+
             if let Some(req) = &mut self.req {
-                req.insert_header(name.as_ref(), value.as_ref());
+                let name = HeaderName::from_str(name.as_ref())?;
+                let value = HeaderValue::from_str(value.as_ref())?;
+
+                req.insert_header(name, value);
             }
-            self
+
+            Ok(self)
         }
 
         fn with_body(&mut self, data: impl Into<Vec<u8>>) -> &mut Self
@@ -434,16 +442,15 @@ mod hyper_client {
 
         /// Add a header to the request.
         fn with_header<S: AsRef<str>>(&mut self, name: S, value: S)
-        -> &mut Self {
+        -> Result<&mut Self, ValidationError> {
             use std::str::FromStr as _;
             use hyper::header::{HeaderName, HeaderValue};
 
-            // TODO: These errors need to be reported.
-            let name = HeaderName::from_str(name.as_ref()).unwrap();
-            let value = HeaderValue::from_str(value.as_ref()).unwrap();
+            let name = HeaderName::from_str(name.as_ref())?;
+            let value = HeaderValue::from_str(value.as_ref())?;
 
             self.headers.push((name, value));
-            self
+            Ok(self)
         }
 
         fn with_body<'a>(&mut self, data: impl Into<Vec<u8>>) -> &mut Self {
@@ -655,14 +662,14 @@ mod isahc_client {
         gen_method_func!(post, POST);
 
         fn with_header<S: AsRef<str>>(&mut self, name: S, value: S)
-        -> &mut Self {
+        -> Result<&mut Self, ValidationError> {
             use std::str::FromStr as _;
 
-            let name = HeaderName::from_str(name.as_ref()).unwrap();
-            let value = HeaderValue::from_str(value.as_ref()).unwrap();
+            let name = HeaderName::from_str(name.as_ref())?;
+            let value = HeaderValue::from_str(value.as_ref())?;
 
             self.headers.push((name, value));
-            self
+            Ok(self)
         }
 
         fn with_body(&mut self, data: impl Into<Vec<u8>>) -> &mut Self {

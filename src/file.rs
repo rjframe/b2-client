@@ -478,7 +478,7 @@ pub async fn cancel_large_file_by_id<C, E>(
 
     let res = auth.client.post(auth.api_url("b2_cancel_large_file"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(serde_json::json!({ "fileId": id.as_ref() }))
         .send().await?;
 
@@ -905,7 +905,7 @@ pub async fn copy_file<'a, C, E>(
 
     let res = auth.client.post(auth.api_url("b2_copy_file"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(serde_json::to_value(file)?)
         .send().await?;
 
@@ -1065,7 +1065,7 @@ pub async fn copy_file_part<C, E>(
 
     let res = auth.client.post(auth.api_url("b2_copy_part"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(serde_json::to_value(file_part)?)
         .send().await?;
 
@@ -1144,7 +1144,7 @@ pub async fn download_file_headers_by_id<C, E>(
             )
         )
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .send_keep_headers().await?;
 
     Ok(res.1)
@@ -1502,11 +1502,11 @@ async fn download_file_by_id<C, E>(
 
     let mut req = auth.client.post(auth.download_url("b2_download_file_by_id"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(file_req);
 
     if let Some(range) = file.range {
-        req = req.with_header("Range", &range.to_string());
+        req = req.with_header("Range", &range.to_string())?;
     }
 
     if let Some(ServerSideEncryption::SelfManaged(enc)) = file.encryption {
@@ -1514,15 +1514,15 @@ async fn download_file_by_id<C, E>(
             .with_header(
                 "X-Bz-Server-Side-Encryption-Customer-Algorithm",
                 &enc.algorithm.to_string()
-            )
+            )?
             .with_header(
                 "X-Bz-Server-Side-Encryption-Customer-Key",
                 &enc.key
-            )
+            )?
             .with_header(
                 "X-Bz-Server-Side-Encryption-Customer-Key-Md5",
                 &enc.digest
-            );
+            )?;
     }
 
     let (body, headers) = req.send_keep_headers().await?;
@@ -1602,10 +1602,10 @@ async fn download_file_by_name<'a, C, E>(
 
     let mut req = client.get(url)
         .expect("Invalid URL")
-        .with_header("Authorization", &auth_token);
+        .with_header("Authorization", &auth_token).unwrap();
 
     if let Some(range) = file.range {
-        req = req.with_header("Range", &range.to_string())
+        req = req.with_header("Range", &range.to_string())?
     }
 
     let (body, headers) = req.send_keep_headers().await?;
@@ -1649,7 +1649,7 @@ pub async fn delete_file_version_by_name_id<C, E>(
 
     let res = auth.client.post(auth.api_url("b2_delete_file_version"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(body)
         .send().await?;
 
@@ -1694,7 +1694,7 @@ pub async fn finish_large_file_upload_by_id<C, E>(
 
     let res = auth.client.post(auth.api_url("b2_finish_large_file"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(json!( {
             "fileId": file_id.as_ref(),
             "partSha1Array": &sha1_checksums,
@@ -1727,7 +1727,7 @@ pub async fn get_file_info<C, E>(
 
     let res = auth.client.post(auth.api_url("b2_get_file_info"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(json!({
             "fileId": file_id.as_ref(),
         }))
@@ -2008,7 +2008,7 @@ pub async fn get_download_authorization<'a, C, E>(
 
     let res = auth.client.post(auth.api_url("b2_get_download_authorization"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(serde_json::to_value(download_req)?)
         .send().await?;
 
@@ -2087,7 +2087,7 @@ pub async fn get_upload_part_authorization_by_id<'a, 'b, C, E>(
 
     let res = auth.client.post(auth.api_url("b2_get_upload_part_url"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(json!({ "fileId": file_id.as_ref() }))
         .send().await?;
 
@@ -2167,7 +2167,7 @@ pub async fn get_upload_authorization_by_id<'a, 'b, C, E>(
 
     let res = auth.client.post(auth.api_url("b2_get_upload_url"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(json!({ "bucketId": bucket_id.as_ref() }))
         .send().await?;
 
@@ -2227,7 +2227,7 @@ pub async fn hide_file_by_name<C, E>(
 
     let res = auth.client.post(auth.api_url("b2_hide_file"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(json!({
             "bucketId": bucket_id.as_ref(),
             "fileName": file_name.as_ref(),
@@ -2368,7 +2368,7 @@ pub async fn list_file_names<'a, C, E>(
 
     let res = auth.client.post(auth.api_url("b2_list_file_names"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(serde_json::to_value(&request)?)
         .send().await?;
 
@@ -2543,7 +2543,7 @@ pub async fn list_file_versions<'a, C, E>(
 
     let res = auth.client.post(auth.api_url("b2_list_file_versions"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(serde_json::to_value(&request)?)
         .send().await?;
 
@@ -2649,7 +2649,7 @@ pub async fn list_file_parts<'a, C, E>(
 
     let res = auth.client.post(auth.api_url("b2_list_parts"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(serde_json::to_value(&request)?)
         .send().await?;
 
@@ -2769,7 +2769,7 @@ pub async fn list_unfinished_large_files<'a, C, E>(
 
     let res = auth.client.post(auth.api_url("b2_list_unfinished_large_files"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(serde_json::to_value(&request)?)
         .send().await?;
 
@@ -3078,7 +3078,7 @@ pub async fn start_large_file<'a, C, E>(
 
     let res = auth.client.post(auth.api_url("b2_start_large_file"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(serde_json::to_value(file)?)
         .send().await?;
 
@@ -3202,7 +3202,7 @@ pub async fn update_file_legal_hold<C, E>(
 
     let res = auth.client.post(auth.api_url("b2_update_file_legal_hold"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(serde_json::to_value(file_update)?)
         .send().await?;
 
@@ -3331,7 +3331,7 @@ pub async fn update_file_retention<C, E>(
 
     let res = auth.client.post(auth.api_url("b2_update_file_retention"))
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
+        .with_header("Authorization", &auth.authorization_token).unwrap()
         .with_body_json(serde_json::to_value(retention_update)?)
         .send().await?;
 
@@ -3659,11 +3659,11 @@ pub async fn upload_file<C, E>(
 
     let mut req = inner_auth.client.post(&auth.upload_url)
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
-        .with_header("X-Bz-File-Name", &upload.file_name)
-        .with_header("Content-Type", &upload.content_type)
-        .with_header("Content-Length", &data.len().to_string())
-        .with_header("X-Bz-Content-Sha1", upload.sha1_checksum);
+        .with_header("Authorization", &auth.authorization_token)?
+        .with_header("X-Bz-File-Name", &upload.file_name)?
+        .with_header("Content-Type", &upload.content_type)?
+        .with_header("Content-Length", &data.len().to_string())?
+        .with_header("X-Bz-Content-Sha1", upload.sha1_checksum)?;
 
     if let Some(mut file_info) = upload.file_info {
         let info_map = file_info.as_object_mut()
@@ -3672,7 +3672,7 @@ pub async fn upload_file<C, E>(
         macro_rules! add_metadata_header {
             ($header_name:literal) => {
                 if let Some(val) = info_map.remove($header_name) {
-                    req = req.with_header($header_name, val.as_str().unwrap())
+                    req = req.with_header($header_name, val.as_str().unwrap())?
                 }
             };
         }
@@ -3685,40 +3685,40 @@ pub async fn upload_file<C, E>(
         add_metadata_header!("X-Bz-Info-content-encoding");
 
         for (key, val) in info_map.into_iter() {
-            req = req.with_header(key, &val.to_string());
+            req = req.with_header(key, &val.to_string())?;
         }
     }
 
     if let Some(legal_hold) = upload.legal_hold {
-        req = req.with_header("X-Bz-File-Legal-Hold", &legal_hold.to_string());
+        req = req.with_header("X-Bz-File-Legal-Hold", &legal_hold.to_string())?;
     }
 
     if let Some((mode, timestamp)) = upload.file_retention {
         req = req
-            .with_header("X-Bz-File-Retention-Mode", &mode.to_string())
+            .with_header("X-Bz-File-Retention-Mode", &mode.to_string())?
             .with_header("X-Bz-File-Retention-Retain-Until-Timestamp",
-                &timestamp.to_string());
+                &timestamp.to_string())?;
     }
 
     match upload.encryption {
         Some(ServerSideEncryption::B2Managed(enc)) => {
             req = req
-                .with_header("X-Bz-Server-Side-Encryption", &enc.to_string());
+                .with_header("X-Bz-Server-Side-Encryption", &enc.to_string())?;
         },
         Some(ServerSideEncryption::SelfManaged(enc)) => {
             req = req
                 .with_header(
                     "X-Bz-Server-Side-Encryption-Customer-Algorithm",
                     &enc.algorithm.to_string()
-                )
+                )?
                 .with_header(
                     "X-Bz-Server-Side-Encryption-Customer-Key",
                     &enc.key
-                )
+                )?
                 .with_header(
                     "X-Bz-Server-Side-Encryption-Customer-Key-Md5",
                     &enc.digest
-                );
+                )?;
         },
         _ => {},
     }
@@ -3795,10 +3795,10 @@ pub async fn upload_file_part<C, E>(
 
     let req = inner_auth.client.post(&auth.upload_url)
         .expect("Invalid URL")
-        .with_header("Authorization", &auth.authorization_token)
-        .with_header("X-Bz-Part-Number", &part_num.to_string())
-        .with_header("Content-Length", &data.len().to_string())
-        .with_header("X-Bz-Content-Sha1", sha1);
+        .with_header("Authorization", &auth.authorization_token).unwrap()
+        .with_header("X-Bz-Part-Number", &part_num.to_string())?
+        .with_header("Content-Length", &data.len().to_string())?
+        .with_header("X-Bz-Content-Sha1", sha1)?;
 
     // TODO: Encryption headers.
 
