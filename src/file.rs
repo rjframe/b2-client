@@ -3506,9 +3506,32 @@ impl<'a> UploadFileBuilder<'a> {
     ///
     /// If any of the above are set here and via their methods, the value from
     /// the method will override the value specified here.
+    ///
+    /// Any header names that do not begin with "`X-Bz-Info-`" will have it
+    /// prepended to the supplied name.
     pub fn file_info(mut self, info: serde_json::Value)
     -> Result<Self, ValidationError> {
-        self.file_info = Some(validated_file_info(info)?);
+        let mut file_info = validated_file_info(info)?;
+
+        if let Some(map) = file_info.as_object_mut() {
+            let mut key_updates = vec![];
+
+            for key in map.keys() {
+                if ! key.starts_with("X-Bz-Info-") {
+                    key_updates.push(key.to_owned());
+                }
+            }
+
+            for old_key in key_updates.into_iter() {
+                let val = map.remove(&old_key).unwrap();
+                let mut new_key = String::from("X-Bz-Info-");
+                new_key.push_str(&old_key);
+
+                map.insert(new_key, val);
+            }
+        }
+
+        self.file_info = Some(file_info);
         Ok(self)
     }
 

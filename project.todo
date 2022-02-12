@@ -8,7 +8,7 @@ Project:
         ☐ Fix all warnings, including clippy
         ☐ Review, update README, etc. as needed
         ☐ Review generated documentation
-        ☐ Ensure file_info validation includes X-Bz-Info- prefix.
+        ✓ Ensure file_info validation includes X-Bz-Info- prefix. @done(2022-02-12 14:28) @project(Project \ Pre-0.1.0)
 
         In-source TODOs:
             ✓ file::FileRetentionSetting::new() -> ensure time is in the future @done(2022-02-09 11:18) @project(Project \ Pre-0.1.0 \ In-source TODOs)
