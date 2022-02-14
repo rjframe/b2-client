@@ -42,12 +42,15 @@
 //!     * You can upload parts in separate threads for better performance; each
 //!       thread must call [get_upload_part_authorization] and use its
 //!       respective authorization when uploading data.
-//! 4. Use the [UploadPartAuthorization] to (repeatedly) call [upload_file_part]
-//!    with the file data to upload.
-//! 5. Call [finish_large_file_upload] to merge the file parts into a single
+//! 4. Create an [UploadFilePart] object via the [UploadFilePartBuilder].
+//! 5. Use the `UploadPartAuthorization` and `UploadFilePart` to call
+//!    [upload_file_part] with the file data to upload.
+//! 6. Call [UploadFilePart::create_next_part] to create a new upload part
+//!    request.
+//! 7. Repeat steps 5 and 6 until all parts have been uploaded.
+//! 8. Call [finish_large_file_upload] to merge the file parts into a single
 //!    [File]. After finishing the file, it can be treated like any other
 //!    uploaded file.
-//!
 //!
 //! # Examples
 //!
