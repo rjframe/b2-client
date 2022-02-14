@@ -110,7 +110,7 @@ mod empty {
         -> Result<&mut Self, b2_client::error::ValidationError> { Ok(self) }
 
         fn with_header<S: AsRef<str>>(&mut self, name: S, value: S)
-        -> &mut Self { self }
+        -> Result<&mut Self, b2_client::error::ValidationError> { Ok(self) }
         fn with_body(&mut self, data: impl Into<Vec<u8>>)
         -> &mut Self { self }
         fn with_body_json(&mut self, body: serde_json::Value)
