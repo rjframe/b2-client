@@ -52,7 +52,7 @@ pub(crate) mod test_utils {
     use std::boxed::Box;
     use crate::{
         account::{Authorization, Capability, Capabilities},
-        client::{SurfClient, HttpClient},
+        client::SurfClient,
     };
     use surf_vcr::*;
     use surf::http::Method;

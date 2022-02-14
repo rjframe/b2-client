@@ -17,7 +17,7 @@ use std::{
     path::PathBuf,
 };
 
-use crate::error::{ValidationError, Error};
+use crate::error::ValidationError;
 
 #[cfg(feature = "with_surf")]
 pub use surf_client::SurfClient;
@@ -108,6 +108,7 @@ pub use default_user_agent;
 mod surf_client {
     use std::path::PathBuf;
     use super::*;
+    use crate::error::Error;
     use surf::{
         http::Method,
         Request,
@@ -297,6 +298,7 @@ mod surf_client {
 mod hyper_client {
     use std::path::PathBuf;
     use super::*;
+    use crate::error::Error;
     use hyper::{
         client::connect::HttpConnector,
         header::{HeaderName, HeaderValue},
@@ -527,6 +529,7 @@ mod hyper_client {
 #[cfg(feature = "with_isahc")]
 mod isahc_client {
     use super::*;
+    use crate::error::Error;
     use isahc::http::{
         header::{HeaderName, HeaderValue},
         method::Method,

@@ -50,6 +50,7 @@ impl<C> Authorization<C>
 {
     // Allow tests to create fake Authorizations.
     #[cfg(test)]
+    #[allow(dead_code)]
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         client: C,
@@ -156,6 +157,7 @@ pub struct Capabilities {
 impl Capabilities {
     // Allow tests to create Capabilities.
     #[cfg(test)]
+    #[allow(dead_code)]
     pub(crate) fn new(
         capabilities: Vec<Capability>,
         bucket_id: Option<String>,

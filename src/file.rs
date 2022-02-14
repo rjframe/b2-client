@@ -244,6 +244,7 @@ pub enum FileAction {
 /// Sets the file retention mode and date/time during which the retention rule
 /// applies.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct FileRetentionSetting {
     mode: Option<FileRetentionMode>,
     #[serde(rename = "retainUntilTimestamp")]
@@ -276,6 +277,19 @@ pub struct FileRetention {
     #[serde(rename = "isClientAuthorizedToRead")]
     can_read: bool,
     value: FileRetentionSetting,
+}
+
+impl FileRetention {
+    /// Get the file retention settings.
+    ///
+    /// If not authorized to read the settings, returns `None`.
+    pub fn settings(&self) -> Option<FileRetentionSetting> {
+        if self.can_read {
+            Some(self.value)
+        } else {
+            None
+        }
+    }
 }
 
 // TODO: Rename to FileMetadata?

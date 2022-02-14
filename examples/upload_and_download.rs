@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+
 use std::env;
 
 use anyhow::anyhow;
@@ -102,23 +105,23 @@ mod empty {
     impl b2_client::HttpClient for NoClient {
         type Error = b2_client::Error<&'static str>;
 
-        fn get(&mut self, url: impl AsRef<str>)
+        fn get(&mut self, _url: impl AsRef<str>)
         -> Result<&mut Self, b2_client::error::ValidationError> { Ok(self) }
-        fn head(&mut self, url: impl AsRef<str>)
+        fn head(&mut self, _url: impl AsRef<str>)
         -> Result<&mut Self, b2_client::error::ValidationError> { Ok(self) }
-        fn post(&mut self, url: impl AsRef<str>)
+        fn post(&mut self, _url: impl AsRef<str>)
         -> Result<&mut Self, b2_client::error::ValidationError> { Ok(self) }
 
-        fn with_header<S: AsRef<str>>(&mut self, name: S, value: S)
+        fn with_header<S: AsRef<str>>(&mut self, _name: S, _value: S)
         -> Result<&mut Self, b2_client::error::ValidationError> { Ok(self) }
-        fn with_body(&mut self, data: impl Into<Vec<u8>>)
+        fn with_body(&mut self, _data: impl Into<Vec<u8>>)
         -> &mut Self { self }
-        fn with_body_json(&mut self, body: serde_json::Value)
+        fn with_body_json(&mut self, _body: serde_json::Value)
         -> &mut Self { self }
-        fn read_body_from_file(&mut self, path: impl Into<std::path::PathBuf>)
+        fn read_body_from_file(&mut self, _path: impl Into<std::path::PathBuf>)
         -> &mut Self { self }
 
-        fn user_agent(&mut self, user_agent_string: impl Into<String>)
+        fn user_agent(&mut self, _user_agent_string: impl Into<String>)
         -> Result<&mut Self, b2_client::error::ValidationError> { Ok(self) }
 
         async fn send(&mut self) -> Result<Vec<u8>, Self::Error> {

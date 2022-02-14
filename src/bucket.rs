@@ -817,11 +817,35 @@ impl CreateBucketBuilder {
 #[derive(Debug, Deserialize)]
 pub struct FileLockConfiguration {
     #[serde(rename = "isClientAuthorizedToRead")]
-    can_read: bool, // TODO: Is this even worth keeping?
+    can_read: bool,
     #[serde(rename = "isFileLockEnabled")]
     file_lock_enabled: bool,
     #[serde(rename = "value")]
     retention: FileRetentionPolicy,
+}
+
+impl FileLockConfiguration {
+    /// Check whether a file lock is enabled.
+    ///
+    /// If not authorized to read the file lock configuration, returns `None`.
+    pub fn lock_is_enabled(&self) -> Option<bool> {
+        if self.can_read {
+            Some(self.file_lock_enabled)
+        } else {
+            None
+        }
+    }
+
+    /// Get the file lock's retention policy.
+    ///
+    /// If not authorized to read the file lock configuration, returns `None`.
+    pub fn retention_policy(&self) -> Option<FileRetentionPolicy> {
+        if self.can_read {
+            Some(self.retention)
+        } else {
+            None
+        }
+    }
 }
 
 /// The B2 mode of a file's retention policy.
