@@ -74,6 +74,26 @@ pub trait HttpClient
 // TODO: Use http_types::{HeaderName, HeaderValue} instead of Strings?
 pub type HeaderMap = HashMap<String, String>;
 
+/// Generate a standard User-Agent string for HTTP client backends.
+///
+/// This is only useful if creating your own implementation of [HttpClient] and
+/// you want to maintain b2-client's standard User-Agent format.
+///
+/// # Examples
+///
+/// ```
+/// # use b2_client::client::default_user_agent;
+/// struct CurlClient { user_agent: String };
+///
+/// impl Default for CurlClient {
+///     fn default() -> Self {
+///         Self {
+///             user_agent: default_user_agent!("curl"),
+///         }
+///     }
+/// }
+/// ```
+#[macro_export]
 macro_rules! default_user_agent {
     ($client:literal) => {
         format!("rust-b2-client/{}; {}",
@@ -82,6 +102,7 @@ macro_rules! default_user_agent {
         )
     };
 }
+pub use default_user_agent;
 
 #[cfg(feature = "with_surf")]
 mod surf_client {
