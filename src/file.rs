@@ -2556,9 +2556,11 @@ pub async fn list_file_versions<'a, C, E>(
     let files: B2Result<FileVersionList> = serde_json::from_slice(&res)?;
     match files {
         B2Result::Ok(files) => {
-            if let Some(next_file) = files.next_file_name {
-                let mut request = request;
-                request.start_file_name = Some(next_file);
+            let mut request = request;
+
+            if files.next_file_name.is_some() {
+                request.start_file_name = files.next_file_name;
+                request.start_file_id = files.next_file_id;
 
                 Ok((files.files, Some(request)))
             } else {
