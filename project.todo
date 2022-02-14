@@ -5,11 +5,13 @@ Project:
         ✓ Bucket's fields need to be publicly accessible @done(2022-02-09 09:36) @project(Project \ Pre-0.1.0)
         ✓ Check: did I intentionally keep Request in name KeyListRequest when I removed the others? If so, do I still agree? @done(2022-02-09 10:24) @project(Project \ Pre-0.1.0)
         ☐ Move project.todo items to web tracker
-        ☐ Fix all warnings, including clippy
+        ✓ Fix all warnings, including clippy @done(2022-02-14 13:35) @project(Project \ Pre-0.1.0)
         ☐ Review, update README, etc. as needed
         ☐ Review generated documentation
         ✓ Ensure file_info validation includes X-Bz-Info- prefix. @done(2022-02-12 14:28) @project(Project \ Pre-0.1.0)
         ✓ Make client::default_user_agent macro public, document its use @done(2022-02-14 12:31) @project(Project \ Pre-0.1.0)
+        ✓ Implement cache_control() for CreateBucketBuilder, UpdateBucketBuilder, @done(2022-02-14 14:22) @project(Project \ Pre-0.1.0)
+        ✓ Various CacheDirectives in builders need to be CacheControl @done(2022-02-14 14:22) @project(Project \ Pre-0.1.0)
 
         In-source TODOs:
             ✓ file::FileRetentionSetting::new() -> ensure time is in the future @done(2022-02-09 11:18) @project(Project \ Pre-0.1.0 \ In-source TODOs)

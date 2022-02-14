@@ -172,7 +172,7 @@ use crate::{
 };
 
 pub use http_types::{
-    cache::{CacheDirective, Expires},
+    cache::{CacheControl, Expires},
     content::ContentEncoding,
     mime::Mime,
 };
@@ -794,11 +794,8 @@ impl<'a> CopyFileBuilder<'a> {
     ///
     /// This would override the value set at the bucket level, and can be
     /// overriden by a download request.
-    pub fn cache_control(mut self, directive: CacheDirective) -> Self {
-        use http_types::headers::HeaderValue;
-
-        let cc = percent_encode!(HeaderValue::from(directive).to_string());
-        self.cache_control = Some(cc);
+    pub fn cache_control(mut self, cache_control: CacheControl) -> Self {
+        self.cache_control = Some(cache_control.value().to_string());
         self
     }
 
@@ -1359,10 +1356,8 @@ impl<'a> DownloadFileBuilder<'a> {
     ///
     /// If including this header will exceed the 7,000 byte header limit (2,048
     /// bytes if using server-side encryption), the request will be rejected.
-    pub fn cache_control(mut self, directive: CacheDirective) -> Self {
-        use http_types::headers::HeaderValue;
-
-        self.cache_control = Some(HeaderValue::from(directive).to_string());
+    pub fn cache_control(mut self, cache_control: CacheControl) -> Self {
+        self.cache_control = Some(cache_control.value().to_string());
         self
     }
 
@@ -1882,10 +1877,8 @@ impl<'a> DownloadAuthorizationRequestBuilder<'a> {
     }
 
     /// If specified, download requests must have this cache control.
-    pub fn cache_control(mut self, directive: CacheDirective) -> Self {
-        use http_types::headers::HeaderValue;
-
-        self.b2_cache_control = Some(HeaderValue::from(directive).to_string());
+    pub fn cache_control(mut self, cache_control: CacheControl) -> Self {
+        self.b2_cache_control = Some(cache_control.value().to_string());
         self
     }
 
@@ -2986,11 +2979,8 @@ impl<'a> StartLargeFileBuilder<'a> {
     ///
     /// This would override the value set at the bucket level, and can be
     /// overriden by a download request.
-    pub fn cache_control(mut self, directive: CacheDirective) -> Self {
-        use http_types::headers::HeaderValue;
-
-        let cc = percent_encode!(HeaderValue::from(directive).to_string());
-        self.cache_control = Some(cc);
+    pub fn cache_control(mut self, cache_control: CacheControl) -> Self {
+        self.cache_control = Some(cache_control.value().to_string());
         self
     }
 
@@ -3033,6 +3023,7 @@ impl<'a> StartLargeFileBuilder<'a> {
             add_file_info!(info_map, "b2-content-language",
                 self.content_language);
             add_file_info!(info_map, "b2-expires", self.expires);
+            add_file_info!(info_map, "b2-cache-control", self.cache_control);
             add_file_info!(info_map, "b2-content-encoding",
                 self.content_encoding);
 
@@ -3496,11 +3487,8 @@ impl<'a> UploadFileBuilder<'a> {
     ///
     /// This would override the value set at the bucket level, and can be
     /// overriden by a download request.
-    pub fn cache_control(mut self, directive: CacheDirective) -> Self {
-        use http_types::headers::HeaderValue;
-
-        let cc = percent_encode!(HeaderValue::from(directive).to_string());
-        self.cache_control = Some(cc);
+    pub fn cache_control(mut self, cache_control: CacheControl) -> Self {
+        self.cache_control = Some(cache_control.value().to_string());
         self
     }
 
@@ -3977,6 +3965,7 @@ mod tests_mocked {
 
     #[async_std::test]
     async fn test_get_download_authorization() -> Result<(), anyhow::Error> {
+        use http_types::cache::CacheDirective;
 
         // I need two copies of an identical expiration, but it doesn't
         // implement Clone.
@@ -4018,6 +4007,9 @@ mod tests_mocked {
         let mut auth = create_test_auth(client, vec![Capability::ShareFiles])
             .await;
 
+        let mut cache_control = CacheControl::new();
+        cache_control.push(CacheDirective::MustRevalidate);
+
         let req = DownloadAuthorizationRequest::builder()
             .bucket_id("8d625eb63be2775577c70e1a")
             .file_name_prefix("files/")?
@@ -4026,7 +4018,7 @@ mod tests_mocked {
                 ContentDisposition("Attachment; filename=example.html".into())
             )
             .expiration(expires2)
-            .cache_control(CacheDirective::MustRevalidate)
+            .cache_control(cache_control)
             .build()?;
 
         let download_auth = get_download_authorization(&mut auth, req).await?;

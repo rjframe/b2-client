@@ -293,7 +293,8 @@ pub enum Error<E>
     Unauthorized(crate::account::Capability),
     /// An error validating data prior to making a Backblaze B2 API call.
     Validation(ValidationError),
-    /// Attempted to send a request without a valid [Authorization].
+    /// Attempted to send a request without a valid
+    /// [Authorization](crate::account::Authorization).
     MissingAuthorization,
     /// Attempted to send a non-existent request.
     NoRequest,

@@ -20,6 +20,7 @@ use crate::{
     validate::*,
 };
 
+use http_types::cache::CacheControl;
 use serde::{Serialize, Deserialize};
 
 
@@ -628,6 +629,7 @@ pub struct CreateBucketBuilder {
     bucket_name: Option<String>,
     bucket_type: Option<BucketType>,
     bucket_info: Option<serde_json::Value>,
+    cache_control: Option<String>,
     cors_rules: Option<Vec<CorsRule>>,
     file_lock_enabled: bool,
     lifecycle_rules: Option<Vec<LifecycleRule>>,
@@ -666,15 +668,28 @@ impl CreateBucketBuilder {
     /// Use the provided information with the bucket.
     ///
     /// This can contain arbitrary metadata for your own use. You can also set
-    /// cache-control settings from here (but see [Self::cache_control]).
+    /// cache-control settings from here (but see
+    /// [cache_control](Self::cache_control)). If Cache-Control is set here and
+    /// via the `cache-control` method, the latter will override this value.
     // TODO: Validate CORS rules if provided.
     pub fn bucket_info(mut self, info: serde_json::Value)
     -> Result<Self, ValidationError> {
-        self.bucket_info = Some(info);
-        Ok(self)
+        if info.is_object() {
+            self.bucket_info = Some(info);
+            Ok(self)
+        } else {
+            Err(ValidationError::BadFormat(
+                "Bucket info must be a JSON object".into()
+            ))
+        }
     }
 
-    // TODO: pub fn cache_control()
+    /// Set the default Cache-Control header value for files downloaded from the
+    /// bucket.
+    pub fn cache_control(mut self, cache_control: CacheControl) -> Self {
+        self.cache_control = Some(cache_control.value().to_string());
+        self
+    }
 
     /// Use the provided CORS rules for the bucket.
     ///
@@ -800,11 +815,27 @@ impl CreateBucketBuilder {
             )
         )?;
 
+        let bucket_info = if let Some(cache_control) = self.cache_control {
+            let mut info = self.bucket_info.unwrap_or_else(||
+                serde_json::Value::Object(serde_json::Map::new())
+            );
+
+            info.as_object_mut()
+                .map(|map| map.insert(
+                    String::from("Cache-Control"),
+                    serde_json::Value::String(cache_control)
+                ));
+
+            Some(info)
+        } else {
+            self.bucket_info
+        };
+
         Ok(CreateBucket {
             account_id: None,
             bucket_name,
             bucket_type,
-            bucket_info: self.bucket_info,
+            bucket_info,
             cors_rules: self.cors_rules,
             file_lock_enabled: self.file_lock_enabled,
             lifecycle_rules: self.lifecycle_rules,
@@ -1198,6 +1229,7 @@ pub struct UpdateBucketBuilder {
     bucket_id: Option<String>,
     bucket_type: Option<BucketType>,
     bucket_info: Option<serde_json::Value>,
+    cache_control: Option<String>,
     cors_rules: Option<Vec<CorsRule>>,
     default_retention: Option<FileRetentionPolicy>,
     default_server_side_encryption: Option<ServerSideEncryption>,
@@ -1230,14 +1262,21 @@ impl UpdateBucketBuilder {
     /// Replace the current bucket information with the specified information.
     ///
     /// This can contain arbitrary metadata for your own use. You can also set
-    /// cache-control settings from here (but see [Self::cache_control]).
+    /// cache-control settings from here (but see
+    /// [cache_control](Self::cache_control)). If Cache-Control is set here and
+    /// via the `cache-control` method, the latter will override this value.
     pub fn bucket_info(mut self, info: serde_json::Value)
     -> Self {
         self.bucket_info = Some(info);
         self
     }
 
-    // TODO: pub fn cache_control()
+    /// Set the default Cache-Control header value for files downloaded from the
+    /// bucket.
+    pub fn cache_control(mut self, cache_control: CacheControl) -> Self {
+        self.cache_control = Some(cache_control.value().to_string());
+        self
+    }
 
     /// Replace the bucket's current provided CORS rules with the provided
     /// rules.
@@ -1304,11 +1343,27 @@ impl UpdateBucketBuilder {
             )
         )?;
 
+        let bucket_info = if let Some(cache_control) = self.cache_control {
+            let mut info = self.bucket_info.unwrap_or_else(||
+                serde_json::Value::Object(serde_json::Map::new())
+            );
+
+            info.as_object_mut()
+                .map(|map| map.insert(
+                    String::from("Cache-Control"),
+                    serde_json::Value::String(cache_control)
+                ));
+
+            Some(info)
+        } else {
+            self.bucket_info
+        };
+
         Ok(UpdateBucket {
             account_id: None,
             bucket_id,
             bucket_type: self.bucket_type,
-            bucket_info: self.bucket_info,
+            bucket_info,
             cors_rules: self.cors_rules,
             default_retention: self.default_retention,
             default_server_side_encryption: self.default_server_side_encryption,
