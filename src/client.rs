@@ -76,8 +76,11 @@ pub type HeaderMap = HashMap<String, String>;
 
 /// Generate a standard User-Agent string for HTTP client backends.
 ///
-/// This is only useful if creating your own implementation of [HttpClient] and
-/// you want to maintain b2-client's standard User-Agent format.
+/// This is only useful if you either:
+///
+/// * create your own implementation of [HttpClient] and you want to maintain
+///   b2-client's standard User-Agent format, or
+/// * want to add contact information to the default User-Agent string.
 ///
 /// # Examples
 ///
@@ -92,6 +95,17 @@ pub type HeaderMap = HashMap<String, String>;
 ///         }
 ///     }
 /// }
+/// ```
+///
+/// ```
+/// # #[cfg(feature = "with_surf")]
+/// # fn custom_user_agent() {
+/// use b2_client::client::{default_user_agent, HttpClient as _, SurfClient};
+///
+/// let client = SurfClient::default()
+///     .user_agent(default_user_agent!("surf (contact@example.com)"));
+/// # }
+///
 /// ```
 #[macro_export]
 macro_rules! default_user_agent {

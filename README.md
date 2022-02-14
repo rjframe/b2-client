@@ -1,7 +1,7 @@
 # B2-client - Backend-agnostic Backblaze B2 API Client
 
-B2-client provides a Rust API to Backblaze B2 services, backed by any HTTP
-client.
+B2-client provides a Rust API to Backblaze B2 cloud storage service, backed by
+any async HTTP client utilizing any async runtime.
 
 Support for [Hyper](https://crates.io/crates/hyper),
 [Isahc](https://crates.io/crates/isahc), and
@@ -35,11 +35,10 @@ SourceHut.
 
 ## Introduction
 
-B2-client is an async-runtime-agnostic, HTTP client-agnostic interface to the
-Backblaze B2 API.
+B2-client is an async runtime-agnostic, HTTP client-agnostic interface to the
+Backblaze B2 API. The full B2 API is supported.
 
-Note that most (if not all) of these functions can incur charges to your
-account. You will want to mock the B2 servers in your code's tests.
+Note that most of these functions can incur charges to your account.
 
 
 ## License
@@ -55,17 +54,8 @@ The source code of examples is licensed under the terms of the
 
 ### Installation
 
-The full B2 API is supported. I have a few tasks to complete prior to listing
-this on the Cargo registry, so for now you need to clone the git repository and
-add it as a path-based dependency.
-
-```toml
-[dependencies]
-b2-client = { path = "../b2-client" }
-```
-
 To use a pre-packaged HTTP client, choose the backend via the relevant feature.
-Supported features are
+Supported features are:
 
 * `with_hyper`
 * `with_surf`
@@ -74,16 +64,23 @@ Supported features are
 This list will eventually use the lower-level client libraries instead (e.g., h1
 instead of hyper).
 
-There is no default client, so you must choose one of the above features or a
-custom HTTP client. To use your own HTTP backend, simply implement the
-`HttpClient` trait.
+Add b2-client as a dependency via cargo; for example, to use the
+[Surf](https://crates.io/crates/surf) HTTP client:
+
+```shell
+cargo add b2-client --features with_surf
+```
+
+There is no default client, so you must choose one of the above features or use
+a custom HTTP client. To use your own HTTP backend, simply implement the
+`HttpClient` trait then pass the struct to `account::authorize_account`.
 
 
 ### Testing
 
 API calls are faked via pre-recorded sessions using the surf backend, so to run
-all tests run them with `--features=with_surf`. No test runs agains the live B2
-service by default.
+all tests run `cargo test --features=with_surf`. No test runs against the live
+B2 service by default.
 
 To run a test against the live B2 API, set the environment variables
 `B2_CLIENT_TEST_KEY` and `B2_CLIENT_TEST_KEY_ID` to a key/id pair capable of
@@ -106,7 +103,6 @@ their pre-recorded sessions if the environment variables are set.
   This is due to the fact that we can validate authorization to write prior to
   making the API call, but cannot pre-validate the authorization to read. This
   is solveable; it just requires determining the best method to merge them.
-* Small design inconsistencies, some private data should be public, etc.
 
 
 ## Contributing
@@ -129,5 +125,7 @@ a draft PR.
 
 ## Related Projects
 
-* [backblaze-b2](https://crates.io/crates/backblaze-b2): Uses Hyper
+* [b2_backblaze](https://crates.io/crates/b2_backblaze): Uses reqwest
 * [raze](https://crates.io/crates/raze): Uses reqwest
+* [backblaze-b2](https://crates.io/crates/backblaze-b2): Uses Hyper. Probably
+  unmaintained

@@ -143,14 +143,6 @@
 //!     ).await?)
 //! }
 //! ```
-//!
-//! # Differences from the B2 Service API
-//!
-//! * The B2 endpoint `b2_get_upload_part_url` is
-//!   [get_upload_part_authorization].
-//! * The B2 endpoint `b2_get_upload_url` is [get_upload_authorization].
-//! * The word "file" is often added for clarity; e.g., the B2 endpoint
-//!   `b2_copy_part` is [copy_file_part].
 
 use std::fmt;
 

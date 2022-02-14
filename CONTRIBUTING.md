@@ -31,8 +31,8 @@ issue/PR or start a discussion.
 * [Create tickets](https://todo.sr.ht/~rjframe/b2-client) for discovered bugs
   and ideas for improvement, reference material to answering questions other
   people have.
-* Improve tests -- in particular, we should be testing against multiple HTTP
-  clients.
+* Improve tests -- in particular, we need to be able to test the live API
+  against multiple HTTP clients.
 * Help implement the B2 API.
 
 
@@ -41,12 +41,15 @@ issue/PR or start a discussion.
 Before submitting a PR or patchset, be sure to check that you haven't broken
 various feature combinations:
 
-* Can you build documentation with all HTTP client backends?
-    - `cargo doc --no-deps --all-features
-* Can you run tests with no default features?
-    - `cargo test --no-default-features`
-* Can you run tests with all HTTP client backends?
-    - `cargo test --all-features
+* Can you build documentation?
+    - `cargo doc --no-deps`
+* Can you run tests with no features?
+    - `cargo test`
+* Can you run tests with each HTTP client backend?
+    - `cargo test --features=with_hyper`
+    - `cargo test --features=with_isahc`
+    - `cargo test --features=with_surf`
+* Are there any clippy warnings?
 
 All new tests related to sending and receiving data from the B2 service need to
 be based on real communication with the service, rather than generated solely
@@ -107,11 +110,6 @@ Resolves: #4
 ```
 
 It's best to keep commits small when possible, doing only one thing.
-
-PRs that are only cosmetic (style) fixes will typically not be accepted since
-this messes up `git blame`. Style-only commits in the code you're working with
-while doing something else are fine, but the style fixes should be in a separate
-commit from functional changes.
 
 
 ### Code Style

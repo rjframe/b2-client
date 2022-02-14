@@ -5,6 +5,50 @@
 
 //! A Backblaze B2 API library that can send and receive data via arbitrary HTTP
 //! clients.
+//!
+//! The full API is supported.
+//!
+//! # Examples
+//!
+//! ```no_run
+//! # fn calculate_sha1(data: &[u8]) -> String { String::default() }
+//! # use anyhow;
+//! use std::env;
+//! use b2_client as b2;
+//!
+//! # #[cfg(feature = "with_surf")]
+//! # async fn upload_file() -> anyhow::Result<()> {
+//! let key = env::var("B2_KEY").ok().unwrap();
+//! let key_id = env::var("B2_KEY_ID").ok().unwrap();
+//!
+//! let client = b2::client::SurfClient::default();
+//! let mut auth = b2::authorize_account(client, &key, &key_id).await?;
+//!
+//! let mut upload_auth = b2::get_upload_authorization_by_id(
+//!     &mut auth,
+//!     "my-bucket-id"
+//! ).await?;
+//!
+//! let file = b2::UploadFile::builder()
+//!     .file_name("my-file.txt")?
+//!     .sha1_checksum("61b8d6600ac94d912874f569a9341120f680c9f8")
+//!     .build()?;
+//!
+//! let data = b"very important information";
+//!
+//! let file_info = b2::upload_file(&mut upload_auth, file, data).await?;
+//!
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Differences from the B2 Service API
+//!
+//! * The B2 endpoint `b2_get_upload_part_url` is
+//!   [get_upload_part_authorization].
+//! * The B2 endpoint `b2_get_upload_url` is [get_upload_authorization].
+//! * The word "file" is often added for clarity; e.g., the B2 endpoint
+//!   `b2_copy_part` is [copy_file_part].
 
 // Increase the recursion limit for a macro in a test in validate.rs.
 #![cfg_attr(test, recursion_limit = "256")]
