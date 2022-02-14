@@ -1462,8 +1462,10 @@ impl<'a, C> From<&'a mut DownloadAuthorization<C>> for DownloadAuth<'a, C>
 /// Download a file from the B2 service.
 ///
 /// If downloading a file by name, you may provide a mutable reference to either
-/// an [Authorization] or a [DownloadAuthorization]. Downloading files by ID
-/// requires an `Authorization`.
+/// an [Authorization] or a [DownloadAuthorization].
+///
+/// Downloading files by ID requires an `Authorization`. If provided with a
+/// `DownloadAuthorization`, returns `Error::MissingAuthorization`.
 pub async fn download_file<'a, C, E>(
     auth: impl Into<DownloadAuth<'a, C>>,
     file: DownloadFile<'_>
@@ -1476,7 +1478,7 @@ pub async fn download_file<'a, C, E>(
             match auth.into() {
                 DownloadAuth::Auth(auth) => download_file_by_id(auth, file)
                     .await,
-                _ => Err(Error::BadRequest),
+                _ => Err(Error::MissingAuthorization),
             }
         },
         FileHandle::Name(_) => download_file_by_name(auth, file).await
