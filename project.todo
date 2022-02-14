@@ -9,13 +9,14 @@ Project:
         ☐ Review, update README, etc. as needed
         ☐ Review generated documentation
         ✓ Ensure file_info validation includes X-Bz-Info- prefix. @done(2022-02-12 14:28) @project(Project \ Pre-0.1.0)
+        ☐ Make client::default_user_agent macro public, document its use
 
         In-source TODOs:
             ✓ file::FileRetentionSetting::new() -> ensure time is in the future @done(2022-02-09 11:18) @project(Project \ Pre-0.1.0 \ In-source TODOs)
             ✓ Document file::StartLargeFileBuilder::content_disposition() @done(2022-02-12 15:00) @project(Project \ Pre-0.1.0 \ In-source TODOs)
             ✓ Support custom headers in file::UploadFile @done(2022-02-10 12:38) @project(Project \ Pre-0.1.0 \ In-source TODOs)
             ✓ Replace client::HttpClient::new() with required Default implementation @done(2022-02-09 10:56) @project(Project \ Pre-0.1.0 \ In-source TODOs)
-            ☐ Support encryption headers in file::upload_file_part()
+            ✓ Support encryption headers in file::upload_file_part() @done(2022-02-14 11:43) @project(Project \ Pre-0.1.0 \ In-source TODOs)
             ✓ client::HttpClient::with_header() needs to return error type @done(2022-02-12 14:56) @project(Project \ Pre-0.1.0 \ In-source TODOs)
             ✓ Document CORS rule requirements for bucket::CorsRuleBuilder @done(2022-02-12 15:02) @project(Project \ Pre-0.1.0 \ In-source TODOs)
             ☐ Either separate all errors that use error::ValidationError::BadRequest or improve its message

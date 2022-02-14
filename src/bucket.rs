@@ -11,7 +11,7 @@
 //! A B2 account has a limit of 100 buckets. All bucket names must be globally
 //! unique (unique across all accounts).
 
-use std::fmt;
+use std::{borrow::Cow, fmt};
 
 use crate::{
     prelude::*,
@@ -556,6 +556,36 @@ pub enum ServerSideEncryption {
 impl Default for ServerSideEncryption {
     fn default() -> Self {
         Self::NoEncryption
+    }
+}
+
+impl ServerSideEncryption {
+    /// Generate the headers required when uploading files.
+    pub(crate) fn to_headers(&self) -> Option<Vec<(&'static str, Cow<str>)>> {
+        match self {
+            Self::B2Managed(enc) => {
+                Some(vec![
+                    ("X-Bz-Server-Side-Encryption", Cow::from(enc.to_string()))
+                ])
+            },
+            Self::SelfManaged(enc) => {
+                Some(vec![
+                    (
+                        "X-Bz-Server-Side-Encryption",
+                        Cow::from(enc.algorithm.to_string())
+                    ),
+                    (
+                        "X-Bz-Server-Side-Encryption-Customer-Key",
+                        Cow::from(&enc.key)
+                    ),
+                    (
+                        "X-Bz-Server-Side-Encryption-Customer-Key-Md5",
+                        Cow::from(&enc.digest)
+                    )
+                ])
+            },
+            Self::NoEncryption => None,
+        }
     }
 }
 

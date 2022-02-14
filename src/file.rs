@@ -115,17 +115,21 @@
 //!     let sha1 = calculate_sha1(&data_part1);
 //!     let sha2 = calculate_sha1(&data_part2);
 //!
+//!     let upload_req = b2::UploadFilePart::builder()
+//!         .part_sha1_checksum(&sha1)
+//!         .build();
+//!
 //!     let _part1 = b2::upload_file_part(
 //!         &mut upload_auth,
-//!         1,
-//!         Some(&sha1),
+//!         &upload_req,
 //!         &data_part1,
 //!     ).await?;
 //!
+//!     let upload_req = upload_req.create_next_part(Some(&sha2))?;
+//!
 //!     let _part2 = b2::upload_file_part(
 //!         &mut upload_auth,
-//!         2,
-//!         Some(&sha2),
+//!         &upload_req,
 //!         &data_part2,
 //!     ).await?;
 //!
@@ -3702,33 +3706,106 @@ pub async fn upload_file<C, E>(
                 &timestamp.to_string())?;
     }
 
-    match upload.encryption {
-        Some(ServerSideEncryption::B2Managed(enc)) => {
-            req = req
-                .with_header("X-Bz-Server-Side-Encryption", &enc.to_string())?;
-        },
-        Some(ServerSideEncryption::SelfManaged(enc)) => {
-            req = req
-                .with_header(
-                    "X-Bz-Server-Side-Encryption-Customer-Algorithm",
-                    &enc.algorithm.to_string()
-                )?
-                .with_header(
-                    "X-Bz-Server-Side-Encryption-Customer-Key",
-                    &enc.key
-                )?
-                .with_header(
-                    "X-Bz-Server-Side-Encryption-Customer-Key-Md5",
-                    &enc.digest
-                )?;
-        },
-        _ => {},
+    if let Some(enc) = upload.encryption {
+        if let Some(headers) = enc.to_headers() {
+            for (header, value) in headers.into_iter() {
+                req = req.with_header(header, &value)?;
+            }
+        }
     }
 
     let res = req.with_body(data).send().await?;
 
     let file: B2Result<File> = serde_json::from_slice(&res)?;
     file.into()
+}
+
+/// A request to upload part of a large file.
+#[derive(Clone)]
+pub struct UploadFilePart<'a> {
+    part_number: u16,
+    content_sha1: &'a str,
+    encryption: Option<ServerSideEncryption>,
+}
+
+impl<'a> UploadFilePart<'a> {
+    pub fn builder() -> UploadFilePartBuilder<'a> {
+        UploadFilePartBuilder::default()
+    }
+
+    /// Create a request to upload the next part.
+    pub fn create_next_part(mut self, sha1_checksum: Option<&'a str>)
+    -> Result<Self, ValidationError> {
+        self.content_sha1 = sha1_checksum.unwrap_or("do_not_verify");
+
+        if self.part_number < 10_000 {
+            self.part_number += 1;
+            Ok(self)
+        } else {
+            Err(ValidationError::OutOfBounds(
+                "The maximum part number is 10,000.".into()
+            ))
+        }
+    }
+}
+
+/// A builder for an [UploadFilePart] request.
+pub struct UploadFilePartBuilder<'a> {
+    part_number: u16,
+    content_sha1: &'a str,
+    encryption: Option<ServerSideEncryption>,
+}
+
+impl<'a> Default for UploadFilePartBuilder<'a> {
+    fn default() -> Self {
+        Self {
+            part_number: 1,
+            content_sha1: "do_not_verify",
+            encryption: None,
+        }
+    }
+}
+
+impl<'a> UploadFilePartBuilder<'a> {
+    /// Set the number of this part.
+    ///
+    /// Part numbers increment from 1 to 10,000 inclusive and will be clamped to
+    /// that range if necessary.
+    pub fn part_number(mut self, num: u16) -> Self {
+        use std::cmp::Ord as _;
+
+        self.part_number = num.clamp(1, 10_000);
+        self
+    }
+
+    /// The SHA1 checkum of this part of the file.
+    ///
+    /// If not provided, the file part will not be immediately verified. The
+    /// SHA1 checksums are required to [finish the file
+    /// upload](finish_large_file_upload), so they will be verified either when
+    /// you upload the part or at the end of the process.
+    pub fn part_sha1_checksum(mut self, sha1: &'a str) -> Self {
+        self.content_sha1 = sha1;
+        self
+    }
+
+    /// Set the encryption settings for the source file.
+    ///
+    /// This must match the settings passed to [start_large_file].
+    pub fn server_side_encryption(mut self, encryption: ServerSideEncryption)
+    -> Self {
+        self.encryption = Some(encryption);
+        self
+    }
+
+    /// Create an [UploadFilePart] request to pass to [upload_file_part].
+    pub fn build(self) -> UploadFilePart<'a> {
+        UploadFilePart {
+            part_number: self.part_number,
+            content_sha1: self.content_sha1,
+            encryption: self.encryption,
+        }
+    }
 }
 
 /// Upload a part of a large file to B2.
@@ -3769,25 +3846,12 @@ pub async fn upload_file<C, E>(
 // TODO: Stream-based data upload to avoid requiring all data be in RAM at once.
 pub async fn upload_file_part<C, E>(
     auth: &mut UploadPartAuthorization<'_, '_, C, E>,
-    part_num: u16,
-    sha1_checksum: Option<impl AsRef<str>>,
+    upload: &UploadFilePart<'_>,
     data: &[u8],
 ) -> Result<FilePart, Error<E>>
     where C: HttpClient<Error=Error<E>>,
           E: fmt::Debug + fmt::Display,
 {
-    #[allow(clippy::manual_range_contains)]
-    if part_num < 1 || part_num > 10000 {
-        return Err(ValidationError::OutOfBounds(format!(
-            "part_num must be between 1 and 10,000 inclusive. Was {}", part_num
-        )).into());
-    }
-
-    let sha1 = match sha1_checksum {
-        Some(ref sha1) => sha1.as_ref(),
-        None => "do_not_verify",
-    };
-
     // Unwrap safety: an `UploadPartAuthorization` can only be created from
     // `get_upload_part_authorization`, which will always embed an
     // `Authorization` reference before returning.
@@ -3795,14 +3859,20 @@ pub async fn upload_file_part<C, E>(
 
     require_capability!(inner_auth, Capability::WriteFiles);
 
-    let req = inner_auth.client.post(&auth.upload_url)
+    let mut req = inner_auth.client.post(&auth.upload_url)
         .expect("Invalid URL")
         .with_header("Authorization", &auth.authorization_token).unwrap()
-        .with_header("X-Bz-Part-Number", &part_num.to_string())?
+        .with_header("X-Bz-Part-Number", &upload.part_number.to_string())?
         .with_header("Content-Length", &data.len().to_string())?
-        .with_header("X-Bz-Content-Sha1", sha1)?;
+        .with_header("X-Bz-Content-Sha1", upload.content_sha1)?;
 
-    // TODO: Encryption headers.
+    if let Some(enc) = &upload.encryption {
+        if let Some(headers) = enc.to_headers() {
+            for (header, value) in headers.into_iter() {
+                req = req.with_header(header, &value)?;
+            }
+        }
+    }
 
     let res = req.with_body(data).send().await?;
 
@@ -4303,19 +4373,19 @@ mod tests_mocked {
         let data1: Vec<u8> = [b'a'].iter().cycle().take(5*1024*1024)
             .cloned().collect();
 
-        let _part1 = upload_file_part(
-            &mut upload_auth,
-            1,
-            Some("61b8d6600ac94d912874f569a9341120f680c9f8"),
-            &data1
-        ).await?;
+        let upload = UploadFilePart::builder()
+            .part_number(1)
+            .part_sha1_checksum("61b8d6600ac94d912874f569a9341120f680c9f8")
+            .build();
 
-        let _part2 = upload_file_part(
-            &mut upload_auth,
-            2,
-            Some("924f61661a3472da74307a35f2c8d22e07e84a4d"),
-            b"bcd"
-        ).await?;
+
+        let _part1 = upload_file_part(&mut upload_auth, &upload, &data1).await?;
+
+        let upload = upload.create_next_part(
+            Some("924f61661a3472da74307a35f2c8d22e07e84a4d")
+        )?;
+
+        let _part2 = upload_file_part(&mut upload_auth, &upload, b"bcd").await?;
 
         let file = finish_large_file_upload(
             &mut auth,
@@ -4509,19 +4579,19 @@ mod tests_mocked {
             let data1: Vec<u8> = [b'a'].iter().cycle().take(5*1024*1024)
                 .cloned().collect();
 
-            let _part1 = upload_file_part(
-                &mut upload_auth,
-                1,
-                Some("61b8d6600ac94d912874f569a9341120f680c9f8"),
-                &data1
-            ).await?;
+            let upload = UploadFilePart::builder()
+                .part_sha1_checksum("61b8d6600ac94d912874f569a9341120f680c9f8")
+                .build();
 
-            let _part2 = upload_file_part(
-                &mut upload_auth,
-                2,
-                Some("924f61661a3472da74307a35f2c8d22e07e84a4d"),
-                b"bcd"
-            ).await?;
+            let _part1 = upload_file_part(&mut upload_auth, &upload, &data1)
+                .await?;
+
+            let upload = upload.create_next_part(
+                Some("924f61661a3472da74307a35f2c8d22e07e84a4d")
+            )?;
+
+            let _part2 = upload_file_part(&mut upload_auth, &upload, b"bcd")
+                .await?;
 
             file
         };
