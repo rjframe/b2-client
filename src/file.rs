@@ -3370,8 +3370,8 @@ impl<'a> UploadFile<'a> {
 
 /// A builder to create an [UploadFile] request.
 ///
-/// The [file_name](Self::file_name), [content_type](Self::content_type), and
-/// [sha1_checksum](Self::sha1_checksum) are required.
+/// The [file_name](Self::file_name) and [sha1_checksum](Self::sha1_checksum)
+/// are required.
 ///
 /// The combined length limit of
 /// [content_disposition](Self::content_disposition),
