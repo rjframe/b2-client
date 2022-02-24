@@ -470,6 +470,10 @@ pub struct Key {
 impl Key {
     /// The name assigned to this key.
     pub fn key_name(&self) -> &str { &self.key_name }
+    /// The application key ID. This, combined with the secret returned when the
+    /// key was created, allows you to create an [Authorization] token to make
+    /// API calls.
+    pub fn key_id(&self) -> &str { &self.application_key_id }
     /// The list of capabilities granted by this key.
     pub fn capabilities(&self) -> &[Capability] { &self.capabilities }
     /// The account this key is for.
