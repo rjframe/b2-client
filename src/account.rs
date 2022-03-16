@@ -76,6 +76,9 @@ impl<C> Authorization<C>
         }
     }
 
+    /// The authorization token used for Backblaze requests.
+    pub fn authorization_token(&self) -> &str { &self.authorization_token }
+
     /// The ID for the account.
     pub fn account_id(&self) -> &str { &self.account_id }
     /// The capabilities granted to this auth token.
