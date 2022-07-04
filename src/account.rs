@@ -220,6 +220,8 @@ pub enum Capability {
     ReadFileRetentions,
     WriteFileRetentions,
     BypassGovernance,
+    ReadBucketReplications,
+    WriteBucketReplications,
 }
 
 /// Log onto the B2 API.
@@ -432,7 +434,9 @@ impl CreateKeyBuilder {
                     | Capability::WriteFileLegalHolds
                     | Capability::ReadFileRetentions
                     | Capability::WriteFileRetentions
-                    | Capability::BypassGovernance => {},
+                    | Capability::BypassGovernance
+                    | Capability::ReadBucketReplications
+                    | Capability::WriteBucketReplications => {},
                     cap => return Err(ValidationError::Incompatible(format!(
                         "Invalid capability when bucket_id is set: {:?}",
                         cap
