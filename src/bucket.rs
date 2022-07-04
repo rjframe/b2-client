@@ -984,6 +984,7 @@ pub struct Bucket {
 
 impl Bucket {
     pub fn account_id(&self) -> &str { &self.account_id }
+    pub fn bucket_id(&self) -> &str { &self.bucket_id }
     pub fn name(&self) -> &str { &self.bucket_name }
     pub fn bucket_type(&self) -> BucketType { self.bucket_type }
     pub fn info(&self) -> &serde_json::Value { &self.bucket_info }
