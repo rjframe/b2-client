@@ -24,7 +24,7 @@ const B2_AUTH_URL: &str = "https://api.backblazeb2.com/b2api/v2/";
 /// [authorize_account].
 ///
 /// The token is valid for no more than 24 hours.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Authorization<C>
     where C: HttpClient,
 {
