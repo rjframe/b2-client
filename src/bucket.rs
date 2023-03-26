@@ -52,7 +52,7 @@ impl fmt::Display for BucketType {
 }
 
 /// A valid CORS operation for B2 buckets.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[non_exhaustive]
 pub enum CorsOperation {
     #[serde(rename = "b2_download_file_by_name")]
@@ -80,7 +80,7 @@ pub enum CorsOperation {
 ///
 /// See <https://www.backblaze.com/b2/docs/cors_rules.html> for further
 /// information on CORS and file access via the B2 service.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CorsRule {
     cors_rule_name: String,
@@ -594,7 +594,7 @@ impl ServerSideEncryption {
 ///
 /// Use [CreateBucketBuilder] to create a `CreateBucket`, then pass it to
 /// [create_bucket].
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateBucket<'a> {
     // account_id is provided by an Authorization.
