@@ -271,7 +271,7 @@ impl FileRetentionSetting {
 pub struct FileRetention {
     #[serde(rename = "isClientAuthorizedToRead")]
     can_read: bool,
-    value: FileRetentionSetting,
+    value: Option<FileRetentionSetting>,
 }
 
 impl FileRetention {
@@ -280,7 +280,7 @@ impl FileRetention {
     /// If not authorized to read the settings, returns `None`.
     pub fn settings(&self) -> Option<FileRetentionSetting> {
         if self.can_read {
-            Some(self.value)
+            self.value
         } else {
             None
         }
